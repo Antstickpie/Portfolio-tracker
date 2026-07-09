@@ -1,0 +1,338 @@
+<div class="animate-fade-in">
+  <!-- Header Controls -->
+  <div class="glass-card ledger-header">
+    <div class="header-left">
+      <h1>Transaction Ledger</h1>
+      <p class="subtitle">Click on any row to expand it and configure direct ownership splits.</p>
+    </div>
+    <div class="header-right button-group">
+      <button class="btn btn-secondary" (click)="showAddForm.set(!showAddForm())">
+        {{ showAddForm() ? 'Hide Add Form' : 'Add Manual Transaction' }}
+      </button>
+      <button class="btn btn-danger" (click)="clearAllTransactions()">
+        Clear All Ledger
+      </button>
+    </div>
+  </div>
+
+  <!-- Add Transaction Form -->
+  <div class="glass-card add-form-card animate-fade-in" *ngIf="showAddForm()">
+    <h3>Add Manual Transaction</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="datetime-local" [(ngModel)]="newTx.date">
+      </div>
+      <div class="form-group">
+        <label>Ticker</label>
+        <input type="text" placeholder="e.g. SOFI" [(ngModel)]="newTx.ticker" class="upper">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select [(ngModel)]="newTx.type">
+          <option value="BUY">BUY (Stock)</option>
+          <option value="SELL">SELL (Stock)</option>
+          <option value="DIVIDEND">DIVIDEND (Stock)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" placeholder="0" [(ngModel)]="newTx.quantity" min="0" step="any">
+      </div>
+      <div class="form-group">
+        <label>Price</label>
+        <input type="number" placeholder="0.00" [(ngModel)]="newTx.price" min="0" step="any">
+      </div>
+      <div class="form-group">
+        <label>Total Amount</label>
+        <input type="number" placeholder="0.00" [(ngModel)]="newTx.totalAmount" min="0" step="any">
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <input type="text" placeholder="USD" [(ngModel)]="newTx.currency" class="upper">
+      </div>
+      <div class="form-group">
+        <label>FX Rate (Base/Tx)</label>
+        <input type="number" placeholder="1.0" [(ngModel)]="newTx.fxRate" min="0.0001" step="any">
+      </div>
+      <div class="form-group">
+        <label>Account / Source</label>
+        <input type="text" placeholder="e.g. Account 1" [(ngModel)]="newTxSource">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" (click)="submitManualTx()">Submit Transaction</button>
+      <button class="btn btn-secondary" (click)="showAddForm.set(false)">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Filters Panel -->
+  <div class="glass-card filters-card">
+    <div class="filters-grid">
+      <div class="form-group">
+        <label>Search Ticker</label>
+        <input type="text" placeholder="Filter by symbol..." [(ngModel)]="filterTicker" class="upper">
+      </div>
+      <div class="form-group">
+        <label>Transaction Type</label>
+        <select [(ngModel)]="filterType">
+          <option value="">All Types</option>
+          <option value="BUY">BUY</option>
+          <option value="SELL">SELL</option>
+          <option value="DIVIDEND">DIVIDEND</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Source / Broker</label>
+        <input type="text" placeholder="Filter by source..." [(ngModel)]="filterSource">
+      </div>
+      <div class="form-group">
+        <label>Audit Currency</label>
+        <div class="currency-toggle" style="margin-top: 0.25rem;">
+          <button 
+            class="currency-btn" 
+            [class.active]="displayCurrency() === 'EUR'" 
+            (click)="displayCurrency.set('EUR')">
+            € EUR
+          </button>
+          <button 
+            class="currency-btn" 
+            [class.active]="displayCurrency() === 'USD'" 
+            (click)="displayCurrency.set('USD')">
+            $ USD
+          </button>
+        </div>
+      </div>
+      <div class="form-group check-field" style="align-self: center; margin-top: 1.2rem; display: flex; gap: 1.5rem; align-items: center;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none;">
+          <input 
+            type="checkbox" 
+            [ngModel]="showCashTopUp()" 
+            (ngModelChange)="showCashTopUp.set($event)"
+            style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+          Show Cash Transactions
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none;">
+          <input 
+            type="checkbox" 
+            [ngModel]="service.showNameTransactions()" 
+            (ngModelChange)="service.showNameTransactions.set($event); service.saveToStorage()"
+            style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+          Show Company Name
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grouped Transactions Tables -->
+  <div class="glass-card table-card account-card animate-fade-in" *ngFor="let group of transactionsByAccount()">
+    <div class="account-table-header">
+      <h3 (click)="toggleAccountCollapse(group.name)" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+        {{ group.name }}
+        <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isAccountCollapsed(group.name) ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+      </h3>
+      <div style="display: flex; align-items: center; gap: 0.8rem;">
+        <span class="badge badge-success" style="font-family: monospace; font-weight: bold; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.25); color: var(--success); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem;">
+          Current Account Value: {{ getAccountCurrentValue(group.name) }}
+        </span>
+        <span class="badge badge-info">{{ group.list.length }} Transactions</span>
+      </div>
+    </div>
+    <div class="table-container" *ngIf="!isAccountCollapsed(group.name)">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 40px"></th>
+            <th (click)="setSort('date')" style="cursor: pointer; user-select: none;">
+              Date <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'date'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
+              Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('name')" style="cursor: pointer; user-select: none;" *ngIf="service.showNameTransactions()">
+              Company Name <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'name'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="center" (click)="setSort('type')" style="cursor: pointer; user-select: none;">
+              Type <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'type'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('quantity')" style="cursor: pointer; user-select: none;">
+              Qty (Total) <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'quantity'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('price')" style="cursor: pointer; user-select: none;">
+              Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'price'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('totalAmount')" style="cursor: pointer; user-select: none;">
+              Total Amount <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalAmount'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th style="min-width: 170px;">Ownership Split Summary</th>
+            <th class="center">Toggle Ownership</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let tx of group.list">
+            <!-- Main Row -->
+            <tr 
+              class="ledger-row-main" 
+              [class.expanded]="expandedTxId() === tx.id"
+              [class.split-row]="isSplit(tx)"
+              (click)="toggleExpand(tx.id)">
+              <td class="center arrow-cell">
+                <span class="arrow-icon">{{ expandedTxId() === tx.id ? '▼' : '▶' }}</span>
+              </td>
+              <td class="text-sm font-mono whitespace-nowrap">{{ tx.date | date:service.dateFormat() }}</td>
+              <td class="bold-ticker">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                  <img 
+                    [src]="service.getLogoData(tx.ticker)" 
+                    (error)="service.onLogoError(tx.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                    *ngIf="tx.ticker && service.hasLogo(tx.ticker) && !service.shouldShowPlaceholder(tx.ticker)">
+                  <div 
+                    *ngIf="tx.ticker && service.hasLogo(tx.ticker) && service.shouldShowPlaceholder(tx.ticker)"
+                    [style.background]="service.getTickerColor(tx.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                    {{ tx.ticker.slice(0, 2) }}
+                  </div>
+                  <span>{{ tx.ticker || '-' }}</span>
+                </div>
+              </td>
+              <td class="text-sm text-muted" *ngIf="service.showNameTransactions()">{{ service.tickerConfigs()[tx.ticker]?.name || tx.ticker }}</td>
+              <td>
+                <span class="badge" [ngClass]="getTypeBadgeClass(tx.type)">
+                  {{ tx.type }}
+                </span>
+              </td>
+              <td class="num font-mono">{{ tx.quantity | number:'1.0-6' }}</td>
+              <td class="num font-mono">{{ tx.price | currency:tx.currency:'symbol':'1.2-2' }}</td>
+              <td class="num font-mono bold">{{ tx.totalAmount | currency:tx.currency:'symbol':'1.2-2' }}</td>
+              
+              <!-- Ownership Split Summary Column -->
+              <td style="min-width: 170px;">
+                <div class="allocation-summary-pill" *ngIf="tx.type === 'BUY' || tx.type === 'SELL' || tx.type === 'DIVIDEND'">
+                  <span class="owner-pill pill-a" [style.width.%]="getPillWidth(tx, 'A')" *ngIf="tx.type === 'DIVIDEND' ? tx.personACostBasis > 0 : tx.personAShares > 0">
+                    {{ getPillLabel(tx, 'A') }}
+                  </span>
+                  <span class="owner-pill pill-b" [style.width.%]="getPillWidth(tx, 'B')" *ngIf="tx.type === 'DIVIDEND' ? tx.personBCostBasis > 0 : tx.personBShares > 0">
+                    {{ getPillLabel(tx, 'B') }}
+                  </span>
+                </div>
+              </td>
+
+              <td class="center" (click)="$event.stopPropagation()">
+                <button class="btn btn-secondary btn-sm" (click)="toggleOwner(tx, $event)" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem; margin: 0 auto;" title="Quick toggle 100% ownership between partners">
+                  ⇄ Swap
+                </button>
+              </td>
+            </tr>
+
+            <!-- Expanded Details Drawer -->
+            <tr *ngIf="expandedTxId() === tx.id" class="drawer-row" (click)="$event.stopPropagation()">
+              <td [attr.colspan]="service.showNameTransactions() ? 10 : 9">
+                <div class="drawer-content animate-fade-in">
+                  <div class="drawer-title">
+                    <h4>Configure Ownership Splits</h4>
+                    <span class="tx-subtitle">
+                      {{ tx.type }} {{ tx.quantity > 0 ? (tx.quantity + ' shares of ' + tx.ticker) : '' }} on {{ tx.date | date:service.dateFormat() }}. Total: {{ tx.totalAmount | currency:tx.currency }}
+                    </span>
+                  </div>
+
+                  <div class="split-controls">
+                    <!-- Mode Selector -->
+                    <div class="mode-selector-group">
+                      <label class="control-label">Allocation Mode</label>
+                      <div class="segmented-control">
+                        <button 
+                          class="segment-btn" 
+                          [class.active]="getAllocationMode(tx) === 'allA'"
+                          (click)="setAllocationMode(tx, 'allA')">
+                          100% {{ service.personAName() }}
+                        </button>
+                        <button 
+                          class="segment-btn" 
+                          [class.active]="getAllocationMode(tx) === 'allB'"
+                          (click)="setAllocationMode(tx, 'allB')">
+                          100% {{ service.personBName() }}
+                        </button>
+                        <button 
+                          class="segment-btn" 
+                          [class.active]="getAllocationMode(tx) === 'split'"
+                          (click)="setAllocationMode(tx, 'split')">
+                          Custom Split
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Split input fields -->
+                    <div class="split-inputs-panel animate-fade-in" *ngIf="getAllocationMode(tx) === 'split'">
+                      <div class="split-input-field">
+                        <label class="control-label">Shares owned by {{ service.personBName() }}</label>
+                        <div class="input-with-limit">
+                          <input 
+                            type="number" 
+                            [value]="tx.personBShares" 
+                            (input)="onSharesSplitChange(tx, $event)"
+                            step="any"
+                            min="0" 
+                            [max]="tx.quantity"
+                            class="split-number-input">
+                          <span class="limit-label">/ {{ tx.quantity }} max shares</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Proportional Output Table -->
+                    <div class="proportional-outputs">
+                      <div class="owner-output-card a-card">
+                        <span class="owner-icon-indicator"></span>
+                        <div class="output-details">
+                          <div class="owner-header-name">{{ service.personAName() }}</div>
+                          <div class="output-stats">
+                            <span>
+                              Shares: <strong>{{ tx.personAShares | number:'1.0-6' }}</strong> ({{ getSharePct(tx, 'A') | number:'1.0-0' }}%)
+                            </span>
+                            <span>
+                              Cost Basis: <strong>{{ tx.personACostBasis | currency:tx.currency:'symbol':'1.2-2' }}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="owner-output-card b-card">
+                        <span class="owner-icon-indicator"></span>
+                        <div class="output-details">
+                          <div class="owner-header-name">{{ service.personBName() }}</div>
+                          <div class="output-stats">
+                            <span>
+                              Shares: <strong>{{ tx.personBShares | number:'1.0-6' }}</strong> ({{ getSharePct(tx, 'B') | number:'1.0-0' }}%)
+                            </span>
+                            <span>
+                              Cost Basis: <strong>{{ tx.personBCostBasis | currency:tx.currency:'symbol':'1.2-2' }}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="drawer-actions" style="display: flex; justify-content: space-between; width: 100%;">
+                    <button class="btn btn-danger btn-sm" (click)="deleteTx(tx.id); $event.stopPropagation();" title="Permanently delete this transaction from the ledger" style="padding: 0.35rem 0.8rem; font-size: 0.75rem;">
+                      Delete Transaction
+                    </button>
+                    <button class="btn btn-secondary btn-sm" (click)="toggleExpand(tx.id)">
+                      Close Detail
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Empty state if no groups exist -->
+  <div class="glass-card empty-card" *ngIf="transactionsByAccount().length === 0">
+    <p class="empty-state">No transactions in ledger. Use the "Import Data" tab or the form above to add some.</p>
+  </div>
+</div>

@@ -1,0 +1,99 @@
+<div class="app-frame">
+  <!-- Navigation Header -->
+  <header class="app-navbar glass-card">
+    <div class="nav-logo">
+      <span class="logo-icon">&#9650;</span>
+      <span class="logo-text">PORTFOLIO <span class="logo-sub">TRACKER</span></span>
+    </div>
+    
+    <nav class="nav-tabs">
+      <button 
+        class="nav-tab-btn" 
+        [class.active]="activeTab() === 'dashboard'" 
+        (click)="switchTab('dashboard')">
+        <span class="tab-icon">&#9638;</span> Dashboard
+      </button>
+      <button 
+        class="nav-tab-btn" 
+        [class.active]="activeTab() === 'import'" 
+        (click)="switchTab('import')">
+        <span class="tab-icon">&#8677;</span> Import Data
+      </button>
+      <button 
+        class="nav-tab-btn" 
+        [class.active]="activeTab() === 'ledger'" 
+        (click)="switchTab('ledger')">
+        <span class="tab-icon">&#9783;</span> Transaction Ledger
+      </button>
+      <button 
+        class="nav-tab-btn" 
+        [class.active]="activeTab() === 'prices'" 
+        (click)="switchTab('prices')">
+        <span class="tab-icon">&#9881;</span> Settings & Market Rates
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Content Body -->
+  <main class="app-main-content">
+    <app-dashboard *ngIf="activeTab() === 'dashboard'"></app-dashboard>
+    <app-import *ngIf="activeTab() === 'import'"></app-import>
+    <app-transactions *ngIf="activeTab() === 'ledger'"></app-transactions>
+    <app-prices *ngIf="activeTab() === 'prices'"></app-prices>
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="app-footer">
+    <p>Portfolio Tracker &copy; 2026. Data stored locally in browser.</p>
+  </footer>
+</div>
+
+<!-- Global Custom Toast Notifications -->
+<div class="toast-container">
+  <div 
+    *ngFor="let toast of service.toasts()" 
+    class="toast-item glass-card animate-slide-in"
+    [class]="toast.type">
+    <span class="toast-icon" *ngIf="toast.type === 'success'">✓</span>
+    <span class="toast-icon" *ngIf="toast.type === 'error'">✕</span>
+    <span class="toast-icon" *ngIf="toast.type === 'info'">ℹ</span>
+    <span class="toast-message">{{ toast.message }}</span>
+  </div>
+</div>
+
+<!-- Global Custom Confirmation Modal overlay -->
+<div class="modal-backdrop-overlay animate-fade-in" *ngIf="service.confirmModal() as modal">
+  <div class="modal-content-card glass-card animate-scale-in">
+    <div class="modal-header">
+      <h3>{{ modal.title }}</h3>
+    </div>
+    <div class="modal-body">
+      <p>{{ modal.message }}</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" (click)="modal.resolve(false); service.confirmModal.set(null)">
+        Cancel
+      </button>
+      <button class="btn btn-primary btn-sm" (click)="modal.resolve(true); service.confirmModal.set(null)">
+        Confirm
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Global Custom Alert Modal overlay -->
+<div class="modal-backdrop-overlay animate-fade-in" *ngIf="service.alertModal() as modal">
+  <div class="modal-content-card glass-card animate-scale-in">
+    <div class="modal-header">
+      <h3>{{ modal.title }}</h3>
+    </div>
+    <div class="modal-body">
+      <p>{{ modal.message }}</p>
+    </div>
+    <div class="modal-actions" style="justify-content: flex-end;">
+      <button class="btn btn-primary btn-sm" (click)="modal.resolve()">
+        OK
+      </button>
+    </div>
+  </div>
+</div>

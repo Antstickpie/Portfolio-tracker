@@ -1,0 +1,391 @@
+.ledger-header {
+  margin-bottom: 2rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+/* Add Manual Transaction styling */
+.add-form-card {
+  margin-bottom: 1.5rem;
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.add-form-card h3 {
+  margin-bottom: 1rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+/* Filters card */
+.filters-card {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.5rem !important;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Table styles */
+.ledger-row-main {
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.ledger-row-main:hover {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.ledger-row-main.expanded {
+  background: rgba(99, 102, 241, 0.03) !important;
+  border-left: 3px solid var(--primary);
+}
+
+.arrow-cell {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.bold-ticker {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+.num {
+  text-align: right;
+}
+
+.bold {
+  font-weight: 600;
+}
+
+.font-mono {
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.btn-delete-row {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-delete-row:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.truncate-cell {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.split-row {
+  border-left: 2px solid var(--secondary);
+}
+
+/* Allocation Summary Pill Chart in table */
+.allocation-summary-pill {
+  display: flex;
+  height: 20px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.owner-pill {
+  text-align: center;
+  color: #0b0f19;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 0.3rem;
+}
+
+.pill-a {
+  background: var(--primary);
+}
+
+.pill-b {
+  background: var(--secondary);
+}
+
+/* Expandable row content */
+.drawer-row {
+  background: rgba(15, 23, 42, 0.8) !important;
+}
+
+.drawer-content {
+  padding: 1.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin: 0.5rem 1rem;
+  background: rgba(20, 26, 40, 0.5);
+}
+
+.drawer-title {
+  margin-bottom: 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 0.5rem;
+}
+
+.drawer-title h4 {
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.tx-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.split-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.control-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+/* Segmented Control Mode Selector */
+.segmented-control {
+  display: flex;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  width: fit-content;
+}
+
+.segment-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.segment-btn.active {
+  background: var(--primary);
+  color: #0b0f19;
+  font-weight: 600;
+}
+
+/* Number inputs panels */
+.split-inputs-panel {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  width: fit-content;
+  min-width: 320px;
+}
+
+.input-with-limit {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.split-number-input {
+  width: 130px;
+  font-family: 'Consolas', monospace;
+}
+
+.limit-label {
+  font-size: 0.8rem;
+  color: var(--text-dark);
+}
+
+/* Proportional outputs visualization cards */
+.proportional-outputs {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.owner-output-card {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(17, 24, 39, 0.3);
+}
+
+.owner-icon-indicator {
+  width: 8px;
+  height: 40px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.a-card .owner-icon-indicator { background: var(--primary); }
+.b-card .owner-icon-indicator { background: var(--secondary); }
+
+.output-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.owner-header-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.output-stats {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.output-stats strong {
+  color: var(--text-main);
+  font-family: 'Consolas', monospace;
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 1rem;
+}
+
+.method-text {
+  font-size: 0.75rem;
+}
+
+.method-text strong {
+  color: var(--primary);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3rem;
+  font-style: italic;
+}
+
+/* Grouped Accounts layout styles */
+.account-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.2rem 0;
+}
+
+.account-card .table-container {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+
+.account-table-header h3 {
+  font-size: 1.05rem;
+  color: var(--primary);
+  margin: 0;
+  font-weight: 600;
+}
+
+.table-card.account-card {
+  margin-top: 1.5rem;
+}
+
+.currency-toggle {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0.2rem;
+  border-radius: 8px;
+  display: flex;
+  border: 1px solid var(--card-border);
+  width: fit-content;
+}
+
+.currency-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.35rem 0.8rem;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.currency-btn:hover {
+  color: var(--text-main);
+}
+
+.currency-btn.active {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: #0b0f19;
+  font-weight: 600;
+}

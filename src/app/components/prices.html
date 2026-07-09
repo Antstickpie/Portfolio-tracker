@@ -1,0 +1,207 @@
+<div class="animate-fade-in">
+  <div class="glass-card settings-header">
+    <h1>Settings & Market Rates</h1>
+    <p class="subtitle">Customize portfolio owner names, manage stock pricing, and set sector classifications.</p>
+  </div>
+
+  <div class="settings-grid">
+    <!-- General Settings Manager -->
+    <div class="glass-card names-card">
+      <h3>General Settings</h3>
+      <p class="subtitle">Customize owner names and global preferences.</p>
+      
+      <div class="form-group">
+        <label>Person A Name</label>
+        <input type="text" [(ngModel)]="personANameInput" placeholder="Person A">
+      </div>
+      
+      <div class="form-group" style="margin-top: 1.2rem;">
+        <label>Person B Name</label>
+        <input type="text" [(ngModel)]="personBNameInput" placeholder="Person B">
+      </div>
+      
+      <div class="form-group" style="margin-top: 1.2rem;">
+        <label>Date Format</label>
+        <select 
+          [ngModel]="service.dateFormat()" 
+          (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()"
+          style="width: 100%; padding: 0.55rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer;">
+          <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
+          <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
+          <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
+          <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
+        </select>
+      </div>
+      
+      <div style="margin-top: 1.8rem; margin-bottom: 0.5rem; display: flex; justify-content: flex-start;">
+        <button class="btn btn-primary btn-sm" (click)="saveOwnerNames()">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- Backup & Restore Manager -->
+    <div class="glass-card backup-card">
+      <h3>Backup & Restore Database</h3>
+      <p class="subtitle">Download all transaction ledgers and settings to a JSON file, or restore from a backup.</p>
+      
+      <div class="settings-action-row">
+        <div class="action-details">
+          <h4>Export Portfolio</h4>
+          <p class="action-desc">Download a copy of your transactions and settings as a JSON file.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" (click)="exportPortfolioBackup()">
+          Download Backup (.json)
+        </button>
+      </div>
+
+      <div class="settings-action-row" style="margin-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1.5rem;">
+         <div class="action-details">
+           <h4>Import Backup</h4>
+           <p class="action-desc">Restore transaction ledgers and templates from a backup file.</p>
+         </div>
+         <div class="file-upload-wrapper">
+           <input 
+             type="file" 
+             accept=".json" 
+             (change)="importPortfolioBackup($event)"
+             class="file-input"
+             id="backup-upload">
+         </div>
+      </div>
+    </div>
+
+    <!-- Currency Exchange Rates Manager -->
+    <div class="glass-card rates-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
+        <h3 (click)="isRatesCollapsed.set(!isRatesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+          Currency Exchange Rates
+          <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isRatesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+        </h3>
+        <div style="display: flex; gap: 0.5rem;" *ngIf="!isRatesCollapsed()">
+          <button class="btn btn-secondary btn-sm" (click)="loadExchangeRatesApi(false)">Refresh Rates</button>
+          <button class="btn btn-primary btn-sm" (click)="loadExchangeRatesApi(true)">Force Refresh</button>
+          <button 
+            class="btn btn-sm" 
+            [class.btn-primary]="isEditingRates()" 
+            [class.btn-secondary]="!isEditingRates()"
+            (click)="isEditingRates.set(!isEditingRates())">
+            {{ isEditingRates() ? 'Save' : 'Edit' }}
+          </button>
+        </div>
+      </div>
+      <p class="subtitle" *ngIf="!isRatesCollapsed()">Customize or refresh the conversion rates between USD, EUR, and GBP dynamically.</p>
+      
+      <div class="table-container rates-table" style="margin-top: 1rem; max-height: 250px; overflow-y: auto;" *ngIf="!isRatesCollapsed()">
+        <table>
+          <thead>
+            <tr>
+              <th>Currency Pair</th>
+              <th style="text-align: right; padding-right: 1.5rem;">Exchange Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let pair of exchangeRatePairs()">
+              <td class="bold-ticker">{{ pair.name }}</td>
+              <td style="text-align: right; padding-right: 1.5rem; vertical-align: middle;">
+                <input 
+                  *ngIf="isEditingRates()"
+                  type="number" 
+                  step="0.0001"
+                  [ngModel]="pair.rate" 
+                  (ngModelChange)="updateExchangeRate(pair.key, $event)"
+                  class="table-inline-input price-input"
+                  style="width: 100px; text-align: right; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 0.2rem 0.4rem; color: #fff;">
+                <span *ngIf="!isEditingRates()" class="font-mono" style="font-size: 0.9rem; padding-right: 0.4rem; font-weight: bold; color: var(--text-main);">
+                  {{ pair.rate.toFixed(4) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ticker Metadata Pricing Card -->
+  <div class="glass-card prices-card">
+    <div class="prices-header">
+      <div>
+        <h3 (click)="isPricesCollapsed.set(!isPricesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+          Current Stock Prices & Sectors
+          <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isPricesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+        </h3>
+        <p class="subtitle" *ngIf="!isPricesCollapsed()">These rates are used to calculate current valuation and unrealized returns.</p>
+      </div>
+      <div class="catalog-actions" style="display: flex; gap: 0.5rem; align-items: center;" *ngIf="!isPricesCollapsed()">
+        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none; margin-right: 0.5rem;">
+          <input 
+            type="checkbox" 
+            [ngModel]="service.showNameColumn()" 
+            (ngModelChange)="service.showNameColumn.set($event); service.saveToStorage()" 
+            style="cursor: pointer; accent-color: var(--primary);">
+          Show Company Name
+        </label>
+        <input 
+          type="text" 
+          placeholder="Search ticker..." 
+          [ngModel]="filterTicker()" 
+          (ngModelChange)="filterTicker.set($event)" 
+          class="dashboard-search-input upper"
+          style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text-main); font-size: 0.8rem; width: 140px; outline: none; transition: border-color 0.2s;"
+          onfocus="this.style.borderColor='var(--primary)'"
+          onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'">
+        <button class="btn btn-secondary btn-sm" (click)="loadMarketPricesApi(false)">Refresh Prices</button>
+        <button class="btn btn-primary btn-sm" (click)="loadMarketPricesApi(true)">Force Refresh</button>
+      </div>
+    </div>
+
+    <div class="table-container prices-table" *ngIf="!isPricesCollapsed()">
+      <table>
+        <thead>
+          <tr>
+            <th (click)="setSort('name')" style="cursor: pointer; user-select: none;" *ngIf="service.showNameColumn()">
+              Company Name <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'name'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
+              Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none; text-align: left; padding-left: 1.2rem;">
+              Current Price <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; margin-top: 0.1rem; text-transform: none;">(as fetched / native currency)</span>
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('sector')" style="cursor: pointer; user-select: none;">
+              Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of filteredTickerConfigsList()">
+            <td class="text-sm text-muted" *ngIf="service.showNameColumn()">{{ t.name }}</td>
+            <td class="bold-ticker">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <img 
+                  [src]="service.getLogoData(t.ticker)" 
+                  (error)="service.onLogoError(t.ticker)"
+                  style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                  *ngIf="service.hasLogo(t.ticker) && !service.shouldShowPlaceholder(t.ticker)">
+                <div 
+                  *ngIf="service.hasLogo(t.ticker) && service.shouldShowPlaceholder(t.ticker)"
+                  [style.background]="service.getTickerColor(t.ticker)"
+                  style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                  {{ t.ticker.slice(0, 2) }}
+                </div>
+                <span>{{ t.ticker }}</span>
+              </div>
+            </td>
+            <td class="font-mono bold" style="text-align: left; padding-left: 1.2rem;">
+              {{ formatTickerPrice(t.ticker, t.currentPrice) }}
+            </td>
+            <td><span class="sector-badge">{{ t.sector }}</span></td>
+          </tr>
+          <tr *ngIf="filteredTickerConfigsList().length === 0">
+            <td [attr.colspan]="service.showNameColumn() ? 4 : 3" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

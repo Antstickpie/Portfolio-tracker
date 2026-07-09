@@ -1,0 +1,545 @@
+<div class="animate-fade-in">
+  <!-- Dashboard Controls -->
+  <div class="dashboard-header glass-card">
+    <div class="header-left">
+      <h1>Dashboard</h1>
+      <p class="subtitle">Overview of asset allocations and performance</p>
+    </div>
+    <div class="header-right">
+      <!-- Premium Date Picker Container -->
+      <div class="date-range-container">
+        <span class="date-picker-title">Period</span>
+        <div class="date-picker-wrapper">
+          <input
+            type="date"
+            #dateFromInput
+            [ngModel]="service.dateFrom()"
+            (ngModelChange)="service.dateFrom.set($event || '')"
+            class="premium-date-input"
+            title="Start date">
+          <span class="date-arrow">→</span>
+          <input
+            type="date"
+            #dateToInput
+            [ngModel]="service.dateTo()"
+            (ngModelChange)="service.dateTo.set($event || '')"
+            class="premium-date-input"
+            title="End date">
+          <button
+            *ngIf="service.dateFrom() || service.dateTo()"
+            (click)="clearDateFilter()"
+            class="date-clear-btn"
+            title="Clear date filter">✕</button>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="currency-toggle" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center;">
+          <button 
+            class="currency-btn" 
+            style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
+            [class.active]="!service.dateFrom() && !service.dateTo()"
+            (click)="clearDateFilter()">
+            All Time
+          </button>
+          <button 
+            class="currency-btn" 
+            style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
+            [class.active]="service.dateFrom() === (currentYear + '-01-01') && service.dateTo() === (currentYear + '-12-31')"
+            (click)="setThisYear()">
+            This Year
+          </button>
+          <button 
+            class="currency-btn" 
+            style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
+            [class.active]="service.dateFrom() === ((currentYear - 1) + '-01-01') && service.dateTo() === ((currentYear - 1) + '-12-31')"
+            (click)="setLastYear()">
+            Last Year
+          </button>
+        </div>
+      </div>
+
+      <!-- Switchers Wrapper (Right side) -->
+      <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: nowrap; flex-shrink: 0;">
+
+
+        <!-- Currency Toggle -->
+        <div class="currency-toggle">
+          <button 
+            class="currency-btn" 
+            [class.active]="displayCurrency() === 'EUR'" 
+            (click)="displayCurrency.set('EUR')">
+            € EUR
+          </button>
+          <button 
+            class="currency-btn" 
+            [class.active]="displayCurrency() === 'USD'" 
+            (click)="displayCurrency.set('USD')">
+            $ USD
+          </button>
+          <button 
+            class="currency-btn" 
+            [class.active]="displayCurrency() === 'native'" 
+            (click)="displayCurrency.set('native')"
+            title="Show each asset in its native currency (e.g. USD for NOW, EUR for SECO)">
+            ⇄ Native
+          </button>
+        </div>
+
+        <!-- View Tabs -->
+        <div class="tabs-control">
+          <button 
+            class="tab-btn" 
+            [class.active]="activeView() === 'combined'"
+            (click)="activeView.set('combined')">
+            Consolidated Portfolio
+          </button>
+          <button 
+            class="tab-btn" 
+            [class.active]="activeView() === 'ownerA'"
+            (click)="activeView.set('ownerA')">
+            {{ service.personAName() }}
+          </button>
+          <button 
+            class="tab-btn" 
+            [class.active]="activeView() === 'ownerB'"
+            (click)="activeView.set('ownerB')">
+            {{ service.personBName() }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="metrics-grid">
+    <!-- Net Worth / Current Value -->
+    <div class="glass-card metric-card glow-primary" (click)="scrollToTable()" title="View holdings table">
+      <div class="label">Net Worth (Stocks)</div>
+      <div class="value">{{ formatVal(summary().totalValue, 'USD') }}</div>
+      <div class="sub-value text-muted">
+        Cost Basis: <span class="white-text">{{ formatVal(summary().totalCostBasis, 'USD') }}</span>
+      </div>
+      <div class="metric-hint">▼ Holdings</div>
+    </div>
+
+    <!-- Unrealized PnL -->
+    <div class="glass-card metric-card" (click)="scrollToTable()" title="View holdings table">
+      <div class="label">Unrealized Gain / Loss</div>
+      <div class="value" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
+        {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalUnrealized, 'USD') }}
+      </div>
+      <div class="sub-value">
+        <span class="badge" [ngClass]="summary().totalUnrealized >= 0 ? 'badge-success' : 'badge-danger'">
+          {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ unrealizedPercentage() | number:'1.2-2' }}%
+        </span>
+      </div>
+      <div class="metric-hint">▼ Holdings</div>
+    </div>
+
+    <!-- Realized PnL -->
+    <div class="glass-card metric-card" (click)="scrollToTable('realized')" title="View realized ledger">
+      <div class="label">Realized Profit</div>
+      <div class="value" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'">
+        {{ summary().totalRealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalRealized, 'USD') }}
+      </div>
+      <div class="sub-value text-muted">From completed sales</div>
+      <div class="metric-hint">▼ Realized Ledger</div>
+    </div>
+
+    <!-- Accumulated Dividends -->
+    <div class="glass-card metric-card" (click)="scrollToTable()" title="View holdings table">
+      <div class="label">Accumulated Dividends</div>
+      <div class="value text-accent">{{ formatVal(summary().totalDividends, 'USD') }}</div>
+      <div class="sub-value text-muted">Paid out by holdings</div>
+      <div class="metric-hint">▼ Holdings</div>
+    </div>
+
+    <!-- Total Return -->
+    <div class="glass-card metric-card glow-secondary" (click)="scrollToTable()" title="View holdings table">
+      <div class="label">Total Return</div>
+      <div class="value" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
+        {{ summary().totalReturn >= 0 ? '+' : '' }}{{ formatVal(summary().totalReturn, 'USD') }}
+      </div>
+      <div class="sub-value text-muted">
+        All-time returns: <span class="badge badge-info">{{ totalReturnPercentage() | number:'1.2-2' }}%</span>
+      </div>
+      <div class="metric-hint">▼ Holdings</div>
+    </div>
+  </div>
+
+  <!-- Charts Header & Controls -->
+  <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 1.5rem; margin-bottom: 0.8rem; padding: 0 0.5rem;">
+    <div class="currency-toggle" style="align-items: center; gap: 0.5rem; border: none; background: transparent; padding: 0; box-shadow: none;">
+      <!-- Sector Taxonomy Toggle -->
+      <div class="currency-toggle" style="margin-right: 0.75rem;">
+        <button 
+          class="currency-btn" 
+          [class.active]="!service.useProperSectors()" 
+          (click)="service.useProperSectors.set(false)"
+          title="Use custom sector mappings">
+          Custom Sectors
+        </button>
+        <button 
+          class="currency-btn" 
+          [class.active]="service.useProperSectors()" 
+          (click)="service.useProperSectors.set(true)"
+          title="Use live Yahoo Finance sectors">
+          Market Sectors
+        </button>
+      </div>
+
+      <!-- Vertical Divider -->
+      <div style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin-right: 0.75rem; align-self: center;"></div>
+
+      <!-- Sync Button -->
+      <button 
+        class="currency-btn" 
+        (click)="refreshMarketData()" 
+        [disabled]="isRefreshing()"
+        style="display: flex; align-items: center; gap: 0.4rem; border-radius: 8px;"
+        title="Sync prices and FX rates from Yahoo Finance">
+        <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="width: 13px; height: 13px; color: var(--text-main);" *ngIf="isRefreshing()">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" style="opacity: 0.25;"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" style="opacity: 0.75;"></path>
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 13px; height: 13px;" *ngIf="!isRefreshing()">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        <span>
+          {{ isRefreshing() ? 'Syncing...' : ('Sync' + (lastRefreshTime() ? ' (' + (lastRefreshTime() | date: 'h:mm a') + ')' : '')) }}
+        </span>
+      </button>
+
+      <!-- Vertical Divider -->
+      <div style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin-left: 0.75rem; margin-right: 0.75rem; align-self: center;"></div>
+
+      <!-- Valuation Basis Toggle -->
+      <div class="currency-toggle">
+        <button 
+          class="currency-btn" 
+          [class.active]="allocationBasis() === 'cost'" 
+          (click)="allocationBasis.set('cost')">
+          Invested Money
+        </button>
+        <button 
+          class="currency-btn" 
+          [class.active]="allocationBasis() === 'value'" 
+          (click)="allocationBasis.set('value')">
+          Current Value
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="charts-row">
+    <div class="glass-card chart-card" style="position: relative;">
+      <h3>Asset Allocation</h3>
+      <div class="chart-content">
+        <div class="canvas-wrapper">
+          <canvas #assetCanvas width="460" height="320"></canvas>
+        </div>
+      </div>
+      
+      <!-- Beautiful glassmorphic overlay for asset details on hover -->
+      <div class="asset-hover-overlay animate-fade-in" *ngIf="hoveredAssetIndex() !== -1 && hoveredAssetDetail()">
+        <div class="overlay-header">
+          <span class="overlay-dot" [style.background-color]="getColor(hoveredAssetIndex())"></span>
+          <span class="overlay-title">{{ hoveredAssetDetail()?.ticker }}</span>
+        </div>
+        <div class="overlay-content">
+          <div class="overlay-detail-row">
+            <span class="detail-label">Sector:</span>
+            <span class="detail-val-badge" [title]="hoveredAssetDetail()?.sector">{{ hoveredAssetDetail()?.sector }}</span>
+          </div>
+          <div class="overlay-detail-row">
+            <span class="detail-label">Weight:</span>
+            <span class="detail-val-highlight">{{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%</span>
+          </div>
+          <div class="overlay-detail-row">
+            <span class="detail-label">Value:</span>
+            <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card chart-card" style="position: relative;">
+      <h3>Sector Allocation</h3>
+      <div class="chart-content">
+        <div class="canvas-wrapper">
+          <canvas #sectorCanvas width="460" height="320"></canvas>
+        </div>
+      </div>
+      
+      <!-- Beautiful glassmorphic overlay for sector stocks breakdown on hover -->
+      <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
+        <div class="overlay-header">
+          <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+          <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
+        </div>
+        <div class="overlay-list">
+          <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
+            <span class="stock-symbol">{{ stock.ticker }}</span>
+            <div class="progress-track">
+              <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+            </div>
+            <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
+            <span class="stock-val">{{ stock.valueFormatted }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Portfolio Table -->
+  <div class="glass-card table-card" #tableCard>
+    <div class="table-header">
+      <h2 (click)="toggleTable()" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
+        Holdings Analysis
+        <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+        <span class="badge badge-info">{{ filteredPositions().length }} Stocks</span>
+      </h2>
+      <div style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;" *ngIf="!isCollapsed()">
+        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+          <input 
+            type="checkbox" 
+            [ngModel]="service.showNameHoldings()" 
+            (ngModelChange)="service.showNameHoldings.set($event); service.saveToStorage()" 
+            style="cursor: pointer; accent-color: var(--primary);">
+          Show Company Name
+        </label>
+        <input 
+          type="text" 
+          placeholder="Filter by ticker..." 
+          [ngModel]="filterTicker()" 
+          (ngModelChange)="filterTicker.set($event)" 
+          class="dashboard-search-input upper"
+          style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text-main); font-size: 0.8rem; width: 160px; outline: none; transition: border-color 0.2s;"
+          onfocus="this.style.borderColor='var(--primary)'"
+          onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'">
+      </div>
+    </div>
+    <div class="table-container" *ngIf="!isCollapsed()">
+      <table>
+        <thead>
+          <tr>
+            <th (click)="setSort('name'); scrollToTable()" style="cursor: pointer; user-select: none;" *ngIf="service.showNameHoldings()">
+              Name <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'name'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('ticker'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('currentPrice'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Current Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('averageCost'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Avg Cost <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'averageCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('totalShares'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Shares <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalShares'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSort('sector'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('totalCost'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Investment <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('currentValue'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Current Value <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentValue'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('dividends'); scrollToTable()" style="cursor: pointer; user-select: none;">
+              Dividends <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'dividends'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('unrealizedProfit'); scrollToTable()" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Unrealized {{ sortBy() === 'unrealizedProfit' ? (unrealizedSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'unrealizedProfit'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('realizedProfit'); scrollToTable()" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Realized {{ sortBy() === 'realizedProfit' ? (realizedSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'realizedProfit'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSort('totalReturn'); scrollToTable()" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Total {{ sortBy() === 'totalReturn' ? (totalReturnSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalReturn'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let pos of filteredPositions()">
+            <td class="text-muted text-sm truncate-cell" *ngIf="service.showNameHoldings()">{{ pos.name }}</td>
+            <td class="bold-ticker">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <img 
+                  [src]="service.getLogoData(pos.ticker)" 
+                  (error)="service.onLogoError(pos.ticker)"
+                  style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                  *ngIf="service.hasLogo(pos.ticker) && !service.shouldShowPlaceholder(pos.ticker)">
+                <div 
+                  *ngIf="service.hasLogo(pos.ticker) && service.shouldShowPlaceholder(pos.ticker)"
+                  [style.background]="service.getTickerColor(pos.ticker)"
+                  style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                  {{ pos.ticker.slice(0, 2) }}
+                </div>
+                <span>{{ pos.ticker }}</span>
+              </div>
+            </td>
+            <td class="num font-mono">{{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}</td>
+            <td class="num font-mono">{{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}</td>
+            <td class="num font-mono">{{ pos.totalShares | number:'1.0-6' }}</td>
+            <td><span class="sector-badge">{{ pos.sector }}</span></td>
+            <td class="num font-mono">{{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}</td>
+            <td class="num bold font-mono">{{ formatVal(pos.currentValue, 'USD', 2, pos.currency) }}</td>
+            <td class="num text-accent font-mono">{{ formatVal(pos.dividends, 'USD', 2, pos.currency) }}</td>
+            <td class="num font-mono" [ngClass]="pos.unrealizedProfit >= 0 ? 'text-success' : 'text-danger'">
+              {{ pos.unrealizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency) }}
+              <span class="cell-pct">({{ pos.unrealizedReturnPct | number:'1.1-1' }}%)</span>
+            </td>
+            <td class="num font-mono" [ngClass]="pos.realizedProfit >= 0 ? 'text-success' : 'text-danger'">
+              {{ pos.realizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency) }}
+              <span class="cell-pct" *ngIf="pos.realizedReturnPct !== 0">({{ pos.realizedReturnPct | number:'1.1-1' }}%)</span>
+            </td>
+            <td class="num font-mono bold" [ngClass]="pos.totalReturn >= 0 ? 'text-success' : 'text-danger'">
+              {{ pos.totalReturn >= 0 ? '+' : '' }}{{ formatVal(pos.totalReturn, 'USD', 2, pos.currency) }}
+              <span class="cell-pct">({{ pos.totalReturnPct | number:'1.1-1' }}%)</span>
+            </td>
+          </tr>
+          <!-- Totals row -->
+          <tr *ngIf="summary().positions.length > 0" class="totals-row">
+            <td [attr.colspan]="service.showNameHoldings() ? 3 : 2">Total Portfolio</td>
+            <td colspan="3"></td>
+            <td class="num bold font-mono">{{ formatVal(summary().totalCostBasis, 'USD') }}</td>
+            <td class="num bold font-mono">{{ formatVal(summary().totalValue, 'USD') }}</td>
+            <td class="num text-accent font-mono">{{ formatVal(summary().totalDividends, 'USD') }}</td>
+            <td class="num font-mono" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
+              {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalUnrealized, 'USD') }}
+              <span class="cell-pct" *ngIf="summary().totalCostBasis > 0">({{(summary().totalUnrealized / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
+            </td>
+            <td class="num font-mono" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'">
+              {{ summary().totalRealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalRealized, 'USD') }}
+            </td>
+            <td class="num font-mono bold" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
+              {{ summary().totalReturn >= 0 ? '+' : '' }}{{ formatVal(summary().totalReturn, 'USD') }}
+              <span class="cell-pct" *ngIf="summary().totalCostBasis > 0">({{(summary().totalReturn / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
+            </td>
+          </tr>
+          <tr *ngIf="summary().positions.length === 0">
+            <td [attr.colspan]="service.showNameHoldings() ? 12 : 11" class="empty-state">No holdings available. Paste some transaction sources or configure mock data!</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Realized Gains Table -->
+  <div class="glass-card table-card" style="margin-top: 2rem;" #realizedTableCard>
+    <div class="table-header">
+      <h2 (click)="isRealizedCollapsed.set(!isRealizedCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
+        Realized Gains Ledger
+        <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isRealizedCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+        <span class="badge badge-info">{{ realizedGains().length }} Sales</span>
+      </h2>
+      <div style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;" *ngIf="!isRealizedCollapsed()">
+        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+          <input 
+            type="checkbox" 
+            [ngModel]="service.showNameRealized()" 
+            (ngModelChange)="service.showNameRealized.set($event); service.saveToStorage()" 
+            style="cursor: pointer; accent-color: var(--primary);">
+          Show Company Name
+        </label>
+        <input 
+          type="text" 
+          placeholder="Filter by ticker..." 
+          [ngModel]="filterRealizedTicker()" 
+          (ngModelChange)="filterRealizedTicker.set($event)" 
+          class="dashboard-search-input upper"
+          style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text-main); font-size: 0.8rem; width: 160px; outline: none; transition: border-color 0.2s;"
+          onfocus="this.style.borderColor='var(--primary)'"
+          onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'">
+      </div>
+    </div>
+    <div class="table-container" *ngIf="!isRealizedCollapsed()">
+       <table>
+        <thead>
+          <tr>
+            <th (click)="setSortRealized('date')" style="cursor: pointer; user-select: none;">
+              Date <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'date'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSortRealized('name')" style="cursor: pointer; user-select: none;" *ngIf="service.showNameRealized()">
+              Name <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'name'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th (click)="setSortRealized('ticker')" style="cursor: pointer; user-select: none;">
+              Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'ticker'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('sellPrice')" style="cursor: pointer; user-select: none;">
+              Sell Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'sellPrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('purchasePrice')" style="cursor: pointer; user-select: none;">
+              Avg Cost <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'purchasePrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('shares')" style="cursor: pointer; user-select: none;">
+              Shares <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'shares'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('sellRevenue')" style="cursor: pointer; user-select: none;">
+              Revenue <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'sellRevenue'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('costBasis')" style="cursor: pointer; user-select: none;">
+              Cost Basis <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'costBasis'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('realizedGain')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Realized {{ sortByRealized() === 'realizedGain' ? (realizedLedgerSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'realizedGain'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let g of realizedGains()">
+            <td class="text-muted text-sm font-mono">{{ g.date | date:service.dateFormat() }}</td>
+            <td class="text-sm text-muted" *ngIf="service.showNameRealized()">{{ g.name }}</td>
+            <td class="bold-ticker">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <img 
+                  [src]="service.getLogoData(g.ticker)" 
+                  (error)="service.onLogoError(g.ticker)"
+                  style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                  *ngIf="service.hasLogo(g.ticker) && !service.shouldShowPlaceholder(g.ticker)">
+                <div 
+                  *ngIf="service.hasLogo(g.ticker) && service.shouldShowPlaceholder(g.ticker)"
+                  [style.background]="service.getTickerColor(g.ticker)"
+                  style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                  {{ g.ticker.slice(0, 2) }}
+                </div>
+                <span>{{ g.ticker }}</span>
+              </div>
+            </td>
+            <td class="num font-mono">{{ formatVal(g.sellPrice, g.currency, 2, g.currency) }}</td>
+            <td class="num font-mono">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
+            <td class="num font-mono">{{ g.shares | number:'1.0-6' }}</td>
+            <td class="num font-mono">{{ formatVal(g.sellRevenue, 'USD', 2, g.currency) }}</td>
+            <td class="num font-mono">{{ formatVal(g.costBasis, 'USD', 2, g.currency) }}</td>
+            <td class="num font-mono bold" [ngClass]="g.realizedGain >= 0 ? 'text-success' : 'text-danger'">
+              {{ g.realizedGain >= 0 ? '+' : '' }}{{ formatVal(g.realizedGain, 'USD', 2, g.currency) }}
+              <span class="cell-pct">({{ g.realizedGainPct | number:'1.1-1' }}%)</span>
+            </td>
+          </tr>
+          <!-- Totals row -->
+          <tr *ngIf="realizedGains().length > 0" class="totals-row">
+            <td [attr.colspan]="service.showNameRealized() ? 3 : 2">Total Realized</td>
+            <td colspan="2"></td>
+            <td class="num bold font-mono">{{ realizedGainsTotals().shares | number:'1.0-6' }}</td>
+            <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().revenue, 'USD') }}</td>
+            <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().costBasis, 'USD') }}</td>
+            <td class="num font-mono bold" [ngClass]="realizedGainsTotals().realizedGain >= 0 ? 'text-success' : 'text-danger'">
+              {{ realizedGainsTotals().realizedGain >= 0 ? '+' : '' }}{{ formatVal(realizedGainsTotals().realizedGain, 'USD') }}
+              <span class="cell-pct" *ngIf="realizedGainsTotals().costBasis > 0">({{(realizedGainsTotals().realizedGain / realizedGainsTotals().costBasis) * 100 | number:'1.1-1'}}%)</span>
+            </td>
+          </tr>
+          <tr *ngIf="realizedGains().length === 0">
+            <td [attr.colspan]="service.showNameRealized() ? 9 : 8" class="empty-state">No realized gains/losses recorded in this period.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,173 @@
+<div class="animate-fade-in">
+  <div class="glass-card import-header">
+    <h1>Import Data</h1>
+    <p class="subtitle">Select a source type, configure mapping headers, and define default owner allocations.</p>
+  </div>
+
+  <div class="import-layout">
+    <!-- Input Area (Left) -->
+    <div class="glass-card input-card">
+      <h3>1. Choose Source & Default Owner</h3>
+      
+      <div class="import-form-group">
+        <label>Select Source Type</label>
+        <div class="source-select-row">
+          <select [ngModel]="selectedTemplateName()" (ngModelChange)="onTemplateChange($event)">
+            <option value="">-- Custom / Create New --</option>
+            <option *ngFor="let t of service.templates()" [value]="t.name">{{ t.name }}</option>
+          </select>
+          
+          <button 
+            class="btn btn-secondary btn-sm" 
+            *ngIf="selectedTemplateName() !== ''"
+            (click)="deleteTemplate(selectedTemplateName())"
+            title="Delete this template">
+            Delete Source Type
+          </button>
+        </div>
+      </div>
+
+      <!-- Create New Template inline input -->
+      <div class="import-form-group animate-fade-in" *ngIf="selectedTemplateName() === ''">
+        <label>Register New Source Type Name</label>
+        <div class="new-source-row">
+          <input 
+            type="text" 
+            [(ngModel)]="newTemplateName" 
+            placeholder="e.g. Trading212, Revolut, eToro">
+          <button 
+            class="btn btn-secondary btn-sm" 
+            (click)="createNewSourceType()" 
+            [disabled]="!newTemplateName.trim()">
+            Add Source
+          </button>
+        </div>
+      </div>
+
+      <div class="import-form-group">
+        <label>Default Transaction Owner (For this import batch)</label>
+        <select [(ngModel)]="defaultOwner">
+          <option value="ownerA">100% to {{ service.personAName() }}</option>
+          <option value="ownerB">100% to {{ service.personBName() }}</option>
+          <option value="split50">50/50 Split</option>
+        </select>
+        <p class="field-hint">You can adjust individual transaction splits in the ledger later.</p>
+      </div>
+
+      <div class="import-form-group">
+        <label>Account / Ledger Batch Name</label>
+        <input 
+          type="text" 
+          [(ngModel)]="accountName" 
+          placeholder="e.g. Account 1, Revolut, Trading212">
+      </div>
+
+      <h3>2. Paste or Upload Broker File</h3>
+      <div class="import-form-group">
+        <label>Upload Statement File (.csv, .tsv, .txt)</label>
+        <input 
+          type="file" 
+          accept=".csv,.tsv,.txt" 
+          (change)="onFileUploaded($event)"
+          class="import-file-input">
+      </div>
+      
+      <div class="form-group">
+        <label>Or Paste Raw Source Text</label>
+        <textarea 
+          [(ngModel)]="rawText" 
+          placeholder="Paste TSV/CSV rows here...&#10;Date&#9;Ticker&#9;Type&#9;Quantity&#9;Price per share&#9;Total Amount&#9;Currency&#9;FX Rate&#10;2026-03-13T17:35:50Z&#9;SOFI&#9;BUY&#9;125&#9;15.00&#9;1875.00&#9;USD&#9;1.0"
+          rows="8">
+        </textarea>
+      </div>
+
+      <div class="import-options">
+        <div class="option-field">
+          <label>Delimiter</label>
+          <select [(ngModel)]="delimiter" (change)="onParserSettingsChange()">
+            <option value="&#9;">Tab Separated (TSV)</option>
+            <option value=",">Comma Separated (CSV)</option>
+          </select>
+        </div>
+        
+        <div class="option-field check-field">
+          <input type="checkbox" id="hasHeader" [(ngModel)]="hasHeader" (change)="onParserSettingsChange()">
+          <label for="hasHeader">First line is header</label>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button class="btn btn-primary" (click)="parsePreview()" [disabled]="!rawText.trim()">
+          Parse & Preview
+        </button>
+        <button class="btn btn-danger" (click)="clearRawInput()">
+          Clear Input
+        </button>
+      </div>
+    </div>
+
+    <!-- Mapper Configuration (Right) -->
+    <div class="glass-card mapper-card" *ngIf="parsedLines().length > 0">
+      <h3>3. Map Columns to Standard Format</h3>
+      <p class="subtitle">Specify which parsed column matches each standard field.</p>
+      
+      <div class="mapping-grid">
+        <div class="mapping-row" *ngFor="let field of targetFields">
+          <div class="field-label">
+            <span class="field-name">{{ field.label }}</span>
+            <span class="required" *ngIf="field.required">*</span>
+          </div>
+          <div class="field-select">
+            <select [(ngModel)]="columnMappings[field.key]">
+              <option [value]="-1">-- Ignore / Select --</option>
+              <option *ngFor="let idx of availableColumnIndices()" [value]="idx">
+                Column {{ idx + 1 }}: {{ getHeaderName(idx) }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save mapping config template -->
+      <div class="save-template-section" *ngIf="selectedTemplateName() !== ''">
+        <p class="text-sm text-muted">Mappings are auto-saved to template: <strong>{{ selectedTemplateName() }}</strong></p>
+        <button class="btn btn-secondary btn-sm" (click)="saveTemplateMappings()">
+          Save Mappings
+        </button>
+      </div>
+
+      <div class="import-confirm-section">
+        <button class="btn btn-primary" (click)="importData()">
+          Confirm & Import {{ parsedLines().length - (hasHeader ? 1 : 0) }} Rows
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Table -->
+  <div class="glass-card preview-card" *ngIf="parsedLines().length > 0">
+    <h3 (click)="isPreviewCollapsed.set(!isPreviewCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+      Pasted Data Preview
+      <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isPreviewCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+    </h3>
+    <div class="table-container" style="margin-top: 1rem;" *ngIf="!isPreviewCollapsed()">
+      <table>
+        <thead>
+          <tr>
+            <th *ngFor="let idx of availableColumnIndices()">
+              Column {{ idx + 1 }}
+              <div class="col-preview-header">{{ getHeaderName(idx) }}</div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of previewRows()">
+            <td *ngFor="let cell of row; let cellIdx = index">
+              {{ cell }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

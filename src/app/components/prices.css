@@ -1,0 +1,198 @@
+.settings-header {
+  margin-bottom: 2rem;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 800px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rules-form, .names-form {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  align-items: flex-end;
+}
+
+.names-card .form-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.names-card label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.split-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.split-input-wrapper input {
+  width: 90px;
+  padding-right: 1.8rem;
+}
+
+.pct-addon {
+  position: absolute;
+  right: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.upper {
+  text-transform: uppercase;
+}
+
+.action-align {
+  margin-top: auto;
+}
+
+.num {
+  text-align: right;
+}
+
+.center {
+  text-align: center;
+}
+
+.bold-ticker {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.btn-delete {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-size: 1.3rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-delete:hover {
+  color: #ff3b30;
+}
+
+/* Backup Card styles */
+.backup-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.action-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.action-details h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.action-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.file-upload-wrapper {
+  max-width: 240px;
+  width: 100%;
+}
+
+.file-input {
+  width: 100%;
+  background: rgba(17, 24, 39, 0.4);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+/* Prices card */
+.prices-card {
+  margin-top: 1.5rem;
+}
+
+.prices-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.form-grid-inline {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--card-border);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  align-items: flex-end;
+}
+
+.table-inline-input, .table-inline-select {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.table-inline-input:focus, .table-inline-select:focus {
+  background: rgba(10, 15, 26, 0.6);
+  border-color: var(--primary);
+}
+
+.price-input {
+  text-align: right;
+  font-family: 'Consolas', 'Courier New', monospace;
+  width: 100px;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3rem;
+  font-style: italic;
+}
