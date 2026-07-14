@@ -9,4 +9,5 @@ export interface PersonPortfolioSummary {
   totalRealized: number;
   totalDividends: number;
   totalReturn: number;
+  totalFees: number;
 }

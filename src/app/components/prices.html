@@ -69,6 +69,7 @@
       </div>
     </div>
 
+
     <!-- Currency Exchange Rates Manager -->
     <div class="glass-card rates-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -121,6 +122,109 @@
     </div>
   </div>
 
+  <!-- Google Drive Cloud Sync - Full Width -->
+  <div class="glass-card" style="margin-top: 1.5rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
+      <!-- Left: Branding + status -->
+      <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 220px;">
+        <div style="width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; align-self: center;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="-21 0 130 80" width="36" height="36" style="display: block;">
+            <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 3.15.85 6.1 2.6 8.85z" fill="#0066da"/>
+            <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.45h27.5z" fill="#00ac47"/>
+            <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.9 1.2-4.45h-27.5l5.85 11.5z" fill="#ea4335"/>
+            <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+            <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+            <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-3.15-.85-6.1-2.6-8.85z" fill="#ffba00"/>
+          </svg>
+        </div>
+        <div>
+          <h3 style="margin: 0; font-size: 1rem;">Google Drive Sync</h3>
+          <p class="subtitle" style="margin: 0.15rem 0 0; font-size: 0.78rem;">Your portfolio is privately backed up to your own Google Drive.</p>
+        </div>
+      </div>
+
+      <!-- Middle: Status / File name -->
+      <div style="flex: 1; min-width: 200px;">
+        <div *ngIf="service.isGoogleConnected()" style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: #0f9d58; font-size: 1rem;">●</span>
+          <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 500;">Connected</span>
+          <span *ngIf="service.lastGoogleSyncTime()" style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">
+            Last sync: {{ formatSyncTime(service.lastGoogleSyncTime()!) }}
+          </span>
+        </div>
+        <div *ngIf="!service.isGoogleConnected()" style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: var(--text-muted); font-size: 1rem;">○</span>
+          <span style="font-size: 0.82rem; color: var(--text-muted);">Not connected</span>
+        </div>
+        <div style="margin-top: 0.5rem;">
+          <input
+            type="text"
+            [ngModel]="service.googleFileName()"
+            (ngModelChange)="service.googleFileName.set($event)"
+            placeholder="portfolio_tracker_transactions.json"
+            style="font-size: 0.78rem; padding: 0.3rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; width: 100%;">
+        </div>
+      </div>
+
+      <!-- Right: Actions -->
+      <div style="display: flex; gap: 0.6rem; flex-shrink: 0; align-items: center;">
+        <ng-container *ngIf="service.isGoogleConnected()">
+          <button
+            class="btn btn-primary btn-sm"
+            (click)="service.uploadToGoogleDrive()"
+            [disabled]="service.isGoogleSyncing()"
+            title="Upload local data → overwrites Drive backup">
+            {{ service.isGoogleSyncing() ? 'Working…' : '↑ Upload to Drive' }}
+          </button>
+          <button
+            class="btn btn-secondary btn-sm"
+            (click)="service.downloadFromGoogleDrive()"
+            [disabled]="service.isGoogleSyncing()"
+            title="Download from Drive → overwrites local data">
+            ↓ Load from Drive
+          </button>
+          <button class="btn btn-secondary btn-sm" (click)="service.disconnectGoogleDrive()">Disconnect</button>
+        </ng-container>
+        <ng-container *ngIf="!service.isGoogleConnected()">
+          <button class="btn btn-primary btn-sm" (click)="service.connectGoogleDrive()">Connect Google Drive</button>
+        </ng-container>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sector Manager -->
+  <div class="glass-card" style="margin-top: 1.5rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <h3 style="margin: 0;">Sector Labels</h3>
+        <p class="subtitle" style="margin: 0.2rem 0 0; font-size: 0.78rem;">Define the sectors available in the dropdown below.</p>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+      <span
+        *ngFor="let s of service.customSectors(); let i = index"
+        style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-main);">
+        {{ s }}
+        <button
+          (click)="removeSector(i)"
+          style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; transition: color 0.15s;"
+          onmouseover="this.style.color='#ef4444'"
+          onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+      </span>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <input
+        type="text"
+        [(ngModel)]="newSectorName"
+        placeholder="New sector name…"
+        (keydown.enter)="addSector()"
+        style="flex: 1; max-width: 240px; padding: 0.4rem 0.7rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); outline: none; font-size: 0.82rem;">
+      <button class="btn btn-primary btn-sm" (click)="addSector()" [disabled]="!newSectorName.trim()">+ Add</button>
+    </div>
+  </div>
+
   <!-- Ticker Metadata Pricing Card -->
   <div class="glass-card prices-card">
     <div class="prices-header">
@@ -164,17 +268,20 @@
             <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
               Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none; text-align: left; padding-left: 1.2rem;">
+            <th class="num" (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none;">
               Current Price <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; margin-top: 0.1rem; text-transform: none;">(as fetched / native currency)</span>
               <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
             <th (click)="setSort('sector')" style="cursor: pointer; user-select: none;">
-              Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              Custom Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th style="text-align: left; min-width: 140px;">
+              Yahoo Symbol <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; margin-top: 0.1rem; text-transform: none;">(override suffix e.g. SEC0.DE)</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let t of filteredTickerConfigsList()">
+          <tr *ngFor="let t of filteredTickerConfigsList(); trackBy: trackByTicker">
             <td class="text-sm text-muted" *ngIf="service.showNameColumn()">{{ t.name }}</td>
             <td class="bold-ticker">
               <div style="display: flex; align-items: center; gap: 0.6rem;">
@@ -192,13 +299,32 @@
                 <span>{{ t.ticker }}</span>
               </div>
             </td>
-            <td class="font-mono bold" style="text-align: left; padding-left: 1.2rem;">
+            <td class="num font-mono bold">
               {{ formatTickerPrice(t.ticker, t.currentPrice) }}
             </td>
-            <td><span class="sector-badge">{{ t.sector }}</span></td>
+            <td>
+              <select
+                [ngModel]="t.customSector || t.sector"
+                (ngModelChange)="updateTickerSector(t.ticker, $event)"
+                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; color: var(--text-main); font-size: 0.75rem; padding: 0.2rem 1.6rem 0.2rem 0.6rem; outline: none; cursor: pointer; max-width: 170px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align-last: center; text-align: center;">
+                <option *ngFor="let s of service.customSectors()" [value]="s" style="background: #0d1117;">{{ s }}</option>
+                <option *ngIf="!service.customSectors().includes(t.sector)" [value]="t.sector" style="background: #0d1117;">{{ t.sector }}</option>
+              </select>
+            </td>
+            <td>
+              <input
+                type="text"
+                [ngModel]="t.yahooSymbol || ''"
+                (blur)="updateTickerYahooSymbol(t.ticker, $any($event.target).value)"
+                (keydown.enter)="updateTickerYahooSymbol(t.ticker, $any($event.target).value); $any($event.target).blur()"
+                placeholder="e.g. {{ t.ticker }}.DE"
+                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 110px; transition: border-color 0.15s; text-align: center;"
+                onfocus="this.style.borderColor='var(--primary)'"
+                onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+            </td>
           </tr>
           <tr *ngIf="filteredTickerConfigsList().length === 0">
-            <td [attr.colspan]="service.showNameColumn() ? 4 : 3" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
+            <td [attr.colspan]="service.showNameColumn() ? 5 : 4" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
           </tr>
         </tbody>
       </table>

@@ -98,6 +98,7 @@ export class TransactionsComponent {
     totalAmount: 0,
     currency: 'USD',
     fxRate: 1.0,
+    fees: 0,
   };
 
   public filteredTransactions = computed(() => {
@@ -349,6 +350,7 @@ export class TransactionsComponent {
       personAShares: this.newTx.quantity,
       personACostBasis: this.newTx.totalAmount,
       manualAllocation: false,
+      fees: this.newTx.fees || 0,
     };
 
     this.service.addTransactions([createdTx]);
@@ -363,6 +365,7 @@ export class TransactionsComponent {
       totalAmount: 0,
       currency: 'USD',
       fxRate: 1.0,
+      fees: 0,
     };
     this.showAddForm.set(false);
   }

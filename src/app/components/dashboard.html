@@ -149,8 +149,11 @@
     <!-- Accumulated Dividends -->
     <div class="glass-card metric-card" (click)="scrollToTable()" title="View holdings table">
       <div class="label">Accumulated Dividends</div>
-      <div class="value text-accent">{{ formatVal(summary().totalDividends, 'USD') }}</div>
-      <div class="sub-value text-muted">Paid out by holdings</div>
+      <div class="value text-accent" style="font-size: 1.8rem; line-height: 1.1; margin-bottom: 0.4rem;">{{ formatVal(summary().totalDividends, 'USD') }}</div>
+      <div class="sub-value text-muted" style="display: flex; flex-direction: column; gap: 0.3rem; line-height: 1.2;">
+        <span>Paid out by holdings</span>
+        <span style="font-size: 0.72rem; color: var(--text-muted);">Total Fees: <span style="color: #f43f5e; font-weight: 500;">{{ formatVal(summary().totalFees || 0, 'USD') }}</span></span>
+      </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
 
@@ -175,14 +178,14 @@
         <button 
           class="currency-btn" 
           [class.active]="!service.useProperSectors()" 
-          (click)="service.useProperSectors.set(false)"
+          (click)="service.useProperSectors.set(false); service.saveToStorage()"
           title="Use custom sector mappings">
           Custom Sectors
         </button>
         <button 
           class="currency-btn" 
           [class.active]="service.useProperSectors()" 
-          (click)="service.useProperSectors.set(true)"
+          (click)="service.useProperSectors.set(true); service.saveToStorage()"
           title="Use live Yahoo Finance sectors">
           Market Sectors
         </button>
@@ -238,27 +241,27 @@
       <div class="chart-content">
         <div class="canvas-wrapper">
           <canvas #assetCanvas width="460" height="320"></canvas>
-        </div>
-      </div>
-      
-      <!-- Beautiful glassmorphic overlay for asset details on hover -->
-      <div class="asset-hover-overlay animate-fade-in" *ngIf="hoveredAssetIndex() !== -1 && hoveredAssetDetail()">
-        <div class="overlay-header">
-          <span class="overlay-dot" [style.background-color]="getColor(hoveredAssetIndex())"></span>
-          <span class="overlay-title">{{ hoveredAssetDetail()?.ticker }}</span>
-        </div>
-        <div class="overlay-content">
-          <div class="overlay-detail-row">
-            <span class="detail-label">Sector:</span>
-            <span class="detail-val-badge" [title]="hoveredAssetDetail()?.sector">{{ hoveredAssetDetail()?.sector }}</span>
-          </div>
-          <div class="overlay-detail-row">
-            <span class="detail-label">Weight:</span>
-            <span class="detail-val-highlight">{{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%</span>
-          </div>
-          <div class="overlay-detail-row">
-            <span class="detail-label">Value:</span>
-            <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
+          
+          <!-- Beautiful glassmorphic overlay for asset details on hover -->
+          <div class="asset-hover-overlay animate-fade-in" *ngIf="hoveredAssetIndex() !== -1 && hoveredAssetDetail()">
+            <div class="overlay-header">
+              <span class="overlay-dot" [style.background-color]="getColor(hoveredAssetIndex())"></span>
+              <span class="overlay-title">{{ hoveredAssetDetail()?.ticker }}</span>
+            </div>
+            <div class="overlay-content">
+              <div class="overlay-detail-row">
+                <span class="detail-label">Sector:</span>
+                <span class="detail-val-badge" [title]="hoveredAssetDetail()?.sector">{{ hoveredAssetDetail()?.sector }}</span>
+              </div>
+              <div class="overlay-detail-row">
+                <span class="detail-label">Weight:</span>
+                <span class="detail-val-highlight">{{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%</span>
+              </div>
+              <div class="overlay-detail-row">
+                <span class="detail-label">Value:</span>
+                <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -269,23 +272,23 @@
       <div class="chart-content">
         <div class="canvas-wrapper">
           <canvas #sectorCanvas width="460" height="320"></canvas>
-        </div>
-      </div>
-      
-      <!-- Beautiful glassmorphic overlay for sector stocks breakdown on hover -->
-      <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
-        <div class="overlay-header">
-          <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
-          <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
-        </div>
-        <div class="overlay-list">
-          <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
-            <span class="stock-symbol">{{ stock.ticker }}</span>
-            <div class="progress-track">
-              <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+          
+          <!-- Beautiful glassmorphic overlay for sector stocks breakdown on hover -->
+          <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
+            <div class="overlay-header">
+              <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+              <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
             </div>
-            <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
-            <span class="stock-val">{{ stock.valueFormatted }}</span>
+            <div class="overlay-list">
+              <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
+                <span class="stock-symbol">{{ stock.ticker }}</span>
+                <div class="progress-track">
+                  <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+                </div>
+                <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
+                <span class="stock-val">{{ stock.valueFormatted }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -334,7 +337,8 @@
               Current Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
             <th class="num" (click)="setSort('averageCost'); scrollToTable()" style="cursor: pointer; user-select: none;">
-              Avg Cost <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'averageCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              Avg Cost {{ sortBy() === 'averageCost' ? (averageCostSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'averageCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
             <th class="num" (click)="setSort('totalShares'); scrollToTable()" style="cursor: pointer; user-select: none;">
               Shares <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalShares'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
@@ -366,7 +370,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let pos of filteredPositions()">
+          <tr *ngFor="let pos of filteredPositions(); trackBy: trackByPosition">
             <td class="text-muted text-sm truncate-cell" *ngIf="service.showNameHoldings()">{{ pos.name }}</td>
             <td class="bold-ticker">
               <div style="display: flex; align-items: center; gap: 0.6rem;">
@@ -385,23 +389,20 @@
               </div>
             </td>
             <td class="num font-mono">{{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}</td>
-            <td class="num font-mono">{{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}</td>
+            <td class="num font-mono" style="white-space: nowrap;">{{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}<span [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-left: 0.25rem; font-weight: 500;">({{ (pos.unrealizedReturnPct || 0) >= 0 ? '+' : '' }}{{ (pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%)</span></td>
             <td class="num font-mono">{{ pos.totalShares | number:'1.0-6' }}</td>
-            <td><span class="sector-badge">{{ pos.sector }}</span></td>
+            <td style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pos.sector }}"><span class="sector-badge" style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ pos.sector }}</span></td>
             <td class="num font-mono">{{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}</td>
             <td class="num bold font-mono">{{ formatVal(pos.currentValue, 'USD', 2, pos.currency) }}</td>
             <td class="num text-accent font-mono">{{ formatVal(pos.dividends, 'USD', 2, pos.currency) }}</td>
             <td class="num font-mono" [ngClass]="pos.unrealizedProfit >= 0 ? 'text-success' : 'text-danger'">
-              {{ pos.unrealizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency) }}
-              <span class="cell-pct">({{ pos.unrealizedReturnPct | number:'1.1-1' }}%)</span>
+              {{ pos.unrealizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.unrealizedReturnPct | number:'1.1-1' }}%)</span>
             </td>
             <td class="num font-mono" [ngClass]="pos.realizedProfit >= 0 ? 'text-success' : 'text-danger'">
-              {{ pos.realizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency) }}
-              <span class="cell-pct" *ngIf="pos.realizedReturnPct !== 0">({{ pos.realizedReturnPct | number:'1.1-1' }}%)</span>
+              {{ pos.realizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="pos.realizedReturnPct !== 0">({{ pos.realizedReturnPct | number:'1.1-1' }}%)</span>
             </td>
             <td class="num font-mono bold" [ngClass]="pos.totalReturn >= 0 ? 'text-success' : 'text-danger'">
-              {{ pos.totalReturn >= 0 ? '+' : '' }}{{ formatVal(pos.totalReturn, 'USD', 2, pos.currency) }}
-              <span class="cell-pct">({{ pos.totalReturnPct | number:'1.1-1' }}%)</span>
+              {{ pos.totalReturn >= 0 ? '+' : '' }}{{ formatVal(pos.totalReturn, 'USD', 2, pos.currency) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.totalReturnPct | number:'1.1-1' }}%)</span>
             </td>
           </tr>
           <!-- Totals row -->
@@ -412,15 +413,13 @@
             <td class="num bold font-mono">{{ formatVal(summary().totalValue, 'USD') }}</td>
             <td class="num text-accent font-mono">{{ formatVal(summary().totalDividends, 'USD') }}</td>
             <td class="num font-mono" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
-              {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalUnrealized, 'USD') }}
-              <span class="cell-pct" *ngIf="summary().totalCostBasis > 0">({{(summary().totalUnrealized / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
+              {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalUnrealized, 'USD') }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{(summary().totalUnrealized / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
             </td>
             <td class="num font-mono" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'">
               {{ summary().totalRealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalRealized, 'USD') }}
             </td>
             <td class="num font-mono bold" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
-              {{ summary().totalReturn >= 0 ? '+' : '' }}{{ formatVal(summary().totalReturn, 'USD') }}
-              <span class="cell-pct" *ngIf="summary().totalCostBasis > 0">({{(summary().totalReturn / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
+              {{ summary().totalReturn >= 0 ? '+' : '' }}{{ formatVal(summary().totalReturn, 'USD') }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{(summary().totalReturn / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
             </td>
           </tr>
           <tr *ngIf="summary().positions.length === 0">

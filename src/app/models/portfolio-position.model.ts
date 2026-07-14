@@ -15,4 +15,5 @@ export interface PortfolioPosition {
   unrealizedReturnPct?: number;
   realizedReturnPct?: number;
   totalReturnPct?: number;
+  realizedCost?: number;
 }

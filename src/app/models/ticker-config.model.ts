@@ -5,4 +5,6 @@ export interface TickerConfig {
   sector: string;
   name: string;
   logoData?: string;
+  yahooSymbol?: string;
+  customSector?: string;
 }

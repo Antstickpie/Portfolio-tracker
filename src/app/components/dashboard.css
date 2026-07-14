@@ -302,6 +302,16 @@
   margin-top: 1.5rem;
 }
 
+.table-card table th {
+  padding: 0.65rem 0.5rem;
+  font-size: 0.7rem;
+}
+
+.table-card table td {
+  padding: 0.65rem 0.5rem;
+  font-size: 0.8rem;
+}
+
 .table-header {
   display: flex;
   justify-content: space-between;
@@ -368,7 +378,7 @@
 .sector-hover-overlay, .asset-hover-overlay {
   position: absolute;
   top: 15px;
-  right: 15px;
+  left: 350px;
   background: rgba(10, 15, 30, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);

@@ -53,6 +53,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/Portfolio-tracker/",
               "budgets": [
                 {
                   "type": "initial",

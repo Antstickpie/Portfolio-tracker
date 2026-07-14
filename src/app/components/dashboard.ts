@@ -37,6 +37,7 @@ export class DashboardComponent implements AfterViewInit {
   public sortByRealized = signal<string>('realizedGain');
   public sortDirectionRealized = signal<'asc' | 'desc'>('desc');
   public unrealizedSortMode = signal<'value' | 'pct'>('value');
+  public averageCostSortMode = signal<'value' | 'pct'>('value');
   public realizedSortMode = signal<'value' | 'pct'>('value');
   public totalReturnSortMode = signal<'value' | 'pct'>('value');
   public realizedLedgerSortMode = signal<'value' | 'pct'>('value');
@@ -272,7 +273,30 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   public setSort(field: string) {
-    if (field === 'unrealizedProfit') {
+    if (field === 'averageCost') {
+      if (this.sortBy() !== 'averageCost') {
+        this.sortBy.set('averageCost');
+        this.averageCostSortMode.set('value');
+        this.sortDirection.set('desc');
+      } else {
+        if (this.averageCostSortMode() === 'value') {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.averageCostSortMode.set('pct');
+            this.sortDirection.set('desc');
+          }
+        } else {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.averageCostSortMode.set('value');
+            this.sortDirection.set('desc');
+          }
+        }
+      }
+    } else if (field === 'unrealizedProfit') {
+
       if (this.sortBy() !== 'unrealizedProfit') {
         this.sortBy.set('unrealizedProfit');
         this.unrealizedSortMode.set('value');
@@ -395,7 +419,10 @@ export class DashboardComponent implements AfterViewInit {
       let valA = a[field];
       let valB = b[field];
 
-      if (field === 'unrealizedProfit' && this.unrealizedSortMode() === 'pct') {
+      if (field === 'averageCost' && this.averageCostSortMode() === 'pct') {
+        valA = a.unrealizedReturnPct || 0;
+        valB = b.unrealizedReturnPct || 0;
+      } else if (field === 'unrealizedProfit' && this.unrealizedSortMode() === 'pct') {
         valA = a.unrealizedReturnPct || 0;
         valB = b.unrealizedReturnPct || 0;
       } else if (field === 'realizedProfit' && this.realizedSortMode() === 'pct') {
@@ -592,6 +619,8 @@ export class DashboardComponent implements AfterViewInit {
       const assetData = this.assetChartData();
       const sectorData = this.sectorChartData();
       this.displayCurrency(); // Register dependency
+      this.allocationBasis(); // Force redraw on cost vs value toggle
+      this.service.useProperSectors(); // Force redraw on custom vs market sectors toggle
       this.service.dateFrom(); // Re-draw when date filter changes
       this.service.dateTo();
       
@@ -617,11 +646,11 @@ export class DashboardComponent implements AfterViewInit {
       
       canvas.addEventListener('mousemove', (event: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
+        const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (event.clientY - rect.top) * (canvas.height / rect.height);
         
-        const cx = 460 / 2;
-        const cy = 320 / 2;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
         const radius = Math.min(cx, cy) - 40;
         const innerRadius = radius * 0.50;
         
@@ -687,10 +716,14 @@ export class DashboardComponent implements AfterViewInit {
     const rate = this.service.getExchangeRate(fromCurrency, targetCurr);
     const converted = val * rate;
     const symbol = targetCurr === 'USD' ? '$' : (targetCurr === 'EUR' ? '€' : '£');
-    return symbol + converted.toLocaleString('en-US', {
+    
+    const isNegative = converted < 0;
+    const absVal = Math.abs(converted);
+    const formatted = absVal.toLocaleString('en-US', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
     });
+    return (isNegative ? '-' : '') + symbol + formatted;
   }
 
   public formatValShort(val: number, fromCurrency: string = 'USD'): string {
@@ -699,7 +732,11 @@ export class DashboardComponent implements AfterViewInit {
     const rate = this.service.getExchangeRate(fromCurrency, targetCurr);
     const converted = val * rate;
     const symbol = targetCurr === 'USD' ? '$' : (targetCurr === 'EUR' ? '€' : '£');
-    return symbol + Math.round(converted).toLocaleString('en-US');
+    
+    const isNegative = converted < 0;
+    const absVal = Math.abs(converted);
+    const formatted = Math.round(absVal).toLocaleString('en-US');
+    return (isNegative ? '-' : '') + symbol + formatted;
   }
 
   public getPositionUnrealizedPct(pos: PortfolioPosition): number {
@@ -735,6 +772,13 @@ export class DashboardComponent implements AfterViewInit {
           existing.realizedProfit = parseFloat((existing.realizedProfit + pos.realizedProfit).toFixed(2));
           existing.dividends = parseFloat((existing.dividends + pos.dividends).toFixed(2));
           existing.totalReturn = parseFloat((existing.totalReturn + pos.totalReturn).toFixed(2));
+          
+          const combinedRealizedCost = parseFloat(((existing.realizedCost || 0) + (pos.realizedCost || 0)).toFixed(2));
+          existing.realizedCost = combinedRealizedCost;
+
+          existing.unrealizedReturnPct = existing.totalCost > 0 ? parseFloat(((existing.unrealizedProfit / existing.totalCost) * 100).toFixed(2)) : 0;
+          existing.realizedReturnPct = combinedRealizedCost > 0 ? parseFloat(((existing.realizedProfit / combinedRealizedCost) * 100).toFixed(2)) : 0;
+          existing.totalReturnPct = (existing.totalCost + combinedRealizedCost) > 0 ? parseFloat(((existing.totalReturn / (existing.totalCost + combinedRealizedCost)) * 100).toFixed(2)) : 0;
         }
       });
     };
@@ -754,6 +798,7 @@ export class DashboardComponent implements AfterViewInit {
       totalRealized: parseFloat((summaryA.totalRealized + summaryB.totalRealized).toFixed(2)),
       totalDividends: parseFloat((summaryA.totalDividends + summaryB.totalDividends).toFixed(2)),
       totalReturn: parseFloat((summaryA.totalReturn + summaryB.totalReturn).toFixed(2)),
+      totalFees: parseFloat((summaryA.totalFees + summaryB.totalFees).toFixed(2)),
     };
   }
 
@@ -942,5 +987,9 @@ export class DashboardComponent implements AfterViewInit {
       const convertedTotal = totalVal * rate;
       ctx.fillText(symbol + Math.round(convertedTotal).toLocaleString(), cx, cy + 12);
     }
+  }
+
+  public trackByPosition(index: number, item: any): string {
+    return item.ticker;
   }
 }

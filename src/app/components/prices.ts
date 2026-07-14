@@ -155,6 +155,7 @@ export class PricesComponent {
       templates: this.service.templates(),
       tickerConfigs: this.service.tickerConfigs(),
       exchangeRates: this.service.exchangeRates(),
+      customSectors: this.service.customSectors(),
       personAName: this.service.personAName(),
       personBName: this.service.personBName(),
       dateFormat: this.service.dateFormat(),
@@ -204,6 +205,9 @@ export class PricesComponent {
         
         if (data.exchangeRates) {
           this.service.exchangeRates.set(data.exchangeRates);
+        }
+        if (data.customSectors) {
+          this.service.customSectors.set(data.customSectors);
         }
         if (data.personAName) {
           this.service.personAName.set(data.personAName);
@@ -264,16 +268,6 @@ export class PricesComponent {
     this.service.updateTickerConfig(ticker, current.currentPrice, current.sector, val);
   }
 
-  public updateTickerSector(ticker: string, event: Event) {
-    const val = (event.target as HTMLSelectElement).value;
-    const current = this.service.tickerConfigs()[ticker] || {
-      ticker: ticker.toUpperCase(),
-      currentPrice: this.service.getAverageCost(ticker) || 0,
-      sector: 'Other',
-      name: ticker.toUpperCase()
-    };
-    this.service.updateTickerConfig(ticker, current.currentPrice, val, current.name);
-  }
 
   public updateTickerPrice(ticker: string, event: Event) {
     const val = parseFloat((event.target as HTMLInputElement).value);
@@ -308,5 +302,89 @@ export class PricesComponent {
 
   public async loadExchangeRatesApi(force: boolean = false) {
     await this.service.loadExchangeRatesApi(force);
+  }
+
+  // Sector manager
+  public newSectorName = '';
+
+  public addSector() {
+    const name = this.newSectorName.trim();
+    if (!name) return;
+    if (!this.service.customSectors().includes(name)) {
+      this.service.customSectors.update(s => [...s, name]);
+      this.service.saveToStorage();
+    }
+    this.newSectorName = '';
+  }
+
+  public removeSector(index: number) {
+    this.service.customSectors.update(s => s.filter((_, i) => i !== index));
+    this.service.saveToStorage();
+  }
+
+  public updateTickerSector(ticker: string, sector: string) {
+    const current = this.service.tickerConfigs()[ticker.toUpperCase()] || {
+      ticker: ticker.toUpperCase(),
+      currentPrice: 0,
+      name: ticker.toUpperCase(),
+      priceCurrency: 'USD',
+      sector: 'Other'
+    };
+    this.service.updateTickerConfig(
+      ticker,
+      current.currentPrice,
+      current.sector,
+      current.name,
+      current.priceCurrency,
+      current.logoData,
+      current.yahooSymbol,
+      sector
+    );
+  }
+
+  public updateTickerYahooSymbol(ticker: string, symbol: string) {
+    const current = this.service.tickerConfigs()[ticker.toUpperCase()] || {
+      ticker: ticker.toUpperCase(),
+      currentPrice: 0,
+      name: ticker.toUpperCase(),
+      priceCurrency: 'USD',
+      sector: 'Other',
+      logoData: undefined
+    };
+
+    let finalSymbol = symbol.trim().toUpperCase();
+    if (finalSymbol) {
+      if (finalSymbol.startsWith('.')) {
+        finalSymbol = ticker.toUpperCase() + finalSymbol;
+      } else if (!finalSymbol.includes('.') && finalSymbol.length <= 4 && finalSymbol !== ticker.toUpperCase()) {
+        finalSymbol = ticker.toUpperCase() + '.' + finalSymbol;
+      }
+    }
+
+    this.service.updateTickerConfig(
+      ticker,
+      current.currentPrice,
+      current.sector,
+      current.name,
+      current.priceCurrency,
+      current.logoData,
+      finalSymbol
+    );
+    this.service.showToast(`Updated Yahoo Symbol to ${finalSymbol || 'default'} for ${ticker.toUpperCase()}`, 'success');
+  }
+
+
+  public formatSyncTime(timestamp: number): string {
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return new Date(timestamp).toLocaleDateString();
+  }
+
+  public trackByTicker(index: number, item: any): string {
+    return item.ticker;
   }
 }

@@ -5,6 +5,7 @@ import { TickerConfig } from '../models/ticker-config.model';
 import { PortfolioPosition } from '../models/portfolio-position.model';
 import { PersonPortfolioSummary } from '../models/portfolio-summary.model';
 
+declare var google: any;
 
 @Injectable({
   providedIn: 'root',
@@ -15,6 +16,7 @@ export class PortfolioService {
   public templates = signal<MappingTemplate[]>([]);
   public tickerConfigs = signal<Record<string, TickerConfig>>({});
   public exchangeRates = signal<Record<string, number>>({});
+  public customSectors = signal<string[]>(['Technology', 'Financials', 'Healthcare', 'Consumer', 'Energy', 'Industrials', 'ETFs', 'Chips', 'Tech (Mag 7)', 'Crypto', 'Other', 'SPAC']);
   public dateFrom = signal<string>('');
   public dateTo = signal<string>('');
   public dateFormat = signal<string>('MMMM d, yyyy');
@@ -147,19 +149,24 @@ export class PortfolioService {
   };
 
   public getTickerSector(ticker: string, storedSector?: string): string {
-    const tUpper = ticker.replace(/\..*$/, '').toUpperCase().trim();
-    if (!this.useProperSectors()) {
-      return this.sectorMap[tUpper] || 'Other';
+    const clean = ticker.replace(/\..*$/, '').toUpperCase().trim();
+    const full = ticker.toUpperCase().trim();
+    const config = this.tickerConfigs()[full] || this.tickerConfigs()[clean];
+    if (this.useProperSectors()) {
+      return storedSector || config?.sector || 'Other';
+    } else {
+      return config?.customSector || this.sectorMap[clean] || 'Other';
     }
-    return storedSector || this.tickerConfigs()[tUpper]?.sector || 'Other';
   }
 
   public getTickerName(ticker: string, storedName?: string): string {
-    const tUpper = ticker.replace(/\..*$/, '').toUpperCase().trim();
+    const clean = ticker.replace(/\..*$/, '').toUpperCase().trim();
+    const full = ticker.toUpperCase().trim();
     if (!this.useProperSectors()) {
-      return this.companyNameMap[tUpper] || ticker;
+      return this.companyNameMap[clean] || ticker;
     }
-    return storedName || this.tickerConfigs()[tUpper]?.name || ticker;
+    const config = this.tickerConfigs()[full] || this.tickerConfigs()[clean];
+    return storedName || config?.name || ticker;
   }
 
   public getLogoData(ticker: string): string {
@@ -187,6 +194,19 @@ export class PortfolioService {
     }
   }
   
+  // Google Drive Sync properties
+  public googleClientId = signal<string>('309949315167-dvuguf67papta8jlu9hjdgljccli6njo.apps.googleusercontent.com');
+  public googleFileName = signal<string>('portfolio_tracker_transactions.json');
+  public isGoogleConnected = signal<boolean>(false);
+  public googleUserEmail = signal<string>('');
+  public lastGoogleSyncTime = signal<number | null>(null);
+  public isGoogleSyncing = signal<boolean>(false);
+  public lastUpdated = signal<number>(0);
+
+  private accessToken: string | null = null;
+  private tokenClient: any = null;
+  private pendingGoogleDriveAction: 'upload' | 'download' | null = null;
+
   // Names of the two portfolio owners
   public personAName = signal<string>('Person A');
   public personBName = signal<string>('Person B');
@@ -325,16 +345,41 @@ export class PortfolioService {
       }
       const ups = localStorage.getItem('pt_use_proper_sectors');
       if (ups) this.useProperSectors.set(ups === 'true');
+
+      const cs = localStorage.getItem('pt_custom_sectors');
+      if (cs) this.customSectors.set(JSON.parse(cs));
+
+      const cid = localStorage.getItem('pt_google_client_id');
+      if (cid) this.googleClientId.set(cid);
+
+      const fn = localStorage.getItem('pt_google_file_name');
+      if (fn) this.googleFileName.set(fn);
+
+      const gconn = localStorage.getItem('pt_google_connected');
+      if (gconn) this.isGoogleConnected.set(gconn === 'true');
+
+      const gemail = localStorage.getItem('pt_google_user_email');
+      if (gemail) this.googleUserEmail.set(gemail);
+
+      const gsync = localStorage.getItem('pt_last_google_sync');
+      if (gsync) this.lastGoogleSyncTime.set(parseInt(gsync, 10));
+
+      const lu = localStorage.getItem('pt_last_updated');
+      if (lu) this.lastUpdated.set(parseInt(lu, 10));
     } catch (e) {
       console.error('Failed to load portfolio tracker data from localStorage', e);
     }
   }
 
   public saveToStorage() {
+    this.lastUpdated.set(Date.now());
+    localStorage.setItem('pt_last_updated', this.lastUpdated().toString());
+
     localStorage.setItem('pt_transactions', JSON.stringify(this.transactions()));
     localStorage.setItem('pt_templates', JSON.stringify(this.templates()));
     localStorage.setItem('pt_ticker_configs', JSON.stringify(this.tickerConfigs()));
     localStorage.setItem('pt_exchange_rates', JSON.stringify(this.exchangeRates()));
+    localStorage.setItem('pt_custom_sectors', JSON.stringify(this.customSectors()));
     localStorage.setItem('pt_use_proper_sectors', this.useProperSectors().toString());
 
     localStorage.setItem('pt_person_a_name', this.personAName());
@@ -345,6 +390,15 @@ export class PortfolioService {
     localStorage.setItem('pt_show_name_realized', this.showNameRealized().toString());
     localStorage.setItem('pt_show_name_transactions', this.showNameTransactions().toString());
     localStorage.setItem('pt_db_version', '2.0');
+
+    localStorage.setItem('pt_google_client_id', this.googleClientId());
+    localStorage.setItem('pt_google_file_name', this.googleFileName());
+    localStorage.setItem('pt_google_connected', this.isGoogleConnected().toString());
+    localStorage.setItem('pt_google_user_email', this.googleUserEmail());
+    if (this.lastGoogleSyncTime() !== null) {
+      localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
+    }
+
   }
 
   // Update a single transaction allocation and recalculate shares
@@ -500,8 +554,7 @@ export class PortfolioService {
     this.saveToStorage();
   }
 
-  // Manage Ticker Configs
-  public updateTickerConfig(ticker: string, currentPrice: number, sector: string, name: string = '', priceCurrency?: string, logoData?: string) {
+  public updateTickerConfig(ticker: string, currentPrice: number, sector: string, name: string = '', priceCurrency?: string, logoData?: string, yahooSymbol?: string, customSector?: string) {
     const cleanTicker = ticker.replace(/\..*$/, '').toUpperCase().trim();
     const finalSector = sector || 'Other';
 
@@ -511,18 +564,27 @@ export class PortfolioService {
     const finalCurrency = priceCurrency || existingCurrency || this.getTickerCurrency(ticker);
     const existingLogo = prev[ticker.toUpperCase()]?.logoData;
     const finalLogo = logoData || existingLogo;
+    const existingYahooSymbol = prev[ticker.toUpperCase()]?.yahooSymbol;
+    const finalYahooSymbol = yahooSymbol !== undefined ? yahooSymbol : existingYahooSymbol;
+    const existingCustomSector = prev[ticker.toUpperCase()]?.customSector;
+    const finalCustomSector = customSector !== undefined ? customSector : existingCustomSector;
 
-    this.tickerConfigs.update((p) => ({
-      ...p,
-      [ticker.toUpperCase()]: {
-        ticker: ticker.toUpperCase(),
-        currentPrice: parseFloat(currentPrice as any) || 0,
-        priceCurrency: finalCurrency,
-        sector: finalSector,
-        name: name || p[ticker.toUpperCase()]?.name || ticker,
-        logoData: finalLogo
-      },
-    }));
+    this.tickerConfigs.update((p) => {
+      const updated = {
+        ...p,
+        [ticker.toUpperCase()]: {
+          ticker: ticker.toUpperCase(),
+          currentPrice: parseFloat(currentPrice as any) || 0,
+          priceCurrency: finalCurrency,
+          sector: finalSector,
+          name: name || p[ticker.toUpperCase()]?.name || ticker,
+          logoData: finalLogo,
+          yahooSymbol: finalYahooSymbol,
+          customSector: finalCustomSector
+        }
+      };
+      return updated;
+    });
     this.saveToStorage();
   }
 
@@ -694,6 +756,8 @@ export class PortfolioService {
       rateToUsd: number;
     }>();
 
+    let totalFees = 0;
+
     for (const tx of txs) {
       const ticker = tx.ticker.toUpperCase().trim();
       const isStock = ticker.length > 0;
@@ -708,6 +772,10 @@ export class PortfolioService {
         : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.getExchangeRate(tx.currency, 'USD'));
 
       const baseCost = costAllocated * rateToUsd;
+
+      const totalShares = tx.quantity || 0;
+      const ownerFraction = totalShares > 0 ? (sharesAllocated / totalShares) : 0;
+      totalFees += (tx.fees || 0) * rateToUsd * ownerFraction;
 
       if (!positionsMap.has(ticker)) {
         positionsMap.set(ticker, { 
@@ -812,6 +880,7 @@ export class PortfolioService {
         unrealizedReturnPct: parseFloat(unrealizedReturnPct.toFixed(2)),
         realizedReturnPct: parseFloat(realizedReturnPct.toFixed(2)),
         totalReturnPct: parseFloat(totalReturnPct.toFixed(2)),
+        realizedCost: parseFloat(pos.realizedCost.toFixed(2)),
       });
 
       totalValue += currentValue;
@@ -834,6 +903,7 @@ export class PortfolioService {
       totalRealized: parseFloat(totalRealized.toFixed(2)),
       totalDividends: parseFloat(totalDividends.toFixed(2)),
       totalReturn: parseFloat(totalReturn.toFixed(2)),
+      totalFees: parseFloat(totalFees.toFixed(2)),
     };
   }
 
@@ -1111,23 +1181,38 @@ export class PortfolioService {
           let sector = 'Other';
           let name = cleanTicker;
           
-          // ALWAYS run search lookup to dynamically discover resolved suffix, name, and sector
-          const searchUrl = `https://corsproxy.io/?https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}&nocache=${Date.now()}`;
-          const searchResponse = await fetch(searchUrl, { cache: 'no-store' });
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json();
-            const quotes = searchData?.quotes || [];
-            
-            // Try to find the exact matching quote or default to first quote
-            let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
-            if (!quote && quotes.length > 0) {
-              quote = quotes[0];
+          // Check for custom yahooSymbol override
+          const config = meta[cleanTicker];
+          if (config && config.yahooSymbol) {
+            const symbolOverride = config.yahooSymbol.toUpperCase().trim();
+            if (symbolOverride.startsWith('.')) {
+              resolvedSymbol = cleanTicker + symbolOverride;
+            } else if (!symbolOverride.includes('.') && symbolOverride.length <= 4 && symbolOverride !== cleanTicker) {
+              resolvedSymbol = cleanTicker + '.' + symbolOverride;
+            } else {
+              resolvedSymbol = symbolOverride;
             }
-            
-            if (quote) {
-              resolvedSymbol = quote.symbol.toUpperCase();
-              name = quote.longname || quote.shortname || cleanTicker;
-              sector = quote.sector || 'Other';
+            name = config.name || cleanTicker;
+            sector = config.sector || 'Other';
+          } else {
+            // ALWAYS run search lookup to dynamically discover resolved suffix, name, and sector
+            const searchUrl = `https://corsproxy.io/?https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}&nocache=${Date.now()}`;
+            const searchResponse = await fetch(searchUrl, { cache: 'no-store' });
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              const quotes = searchData?.quotes || [];
+              
+              // Try to find the exact matching quote or default to first quote
+              let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
+              if (!quote && quotes.length > 0) {
+                quote = quotes[0];
+              }
+              
+              if (quote) {
+                resolvedSymbol = quote.symbol.toUpperCase();
+                name = quote.longname || quote.shortname || cleanTicker;
+                sector = quote.sector || 'Other';
+              }
             }
           }
 
@@ -1163,28 +1248,7 @@ export class PortfolioService {
                 currency = 'GBP';
               }
 
-              // Dynamically fetch and cache logo image on first load
-              let logoData: string | undefined = undefined;
-              if (!meta[cleanTicker]?.logoData) {
-                try {
-                  const logoUrl = `https://corsproxy.io/?https://images.financialmodelingprep.com/symbol/${cleanTicker.split('.')[0]}.png`;
-                  const res = await fetch(logoUrl);
-                  if (res.ok) {
-                    const blob = await res.blob();
-                    logoData = await new Promise<string>((resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.onloadend = () => resolve(reader.result as string);
-                      reader.onerror = reject;
-                      reader.readAsDataURL(blob);
-                    });
-                  }
-                } catch (e) {
-                  console.warn(`Failed to fetch logo for ${cleanTicker}:`, e);
-                }
-              } else {
-                logoData = meta[cleanTicker].logoData;
-              }
-              
+              const logoData = meta[cleanTicker]?.logoData;
               return { ticker: cleanTicker, price, priceCurrency: currency, sector, name, logoData };
             }
           }
@@ -1305,5 +1369,288 @@ export class PortfolioService {
       console.warn('Exchange rates fetch failed:', err);
       this.showToast('Failed to fetch exchange rates.', 'error');
     }
+  }
+
+  // Google Drive REST API & SDK Sync Integration
+  public initializeGoogleDriveSDK() {
+    if (!this.googleClientId().trim()) {
+      return;
+    }
+    try {
+      if (typeof google === 'undefined') {
+        return;
+      }
+      this.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: this.googleClientId().trim(),
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: async (resp: any) => {
+          if (resp.error) {
+            this.showToast('Authentication failed: ' + resp.error, 'error');
+            return;
+          }
+          if (resp.access_token) {
+            this.accessToken = resp.access_token;
+            this.isGoogleConnected.set(true);
+            localStorage.setItem('pt_google_connected', 'true');
+            this.showToast('Connected to Google Drive!', 'success');
+            if (this.pendingGoogleDriveAction === 'upload') {
+              this.uploadToGoogleDrive();
+            } else if (this.pendingGoogleDriveAction === 'download') {
+              this.downloadFromGoogleDrive();
+            }
+            this.pendingGoogleDriveAction = null;
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Failed to init Google Drive SDK', err);
+    }
+  }
+
+  public connectGoogleDrive() {
+    if (!this.googleClientId().trim()) {
+      this.showToast('Please enter your Google Client ID first.', 'error');
+      return;
+    }
+    if (!this.tokenClient) {
+      this.initializeGoogleDriveSDK();
+    }
+    if (this.tokenClient) {
+      this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+      this.showToast('Google GIS script is loading. Try again in a moment.', 'info');
+    }
+  }
+
+  public disconnectGoogleDrive() {
+    this.accessToken = null;
+    this.isGoogleConnected.set(false);
+    this.googleUserEmail.set('');
+    this.lastGoogleSyncTime.set(null);
+    localStorage.removeItem('pt_google_connected');
+    localStorage.removeItem('pt_google_user_email');
+    localStorage.removeItem('pt_last_google_sync');
+    this.showToast('Disconnected from Google Drive.', 'info');
+  }
+
+  private async findDriveFile(fileName: string): Promise<string | null> {
+    try {
+      const resp = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(fileName)}' and trashed=false&fields=files(id,name)`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`
+          }
+        }
+      );
+      if (!resp.ok) {
+        throw new Error(`Search failed: ${resp.statusText}`);
+      }
+      const data = await resp.json();
+      if (data.files && data.files.length > 0) {
+        return data.files[0].id;
+      }
+      return null;
+    } catch (e) {
+      console.error('Error finding file on Google Drive', e);
+      return null;
+    }
+  }
+
+  private async createDriveFile(fileName: string, content: any): Promise<string | null> {
+    try {
+      const metadata = {
+        name: fileName,
+        mimeType: 'application/json'
+      };
+      
+      const boundary = 'foo_bar_boundary';
+      const multipartBody = 
+        `\r\n--${boundary}\r\n` +
+        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Type: application/json\r\n\r\n` +
+        `${JSON.stringify(content)}\r\n` +
+        `--${boundary}--`;
+
+      const resp = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
+        }
+      );
+      if (!resp.ok) {
+        throw new Error(`Creation failed: ${resp.statusText}`);
+      }
+      const data = await resp.json();
+      return data.id;
+    } catch (e) {
+      console.error('Error creating file on Google Drive', e);
+      return null;
+    }
+  }
+
+  private async updateDriveFile(fileId: string, content: any): Promise<boolean> {
+    try {
+      const resp = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(content)
+        }
+      );
+      return resp.ok;
+    } catch (e) {
+      console.error('Error updating file on Google Drive', e);
+      return false;
+    }
+  }
+
+  private async downloadDriveFile(fileId: string): Promise<any | null> {
+    try {
+      const resp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`
+          }
+        }
+      );
+      if (!resp.ok) {
+        throw new Error(`Download failed: ${resp.statusText}`);
+      }
+      return await resp.json();
+    } catch (e) {
+      console.error('Error downloading file from Google Drive', e);
+      return null;
+    }
+  }
+
+  private applyRemoteData(remoteData: any) {
+    if (remoteData.transactions) this.transactions.set(remoteData.transactions);
+    if (remoteData.templates) this.templates.set(remoteData.templates);
+    if (remoteData.tickerConfigs) this.tickerConfigs.set(remoteData.tickerConfigs);
+    if (remoteData.customSectors) this.customSectors.set(remoteData.customSectors);
+    if (remoteData.personAName) this.personAName.set(remoteData.personAName);
+    if (remoteData.personBName) this.personBName.set(remoteData.personBName);
+    if (remoteData.dateFormat) this.dateFormat.set(remoteData.dateFormat);
+    if (remoteData.showNameColumn !== undefined) this.showNameColumn.set(remoteData.showNameColumn);
+    if (remoteData.showNameHoldings !== undefined) this.showNameHoldings.set(remoteData.showNameHoldings);
+    if (remoteData.showNameRealized !== undefined) this.showNameRealized.set(remoteData.showNameRealized);
+    if (remoteData.showNameTransactions !== undefined) this.showNameTransactions.set(remoteData.showNameTransactions);
+    if (remoteData.exchangeRates) this.exchangeRates.set(remoteData.exchangeRates);
+    if (remoteData.useProperSectors !== undefined) this.useProperSectors.set(remoteData.useProperSectors);
+    if (remoteData.lastUpdated) this.lastUpdated.set(remoteData.lastUpdated);
+  }
+
+  private buildLocalData() {
+    return {
+      transactions: this.transactions(),
+      templates: this.templates(),
+      tickerConfigs: this.tickerConfigs(),
+      customSectors: this.customSectors(),
+      personAName: this.personAName(),
+      personBName: this.personBName(),
+      dateFormat: this.dateFormat(),
+      showNameColumn: this.showNameColumn(),
+      showNameHoldings: this.showNameHoldings(),
+      showNameRealized: this.showNameRealized(),
+      showNameTransactions: this.showNameTransactions(),
+      exchangeRates: this.exchangeRates(),
+      useProperSectors: this.useProperSectors(),
+      lastUpdated: Date.now()
+    };
+  }
+
+  public async uploadToGoogleDrive() {
+    if (!this.accessToken) {
+      this.pendingGoogleDriveAction = 'upload';
+      this.connectGoogleDrive();
+      return;
+    }
+    const localCount = this.transactions().length;
+    const ok = await this.showConfirm(
+      'Upload to Google Drive',
+      `This will OVERWRITE your Google Drive backup with your current local data (${localCount} transactions). Are you sure?`
+    );
+    if (!ok) return;
+
+    this.isGoogleSyncing.set(true);
+    try {
+      const fileName = this.googleFileName().trim() || 'portfolio_tracker_transactions.json';
+      const localData = this.buildLocalData();
+      const fileId = await this.findDriveFile(fileName);
+      let success = false;
+      if (!fileId) {
+        const newId = await this.createDriveFile(fileName, localData);
+        success = !!newId;
+      } else {
+        success = await this.updateDriveFile(fileId, localData);
+      }
+      if (success) {
+        this.lastUpdated.set(localData.lastUpdated);
+        this.lastGoogleSyncTime.set(Date.now());
+        localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
+        this.showToast('Uploaded to Google Drive successfully!', 'success');
+      } else {
+        this.showToast('Upload failed.', 'error');
+      }
+    } catch (e) {
+      this.showToast('Upload failed: ' + e, 'error');
+    } finally {
+      this.isGoogleSyncing.set(false);
+    }
+  }
+
+  public async downloadFromGoogleDrive() {
+    if (!this.accessToken) {
+      this.pendingGoogleDriveAction = 'download';
+      this.connectGoogleDrive();
+      return;
+    }
+    const ok = await this.showConfirm(
+      'Download from Google Drive',
+      `This will OVERWRITE your current local data with the Google Drive backup. Your local changes will be lost. Are you sure?`
+    );
+    if (!ok) return;
+
+    this.isGoogleSyncing.set(true);
+    try {
+      const fileName = this.googleFileName().trim() || 'portfolio_tracker_transactions.json';
+      const fileId = await this.findDriveFile(fileName);
+      if (!fileId) {
+        this.showToast('No portfolio file found on Google Drive.', 'error');
+        return;
+      }
+      const remoteData = await this.downloadDriveFile(fileId);
+      if (!remoteData) {
+        this.showToast('Failed to download from Google Drive.', 'error');
+        return;
+      }
+      this.applyRemoteData(remoteData);
+      this.saveToStorage();
+      this.lastGoogleSyncTime.set(Date.now());
+      localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
+      this.showToast(`Downloaded from Google Drive (${this.transactions().length} transactions).`, 'success');
+    } catch (e) {
+      this.showToast('Download failed: ' + e, 'error');
+    } finally {
+      this.isGoogleSyncing.set(false);
+    }
+  }
+
+  // Keep for backward compatibility
+  public async syncWithGoogleDrive() {
+    await this.uploadToGoogleDrive();
   }
 }

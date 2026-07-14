@@ -123,17 +123,18 @@
   border-left: 2px solid var(--secondary);
 }
 
-/* Allocation Summary Pill Chart in table */
 .allocation-summary-pill {
   display: flex;
-  height: 20px;
-  border-radius: 10px;
+  height: 16px;
+  border-radius: 8px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 14px;
+  max-width: 130px;
+  margin: 0 auto;
 }
 
 .owner-pill {

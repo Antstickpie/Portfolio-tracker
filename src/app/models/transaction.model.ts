@@ -15,4 +15,5 @@ export interface Transaction {
   personAShares: number;      // Computed automatically as quantity - personBShares
   personACostBasis: number;   // Computed automatically as totalAmount - personBCostBasis
   manualAllocation: boolean;  // Flag if the user manually modified this split
+  fees?: number;
 }

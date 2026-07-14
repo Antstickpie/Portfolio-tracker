@@ -32,7 +32,40 @@
         <span class="tab-icon">&#9881;</span> Settings & Market Rates
       </button>
     </nav>
+
+    <!-- Help link -->
+    <a
+      href="https://github.com/Antstickpie/Portfolio-tracker#readme"
+      target="_blank"
+      title="User Guide & Documentation"
+      style="margin-left: auto; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--text-muted); text-decoration: none; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s; flex-shrink: 0;"
+      onmouseover="this.style.color='var(--primary)';this.style.borderColor='var(--primary)';this.style.background='rgba(99,102,241,0.08)'"
+      onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='rgba(255,255,255,0.1)';this.style.background='transparent'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </a>
   </header>
+
+  <!-- Demo mode banner -->
+  <div *ngIf="isDemoMode()" style="background: linear-gradient(90deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.12) 100%); border-bottom: 1px solid rgba(99,102,241,0.25); padding: 0.6rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+    <span style="font-size: 1rem;">🧪</span>
+    <span style="font-size: 0.82rem; color: var(--text-muted); flex: 1;">
+      <strong style="color: var(--text-main);">You're viewing demo data.</strong>
+      Clear it and import your own transactions to get started.
+    </span>
+    <div style="display: flex; gap: 0.6rem; flex-shrink: 0;">
+      <a href="https://github.com/Antstickpie/Portfolio-tracker#readme" target="_blank"
+        style="font-size: 0.78rem; color: var(--primary); text-decoration: none; padding: 0.3rem 0.7rem; border: 1px solid var(--primary); border-radius: 6px; transition: all 0.2s;"
+        onmouseover="this.style.background='var(--primary)';this.style.color='#000'"
+        onmouseout="this.style.background='transparent';this.style.color='var(--primary)'">
+        📖 Read the guide
+      </a>
+      <button class="btn btn-secondary btn-sm" (click)="switchTab('ledger')" style="font-size: 0.78rem;">Clear Demo Data →</button>
+    </div>
+  </div>
 
   <!-- Main Content Body -->
   <main class="app-main-content">

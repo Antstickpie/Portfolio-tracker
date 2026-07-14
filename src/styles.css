@@ -242,20 +242,21 @@ thead th {
 th {
   color: var(--text-muted);
   font-weight: 500;
-  padding: 0.8rem 0.6rem;
+  padding: 0.7rem 0.35rem;
   border-bottom: 1px solid var(--card-border);
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   letter-spacing: 0.05em;
   transition: var(--transition-smooth);
   white-space: nowrap;
+  text-align: center !important;
 }
 
 th[style*="cursor: pointer"] {
   transition: var(--transition-smooth);
   position: relative;
   user-select: none;
-  padding-right: 1.25rem !important;
+  padding-right: 0.9rem !important;
 }
 
 th[style*="cursor: pointer"]:hover {
@@ -282,24 +283,28 @@ th[style*="cursor: pointer"]:not(:has(.sort-icon)):hover::after {
 }
 
 td {
-  padding: 0.7rem 0.6rem;
+  padding: 0.6rem 0.35rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   color: var(--text-main);
   transition: var(--transition-smooth);
   white-space: nowrap;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  text-align: center !important;
 }
 
 tr:hover td {
   background: rgba(255, 255, 255, 0.015);
 }
 
-/* Global Table Alignment Utility Classes */
 th.num, td.num {
-  text-align: right !important;
+  text-align: center !important;
 }
 th.center, td.center {
   text-align: center !important;
+}
+
+.bold-ticker > div {
+  justify-content: center !important;
 }
 
 /* Badges */

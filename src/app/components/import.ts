@@ -41,6 +41,7 @@ export class ImportComponent {
     totalAmount: -1,
     currency: -1,
     fxRate: -1,
+    fees: -1,
   };
 
   // Target database fields
@@ -53,6 +54,7 @@ export class ImportComponent {
     { key: 'totalAmount', label: 'Total Value', required: true },
     { key: 'currency', label: 'Currency', required: false },
     { key: 'fxRate', label: 'FX Rate', required: false },
+    { key: 'fees', label: 'Fees', required: false },
   ];
 
   // Grid helpers
@@ -155,7 +157,7 @@ export class ImportComponent {
     this.selectedTemplateName.set(name);
     if (!name) {
       // Clear mappings for manual selection
-      this.columnMappings = { date: -1, ticker: -1, type: -1, quantity: -1, price: -1, totalAmount: -1, currency: -1, fxRate: -1 };
+      this.columnMappings = { date: -1, ticker: -1, type: -1, quantity: -1, price: -1, totalAmount: -1, currency: -1, fxRate: -1, fees: -1 };
       return;
     }
     
@@ -184,6 +186,7 @@ export class ImportComponent {
         totalAmount: this.columnMappings['totalAmount'],
         currency: this.columnMappings['currency'],
         fxRate: this.columnMappings['fxRate'],
+        fees: this.columnMappings['fees'],
       }
     };
 
@@ -210,6 +213,7 @@ export class ImportComponent {
         totalAmount: this.columnMappings['totalAmount'],
         currency: this.columnMappings['currency'],
         fxRate: this.columnMappings['fxRate'],
+        fees: this.columnMappings['fees'],
       }
     };
 
@@ -281,6 +285,7 @@ export class ImportComponent {
       
       const currencyVal = this.columnMappings['currency'] !== -1 ? getCurrency(line[this.columnMappings['currency']]) : 'USD';
       const fxRateVal = this.columnMappings['fxRate'] !== -1 ? cleanNum(line[this.columnMappings['fxRate']]) : 1;
+      const feesVal = this.columnMappings['fees'] !== -1 ? cleanNum(line[this.columnMappings['fees']]) : 0;
 
       // Normalize types
       let normalizedType = typeVal.toUpperCase().trim();
@@ -349,6 +354,7 @@ export class ImportComponent {
         personAShares: aShares,
         personACostBasis: aCostBasis,
         manualAllocation,
+        fees: feesVal || 0,
       });
     }
 

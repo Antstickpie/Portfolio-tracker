@@ -56,6 +56,10 @@
         <input type="number" placeholder="1.0" [(ngModel)]="newTx.fxRate" min="0.0001" step="any">
       </div>
       <div class="form-group">
+        <label>Fees</label>
+        <input type="number" placeholder="0.00" [(ngModel)]="newTx.fees" min="0" step="any">
+      </div>
+      <div class="form-group">
         <label>Account / Source</label>
         <input type="text" placeholder="e.g. Account 1" [(ngModel)]="newTxSource">
       </div>
@@ -164,6 +168,7 @@
             <th class="num" (click)="setSort('totalAmount')" style="cursor: pointer; user-select: none;">
               Total Amount <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalAmount'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
+            <th class="num" style="font-size: 0.72rem; color: var(--text-muted);">Fees</th>
             <th style="min-width: 170px;">Ownership Split Summary</th>
             <th class="center">Toggle Ownership</th>
           </tr>
@@ -205,6 +210,7 @@
               <td class="num font-mono">{{ tx.quantity | number:'1.0-6' }}</td>
               <td class="num font-mono">{{ tx.price | currency:tx.currency:'symbol':'1.2-2' }}</td>
               <td class="num font-mono bold">{{ tx.totalAmount | currency:tx.currency:'symbol':'1.2-2' }}</td>
+              <td class="num font-mono text-muted" style="font-size: 0.78rem;">{{ tx.fees ? (tx.fees | currency:tx.currency:'symbol':'1.2-4') : '0.00' }}</td>
               
               <!-- Ownership Split Summary Column -->
               <td style="min-width: 170px;">
@@ -227,7 +233,7 @@
 
             <!-- Expanded Details Drawer -->
             <tr *ngIf="expandedTxId() === tx.id" class="drawer-row" (click)="$event.stopPropagation()">
-              <td [attr.colspan]="service.showNameTransactions() ? 10 : 9">
+              <td [attr.colspan]="service.showNameTransactions() ? 11 : 10">
                 <div class="drawer-content animate-fade-in">
                   <div class="drawer-title">
                     <h4>Configure Ownership Splits</h4>

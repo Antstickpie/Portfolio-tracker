@@ -11,5 +11,6 @@ export interface MappingTemplate {
     totalAmount: number;
     currency: number;
     fxRate: number;
+    fees?: number;
   };
 }
