@@ -37,23 +37,28 @@
           <button 
             class="currency-btn" 
             style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
-            [class.active]="!service.dateFrom() && !service.dateTo()"
+            [class.active]="isAllTimeActive()"
             (click)="clearDateFilter()">
             All Time
           </button>
           <button 
             class="currency-btn" 
             style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
-            [class.active]="service.dateFrom() === (currentYear + '-01-01') && service.dateTo() === (currentYear + '-12-31')"
+            [class.active]="isThisYearActive()"
             (click)="setThisYear()">
             This Year
           </button>
           <button 
             class="currency-btn" 
             style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
-            [class.active]="service.dateFrom() === ((currentYear - 1) + '-01-01') && service.dateTo() === ((currentYear - 1) + '-12-31')"
-            (click)="setLastYear()">
-            Last Year
+            (click)="shiftYear(-1)">
+            ← Year
+          </button>
+          <button 
+            class="currency-btn" 
+            style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
+            (click)="shiftYear(1)">
+            Year →
           </button>
         </div>
       </div>
@@ -66,15 +71,10 @@
         <div class="currency-toggle">
           <button 
             class="currency-btn" 
-            [class.active]="displayCurrency() === 'EUR'" 
-            (click)="displayCurrency.set('EUR')">
-            € EUR
-          </button>
-          <button 
-            class="currency-btn" 
-            [class.active]="displayCurrency() === 'USD'" 
-            (click)="displayCurrency.set('USD')">
-            $ USD
+            *ngFor="let curr of service.visibleCurrencies()"
+            [class.active]="displayCurrency() === curr" 
+            (click)="displayCurrency.set(curr)">
+            {{ getCurrencyBtnLabel(curr) }}
           </button>
           <button 
             class="currency-btn" 
@@ -86,7 +86,7 @@
         </div>
 
         <!-- View Tabs -->
-        <div class="tabs-control">
+        <div class="tabs-control" *ngIf="service.personBName() && service.personBName().trim()">
           <button 
             class="tab-btn" 
             [class.active]="activeView() === 'combined'"
@@ -106,6 +106,10 @@
             {{ service.personBName() }}
           </button>
         </div>
+        <div *ngIf="!service.personBName() || !service.personBName().trim()" 
+             style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: 10px; height: 38px; box-sizing: border-box; display: flex; align-items: center; padding: 0 1.2rem; font-family: var(--font-sans); font-weight: 600; font-size: 0.85rem; color: var(--text-main);">
+          {{ service.personAName() }}
+        </div>
       </div>
     </div>
   </div>
@@ -116,122 +120,303 @@
     <div class="glass-card metric-card glow-primary" (click)="scrollToTable()" title="View holdings table">
       <div class="label">Net Worth (Stocks)</div>
       <div class="value">{{ formatVal(summary().totalValue, 'USD') }}</div>
-      <div class="sub-value text-muted">
-        Cost Basis: <span class="white-text">{{ formatVal(summary().totalCostBasis, 'USD') }}</span>
+      <div class="sub-value">
+        <span style="color:var(--text-muted)">Cost Basis:</span>
+        <span class="white-text" style="font-weight:600;color:var(--text-main)">{{ formatVal(summary().totalCostBasis, 'USD') }}</span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
 
     <!-- Unrealized PnL -->
-    <div class="glass-card metric-card" (click)="scrollToTable()" title="View holdings table">
+    <div class="glass-card metric-card"
+         [class.card-danger]="summary().totalUnrealized < 0"
+         [class.card-success]="summary().totalUnrealized >= 0"
+         (click)="scrollToTable()" title="View holdings table">
       <div class="label">Unrealized Gain / Loss</div>
       <div class="value" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
-        {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalUnrealized, 'USD') }}
+        {{ formatVal(summary().totalUnrealized, 'USD', 2, undefined, true) }}
       </div>
       <div class="sub-value">
         <span class="badge" [ngClass]="summary().totalUnrealized >= 0 ? 'badge-success' : 'badge-danger'">
-          {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ unrealizedPercentage() | number:'1.2-2' }}%
+          {{ summary().totalUnrealized >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(unrealizedPercentage()) | number:'1.2-2' }}%
         </span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
 
     <!-- Realized PnL -->
-    <div class="glass-card metric-card" (click)="scrollToTable('realized')" title="View realized ledger">
+    <div class="glass-card metric-card"
+         [class.card-danger]="summary().totalRealized < 0"
+         [class.card-success]="summary().totalRealized >= 0"
+         (click)="scrollToTable('realized')" title="View realized ledger">
       <div class="label">Realized Profit</div>
       <div class="value" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'">
-        {{ summary().totalRealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalRealized, 'USD') }}
+        {{ formatVal(summary().totalRealized, 'USD', 2, undefined, true) }}
       </div>
-      <div class="sub-value text-muted">From completed sales</div>
+      <div class="sub-value">From completed sales</div>
       <div class="metric-hint">▼ Realized Ledger</div>
     </div>
 
     <!-- Accumulated Dividends -->
     <div class="glass-card metric-card" (click)="scrollToTable()" title="View holdings table">
       <div class="label">Accumulated Dividends</div>
-      <div class="value text-accent" style="font-size: 1.8rem; line-height: 1.1; margin-bottom: 0.4rem;">{{ formatVal(summary().totalDividends, 'USD') }}</div>
-      <div class="sub-value text-muted" style="display: flex; flex-direction: column; gap: 0.3rem; line-height: 1.2;">
+      <div class="value text-accent">{{ formatVal(summary().totalDividends, 'USD') }}</div>
+      <div class="sub-value" style="flex-direction:column;gap:0.25rem;align-items:flex-start">
         <span>Paid out by holdings</span>
-        <span style="font-size: 0.72rem; color: var(--text-muted);">Total Fees: <span style="color: #f43f5e; font-weight: 500;">{{ formatVal(summary().totalFees || 0, 'USD') }}</span></span>
+        <span style="font-size:0.72rem">Total Fees: <span style="color:#f43f5e;font-weight:600">{{ formatVal(summary().totalFees || 0, 'USD') }}</span></span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
 
     <!-- Total Return -->
-    <div class="glass-card metric-card glow-secondary" (click)="scrollToTable()" title="View holdings table">
+    <div class="glass-card metric-card"
+         [class.glow-secondary]="summary().totalReturn >= 0"
+         [class.card-danger]="summary().totalReturn < 0"
+         [class.card-success]="summary().totalReturn >= 0"
+         (click)="scrollToTable()" title="View holdings table">
       <div class="label">Total Return</div>
       <div class="value" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
-        {{ summary().totalReturn >= 0 ? '+' : '' }}{{ formatVal(summary().totalReturn, 'USD') }}
+        {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
       </div>
-      <div class="sub-value text-muted">
-        All-time returns: <span class="badge badge-info">{{ totalReturnPercentage() | number:'1.2-2' }}%</span>
+      <div class="sub-value">
+        {{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge badge-info">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
+
   </div>
 
-  <!-- Charts Header & Controls -->
-  <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 1.5rem; margin-bottom: 0.8rem; padding: 0 0.5rem;">
-    <div class="currency-toggle" style="align-items: center; gap: 0.5rem; border: none; background: transparent; padding: 0; box-shadow: none;">
-      <!-- Sector Taxonomy Toggle -->
-      <div class="currency-toggle" style="margin-right: 0.75rem;">
-        <button 
-          class="currency-btn" 
-          [class.active]="!service.useProperSectors()" 
-          (click)="service.useProperSectors.set(false); service.saveToStorage()"
-          title="Use custom sector mappings">
-          Custom Sectors
-        </button>
-        <button 
-          class="currency-btn" 
-          [class.active]="service.useProperSectors()" 
-          (click)="service.useProperSectors.set(true); service.saveToStorage()"
-          title="Use live Yahoo Finance sectors">
-          Market Sectors
-        </button>
+
+  <!-- Portfolio History Line Chart -->
+  <div class="glass-card chart-card" style="margin-top: 1.5rem; width: 100%; box-sizing: border-box; display: block; margin-bottom: 1.5rem; position: relative;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <h3 style="margin: 0;">Historical Performance</h3>
+        <p class="subtitle" style="margin: 0.2rem 0 0;">Timeline of total invested capital vs. stock portfolio valuation.</p>
       </div>
-
-      <!-- Vertical Divider -->
-      <div style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin-right: 0.75rem; align-self: center;"></div>
-
-      <!-- Sync Button -->
-      <button 
-        class="currency-btn" 
-        (click)="refreshMarketData()" 
-        [disabled]="isRefreshing()"
-        style="display: flex; align-items: center; gap: 0.4rem; border-radius: 8px;"
-        title="Sync prices and FX rates from Yahoo Finance">
-        <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="width: 13px; height: 13px; color: var(--text-main);" *ngIf="isRefreshing()">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" style="opacity: 0.25;"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" style="opacity: 0.75;"></path>
-        </svg>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 13px; height: 13px;" *ngIf="!isRefreshing()">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-        </svg>
-        <span>
-          {{ isRefreshing() ? 'Syncing...' : ('Sync' + (lastRefreshTime() ? ' (' + (lastRefreshTime() | date: 'h:mm a') + ')' : '')) }}
-        </span>
-      </button>
-
-      <!-- Vertical Divider -->
-      <div style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); margin-left: 0.75rem; margin-right: 0.75rem; align-self: center;"></div>
-
-      <!-- Valuation Basis Toggle -->
-      <div class="currency-toggle">
+      
+      <!-- Period Selector Toggle -->
+      <div class="currency-toggle" style="margin: 0;">
         <button 
           class="currency-btn" 
-          [class.active]="allocationBasis() === 'cost'" 
-          (click)="allocationBasis.set('cost')">
-          Invested Money
-        </button>
-        <button 
-          class="currency-btn" 
-          [class.active]="allocationBasis() === 'value'" 
-          (click)="allocationBasis.set('value')">
-          Current Value
+          *ngFor="let p of [{key:'all', label:'All'}, {key:'1y', label:'1Y'}, {key:'6m', label:'6M'}, {key:'3m', label:'3M'}, {key:'1m', label:'1M'}, {key:'1w', label:'1W'}]"
+          [class.active]="historyPeriod() === p.key" 
+          (click)="setHistoryPeriod(p.key)">
+          {{ p.label }}
         </button>
       </div>
     </div>
+
+    <div style="width: 100%; display: flex; justify-content: center; position: relative; margin-top: 0.5rem; min-height: 320px;">
+      <!-- SVG Chart -->
+      <div style="position: relative; width: 100%; height: 320px;">
+        <svg #chartSvg
+             viewBox="0 0 1000 320" 
+             preserveAspectRatio="none"
+             style="width: 100%; height: 100%; display: block; user-select: none;"
+             (mousemove)="onChartMouseMove($event)"
+             (mouseleave)="onChartMouseLeave()">
+          
+          <!-- Gradients -->
+          <defs>
+            <linearGradient [id]="gradientId" x1="0" y1="0" x2="1" y2="0">
+              <stop *ngFor="let stop of lineGradStops" [attr.offset]="stop.offset" [attr.stop-color]="stop.color" />
+            </linearGradient>
+            <linearGradient id="maskGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="white" stop-opacity="0.25" />
+              <stop offset="100%" stop-color="white" stop-opacity="0.0" />
+            </linearGradient>
+            <mask id="chartMask">
+              <rect x="0" y="0" width="1000" height="320" fill="url(#maskGrad)" />
+            </mask>
+          </defs>
+
+          <!-- Grid Lines & Y Axis Labels -->
+          <g>
+            <ng-container *ngFor="let tick of yTicks">
+              <line x1="0" [attr.y1]="tick.y" x2="1000" [attr.y2]="tick.y" 
+                    stroke="rgba(255, 255, 255, 0.05)" 
+                    stroke-width="0.8" 
+                    [attr.stroke-dasharray]="tick.y === yTicks[0].y ? '0' : '4 6'" />
+              
+              <text x="15" [attr.y]="tick.y" 
+                    fill="#9ca3af" 
+                    font-family="Outfit" 
+                    font-size="10" 
+                    font-weight="600" 
+                    text-anchor="start" 
+                    alignment-baseline="middle">
+                {{ tick.valText }}
+              </text>
+            </ng-container>
+          </g>
+
+          <!-- X Axis Labels -->
+          <g>
+            <ng-container *ngFor="let tick of xTicks; let first = first; let last = last">
+              <text [attr.x]="tick.x" y="305" 
+                    fill="#6b7280" 
+                    font-family="Outfit" 
+                    font-size="10" 
+                    font-weight="500" 
+                    [attr.text-anchor]="first ? 'start' : (last ? 'end' : 'middle')">
+                {{ tick.dateStr }}
+              </text>
+            </ng-container>
+          </g>
+
+          <!-- 1. Gradient Area -->
+          <path *ngIf="fillPath" [attr.d]="fillPath" [attr.fill]="'url(#' + gradientId + ')'" mask="url(#chartMask)" />
+
+          <!-- 2. Invested Capital Reference Line -->
+          <path *ngIf="investedPath" [attr.d]="investedPath" 
+                stroke="rgba(99, 102, 241, 0.8)" 
+                stroke-width="1.8" 
+                stroke-dasharray="6 4" 
+                fill="none" />
+
+          <!-- 3. Portfolio Value Line -->
+          <path *ngIf="valuePath" [attr.d]="valuePath" 
+                [attr.stroke]="'url(#' + gradientId + ')'" 
+                stroke-width="3" 
+                stroke-linecap="round" 
+                stroke-linejoin="round" 
+                fill="none" />
+
+          <!-- Legend -->
+          <g>
+            <!-- Invested Capital -->
+            <circle cx="80" cy="15" r="4" fill="#6366f1" />
+            <text x="90" y="15" fill="#6366f1" font-family="Outfit" font-size="11" font-weight="500" alignment-baseline="middle">Invested Capital</text>
+            
+            <!-- Portfolio Value -->
+            <circle cx="220" cy="15" r="4" [attr.fill]="svgThemeColor" />
+            <text x="230" y="15" [attr.fill]="svgThemeColor" font-family="Outfit" font-size="11" font-weight="500" alignment-baseline="middle">Portfolio Value</text>
+          </g>
+
+          <!-- Hover Guide Line & Indicators -->
+          <g *ngIf="hoveredPt">
+            <!-- Vertical Guide Line -->
+            <line [attr.x1]="hoveredPt.x" y1="30" [attr.x2]="hoveredPt.x" y2="280" 
+                  stroke="rgba(255, 255, 255, 0.15)" 
+                  stroke-width="1" 
+                  stroke-dasharray="4 4" />
+            
+            <!-- Invested Indicator Dot -->
+            <circle [attr.cx]="hoveredPt.x" [attr.cy]="hoveredPt.yInv" r="5" fill="#6366f1" stroke="#fff" stroke-width="1.5" />
+            
+            <!-- Value Indicator Dot -->
+            <circle [attr.cx]="hoveredPt.x" [attr.cy]="hoveredPt.yVal" r="5" [attr.fill]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'" stroke="#fff" stroke-width="1.5" />
+          </g>
+        </svg>
+
+        <!-- Tooltip Card (positioned dynamically based on hover coordinates) -->
+         <div *ngIf="hoveredPt" 
+              class="card tooltip-card"
+              [style.left.px]="getTooltipLeft(hoveredPt, chartSvg)"
+              [style.top.px]="getTooltipTop(hoveredPt, chartSvg)"
+              style="position: absolute; transform: translateY(-100%) translateY(-15px); width: 170px; z-index: 10; padding: 12px; pointer-events: none; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(8px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); border-radius: 8px;">
+          <div style="font-weight: 600; color: #9ca3af; margin-bottom: 4px;">{{ hoveredPt.date | date:'EEEE, MMMM d, yyyy' }}</div>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
+            <span style="color: #9ca3af;">{{ filterTicker() ? 'Purchase Value:' : 'Invested:' }}</span>
+            <span style="font-weight: bold; color: #6366f1;">{{ getCurrencySymbol(displayCurrency() === 'native' ? 'EUR' : displayCurrency()) }}{{ hoveredPt.invested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+          </div>
+          
+          <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
+            <span style="color: #9ca3af;">Shares Held:</span>
+            <span style="font-weight: bold; color: #fff;">{{ hoveredPt.shares | number:'1.0-6' }}</span>
+          </div>
+          
+          <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
+            <span style="color: #9ca3af;">Avg Cost:</span>
+            <span style="font-weight: bold; color: #fff;">{{ getCurrencySymbol(displayCurrency() === 'native' ? 'EUR' : displayCurrency()) }}{{ (hoveredPt.avgCost || 0) | number:'1.2-4' }}</span>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.08);">
+            <span style="color: #9ca3af;">Value:</span>
+            <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">{{ getCurrencySymbol(displayCurrency() === 'native' ? 'EUR' : displayCurrency()) }}{{ hoveredPt.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1f2937; padding-top: 4px; margin-top: 4px;">
+            <span style="color: #9ca3af;">Return:</span>
+            <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">
+              {{ hoveredPt.invested > 0 ? (((hoveredPt.value - hoveredPt.invested) / hoveredPt.invested) * 100).toFixed(2) + '%' : '0.00%' }}
+            </span>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #9ca3af;">P&L:</span>
+            <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">
+              {{ hoveredPt.value >= hoveredPt.invested ? '+' : '' }}{{ (hoveredPt.value - hoveredPt.invested).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Allocation Charts Controls (Moved above pies) -->
+  <div style="display: flex; justify-content: center; align-items: center; margin-top: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; width: 100%;">
+    
+    <!-- Sector Taxonomy Toggle -->
+    <div class="currency-toggle" style="margin: 0;">
+      <button 
+        class="currency-btn" 
+        [class.active]="!service.useProperSectors()" 
+        (click)="service.useProperSectors.set(false); service.saveToStorage()"
+        title="Use custom sector mappings">
+        Custom Sectors
+      </button>
+      <button 
+        class="currency-btn" 
+        [class.active]="service.useProperSectors()" 
+        (click)="service.useProperSectors.set(true); service.saveToStorage()"
+        title="Use live Yahoo Finance sectors">
+        Market Sectors
+      </button>
+    </div>
+
+    <!-- Vertical Divider -->
+    <div class="control-divider" style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); align-self: center;"></div>
+
+    <!-- Sync Button -->
+    <button 
+      class="currency-btn" 
+      (click)="refreshMarketData()" 
+      [disabled]="isRefreshing()"
+      style="display: flex; align-items: center; gap: 0.4rem; border-radius: 8px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); height: 38px;"
+      title="Sync prices and FX rates from Yahoo Finance">
+      <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="width: 13px; height: 13px; color: var(--text-main);" *ngIf="isRefreshing()">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" style="opacity: 0.25;"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" style="opacity: 0.75;"></path>
+      </svg>
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 13px; height: 13px;" *ngIf="!isRefreshing()">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+      </svg>
+      <span>
+        {{ isRefreshing() ? 'Syncing...' : ('Sync' + (lastRefreshTime() ? ' (' + (lastRefreshTime() | date: 'h:mm a') + ')' : '')) }}
+      </span>
+    </button>
+
+    <!-- Vertical Divider -->
+    <div class="control-divider" style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); align-self: center;"></div>
+
+    <!-- Valuation Basis Toggle -->
+    <div class="currency-toggle" style="margin: 0;">
+      <button 
+        class="currency-btn" 
+        [class.active]="allocationBasis() === 'cost'" 
+        (click)="allocationBasis.set('cost')">
+        Invested Money
+      </button>
+      <button 
+        class="currency-btn" 
+        [class.active]="allocationBasis() === 'value'" 
+        (click)="allocationBasis.set('value')">
+        Current Value
+      </button>
+    </div>
+
   </div>
 
   <!-- Charts Section -->
@@ -260,6 +445,18 @@
               <div class="overlay-detail-row">
                 <span class="detail-label">Value:</span>
                 <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
+              </div>
+              <div class="overlay-detail-row">
+                <span class="detail-label">Shares:</span>
+                <span class="detail-val-highlight">{{ hoveredAssetDetail()?.shares | number:'1.0-6' }}</span>
+              </div>
+              <div class="overlay-detail-row">
+                <span class="detail-label">Avg Cost:</span>
+                <span class="detail-val-highlight">{{ hoveredAssetDetail()?.avgCostFormatted }}</span>
+              </div>
+              <div class="overlay-detail-row">
+                <span class="detail-label">Purchase:</span>
+                <span class="detail-val-highlight">{{ hoveredAssetDetail()?.purchaseValueFormatted }}</span>
               </div>
             </div>
           </div>
@@ -294,6 +491,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- Portfolio Table -->
   <div class="glass-card table-card" #tableCard>
@@ -385,24 +583,24 @@
                   style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
                   {{ pos.ticker.slice(0, 2) }}
                 </div>
-                <span>{{ pos.ticker }}</span>
+                <a href="https://www.google.com/search?q={{ pos.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ pos.ticker }}</a>
               </div>
             </td>
             <td class="num font-mono">{{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}</td>
-            <td class="num font-mono" style="white-space: nowrap;">{{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}<span [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-left: 0.25rem; font-weight: 500;">({{ (pos.unrealizedReturnPct || 0) >= 0 ? '+' : '' }}{{ (pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%)</span></td>
+            <td class="num font-mono" style="white-space: nowrap;">{{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}<span [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-left: 0.25rem; font-weight: 500;">({{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%)</span></td>
             <td class="num font-mono">{{ pos.totalShares | number:'1.0-6' }}</td>
             <td style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pos.sector }}"><span class="sector-badge" style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ pos.sector }}</span></td>
             <td class="num font-mono">{{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}</td>
             <td class="num bold font-mono">{{ formatVal(pos.currentValue, 'USD', 2, pos.currency) }}</td>
             <td class="num text-accent font-mono">{{ formatVal(pos.dividends, 'USD', 2, pos.currency) }}</td>
-            <td class="num font-mono" [ngClass]="pos.unrealizedProfit >= 0 ? 'text-success' : 'text-danger'">
-              {{ pos.unrealizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.unrealizedReturnPct | number:'1.1-1' }}%)</span>
+            <td class="num font-mono" [ngClass]="pos.unrealizedProfit >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.unrealizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%)</span>
             </td>
-            <td class="num font-mono" [ngClass]="pos.realizedProfit >= 0 ? 'text-success' : 'text-danger'">
-              {{ pos.realizedProfit >= 0 ? '+' : '' }}{{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="pos.realizedReturnPct !== 0">({{ pos.realizedReturnPct | number:'1.1-1' }}%)</span>
+            <td class="num font-mono" [ngClass]="pos.realizedProfit >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="pos.realizedReturnPct !== 0">({{ pos.realizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.realizedReturnPct || 0) | number:'1.1-1' }}%)</span>
             </td>
-            <td class="num font-mono bold" [ngClass]="pos.totalReturn >= 0 ? 'text-success' : 'text-danger'">
-              {{ pos.totalReturn >= 0 ? '+' : '' }}{{ formatVal(pos.totalReturn, 'USD', 2, pos.currency) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.totalReturnPct | number:'1.1-1' }}%)</span>
+            <td class="num font-mono bold" [ngClass]="pos.totalReturn >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(pos.totalReturn, 'USD', 2, pos.currency, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.totalReturnPct || 0) | number:'1.1-1' }}%)</span>
             </td>
           </tr>
           <!-- Totals row -->
@@ -412,14 +610,14 @@
             <td class="num bold font-mono">{{ formatVal(summary().totalCostBasis, 'USD') }}</td>
             <td class="num bold font-mono">{{ formatVal(summary().totalValue, 'USD') }}</td>
             <td class="num text-accent font-mono">{{ formatVal(summary().totalDividends, 'USD') }}</td>
-            <td class="num font-mono" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
-              {{ summary().totalUnrealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalUnrealized, 'USD') }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{(summary().totalUnrealized / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
+            <td class="num font-mono" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(summary().totalUnrealized, 'USD', 2, undefined, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{summary().totalUnrealized >= 0 ? '▲ ' : '▼ '}}{{getAbs((summary().totalUnrealized / summary().totalCostBasis) * 100) | number:'1.1-1'}}%)</span>
             </td>
-            <td class="num font-mono" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'">
-              {{ summary().totalRealized >= 0 ? '+' : '' }}{{ formatVal(summary().totalRealized, 'USD') }}
+            <td class="num font-mono" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(summary().totalRealized, 'USD', 2, undefined, true) }}
             </td>
-            <td class="num font-mono bold" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
-              {{ summary().totalReturn >= 0 ? '+' : '' }}{{ formatVal(summary().totalReturn, 'USD') }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{(summary().totalReturn / summary().totalCostBasis) * 100 | number:'1.1-1'}}%)</span>
+            <td class="num font-mono bold" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{summary().totalReturn >= 0 ? '▲ ' : '▼ '}}{{getAbs((summary().totalReturn / summary().totalCostBasis) * 100) | number:'1.1-1'}}%)</span>
             </td>
           </tr>
           <tr *ngIf="summary().positions.length === 0">
@@ -493,35 +691,68 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let g of realizedGains()">
-            <td class="text-muted text-sm font-mono">{{ g.date | date:service.dateFormat() }}</td>
-            <td class="text-sm text-muted" *ngIf="service.showNameRealized()">{{ g.name }}</td>
-            <td class="bold-ticker">
-              <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <img 
-                  [src]="service.getLogoData(g.ticker)" 
-                  (error)="service.onLogoError(g.ticker)"
-                  style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
-                  *ngIf="service.hasLogo(g.ticker) && !service.shouldShowPlaceholder(g.ticker)">
-                <div 
-                  *ngIf="service.hasLogo(g.ticker) && service.shouldShowPlaceholder(g.ticker)"
-                  [style.background]="service.getTickerColor(g.ticker)"
-                  style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
-                  {{ g.ticker.slice(0, 2) }}
+          <ng-container *ngFor="let g of groupedRealizedGains()">
+            <!-- Main Grouped Ticker Row -->
+            <tr [style.cursor]="g.sales.length > 1 ? 'pointer' : 'default'" 
+                (click)="g.sales.length > 1 ? toggleRealizedTicker(g.ticker) : null" 
+                [style.background]="g.sales.length > 1 ? 'rgba(255, 255, 255, 0.015)' : 'transparent'" 
+                class="hover-bg-light">
+              <td class="text-muted text-sm font-mono" style="vertical-align: middle;">
+                <span *ngIf="g.sales.length > 1" style="font-size: 0.65rem; color: var(--text-muted); transition: transform 0.2s; display: inline-block; margin-right: 0.3rem;" [style.transform]="expandedRealizedTickers().includes(g.ticker) ? 'rotate(90deg)' : 'rotate(0deg)'">▶</span>
+                <span *ngIf="g.sales.length > 1" style="font-size: 0.8rem; color: var(--text-muted);">({{ g.sales.length }} Sales)</span>
+                <span *ngIf="g.sales.length === 1">{{ g.sales[0].date | date:service.dateFormat() }}</span>
+              </td>
+              <td class="text-sm text-muted" *ngIf="service.showNameRealized()" style="vertical-align: middle;">{{ g.name }}</td>
+              <td class="bold-ticker" style="vertical-align: middle;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                  <img 
+                    [src]="service.getLogoData(g.ticker)" 
+                    (error)="service.onLogoError(g.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                    *ngIf="service.hasLogo(g.ticker) && !service.shouldShowPlaceholder(g.ticker)">
+                  <div 
+                    *ngIf="service.hasLogo(g.ticker) && service.shouldShowPlaceholder(g.ticker)"
+                    [style.background]="service.getTickerColor(g.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                    {{ g.ticker.slice(0, 2) }}
+                  </div>
+                  <a href="https://www.google.com/search?q={{ g.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google" (click)="$event.stopPropagation()">{{ g.ticker }}</a>
                 </div>
-                <span>{{ g.ticker }}</span>
-              </div>
-            </td>
-            <td class="num font-mono">{{ formatVal(g.sellPrice, g.currency, 2, g.currency) }}</td>
-            <td class="num font-mono">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
-            <td class="num font-mono">{{ g.shares | number:'1.0-6' }}</td>
-            <td class="num font-mono">{{ formatVal(g.sellRevenue, 'USD', 2, g.currency) }}</td>
-            <td class="num font-mono">{{ formatVal(g.costBasis, 'USD', 2, g.currency) }}</td>
-            <td class="num font-mono bold" [ngClass]="g.realizedGain >= 0 ? 'text-success' : 'text-danger'">
-              {{ g.realizedGain >= 0 ? '+' : '' }}{{ formatVal(g.realizedGain, 'USD', 2, g.currency) }}
-              <span class="cell-pct">({{ g.realizedGainPct | number:'1.1-1' }}%)</span>
-            </td>
-          </tr>
+              </td>
+              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, g.currency, 2, g.currency) }}</td>
+              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
+              <td class="num font-mono" style="vertical-align: middle;">{{ g.shares | number:'1.0-6' }}</td>
+              <td class="num font-mono" style="vertical-align: middle;">{{ formatVal(g.sellRevenue, 'USD', 2, g.currency) }}</td>
+              <td class="num font-mono" style="vertical-align: middle;">{{ formatVal(g.costBasis, 'USD', 2, g.currency) }}</td>
+              <td class="num font-mono bold" [ngClass]="g.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap; vertical-align: middle;">
+                {{ formatVal(g.realizedGain, 'USD', 2, g.currency, true) }}
+                <span class="cell-pct">({{ g.realizedGain >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(g.realizedGainPct || 0) | number:'1.1-1' }}%)</span>
+              </td>
+            </tr>
+
+            <!-- Expanded Individual Sale Details directly inline as table rows -->
+            <ng-container *ngIf="expandedRealizedTickers().includes(g.ticker) && g.sales.length > 1">
+              <tr *ngFor="let s of g.sales" style="background: rgba(255, 255, 255, 0.035); font-size: 0.85rem;" class="hover-bg-light">
+                <td class="text-muted font-mono" style="padding-left: 1.25rem; vertical-align: middle;">
+                  <span style="color: var(--text-muted); opacity: 0.6; margin-right: 0.2rem;">↳</span>
+                  {{ s.date | date:service.dateFormat() }}
+                </td>
+                <td class="text-muted text-sm" *ngIf="service.showNameRealized()" style="vertical-align: middle;"></td>
+                <td class="text-muted" style="vertical-align: middle; padding-left: 1.5rem;">
+                  Sale
+                </td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, s.currency, 2, s.currency) }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.purchasePrice, 'USD', 2, s.currency) }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ s.shares | number:'1.0-6' }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellRevenue, 'USD', 2, s.currency) }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.costBasis, 'USD', 2, s.currency) }}</td>
+                <td class="num font-mono bold text-muted" [ngClass]="s.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="vertical-align: middle;">
+                  {{ formatVal(s.realizedGain, 'USD', 2, s.currency, true) }}
+                  <span class="cell-pct">({{ s.realizedGain >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(s.realizedGainPct || 0) | number:'1.1-1' }}%)</span>
+                </td>
+              </tr>
+            </ng-container>
+          </ng-container>
           <!-- Totals row -->
           <tr *ngIf="realizedGains().length > 0" class="totals-row">
             <td [attr.colspan]="service.showNameRealized() ? 3 : 2">Total Realized</td>
@@ -529,9 +760,9 @@
             <td class="num bold font-mono">{{ realizedGainsTotals().shares | number:'1.0-6' }}</td>
             <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().revenue, 'USD') }}</td>
             <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().costBasis, 'USD') }}</td>
-            <td class="num font-mono bold" [ngClass]="realizedGainsTotals().realizedGain >= 0 ? 'text-success' : 'text-danger'">
-              {{ realizedGainsTotals().realizedGain >= 0 ? '+' : '' }}{{ formatVal(realizedGainsTotals().realizedGain, 'USD') }}
-              <span class="cell-pct" *ngIf="realizedGainsTotals().costBasis > 0">({{(realizedGainsTotals().realizedGain / realizedGainsTotals().costBasis) * 100 | number:'1.1-1'}}%)</span>
+            <td class="num font-mono bold" [ngClass]="realizedGainsTotals().realizedGain >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+              {{ formatVal(realizedGainsTotals().realizedGain, 'USD', 2, undefined, true) }}
+              <span class="cell-pct" *ngIf="realizedGainsTotals().costBasis > 0">({{realizedGainsTotals().realizedGain >= 0 ? '▲ ' : '▼ '}}{{getAbs((realizedGainsTotals().realizedGain / realizedGainsTotals().costBasis) * 100) | number:'1.1-1'}}%)</span>
             </td>
           </tr>
           <tr *ngIf="realizedGains().length === 0">

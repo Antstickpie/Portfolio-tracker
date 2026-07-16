@@ -18,6 +18,7 @@ export class PricesComponent {
   public isEditingRates = signal(false);
   public isRatesCollapsed = signal(false);
   public isPricesCollapsed = signal(false);
+  public newCurrencyCode = '';
 
   public exchangeRatePairs = computed(() => {
     const rates = this.service.exchangeRates();
@@ -135,14 +136,14 @@ export class PricesComponent {
 
 
   public saveOwnerNames() {
-    if (!this.personANameInput.trim() || !this.personBNameInput.trim()) {
-      this.service.showToast('Error: Names cannot be empty.', 'error');
+    if (!this.personANameInput.trim()) {
+      this.service.showToast('Error: Person A name cannot be empty.', 'error');
       return;
     }
     this.service.personAName.set(this.personANameInput.trim());
     this.service.personBName.set(this.personBNameInput.trim());
     this.service.saveToStorage();
-    this.service.showToast('Names updated successfully!', 'success');
+    this.service.showToast('Settings saved successfully!', 'success');
   }
 
   // Backup to JSON file
@@ -159,6 +160,7 @@ export class PricesComponent {
       personAName: this.service.personAName(),
       personBName: this.service.personBName(),
       dateFormat: this.service.dateFormat(),
+      historicalPrices: this.service.historicalPrices(),
       splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null
     };
     
@@ -209,11 +211,11 @@ export class PricesComponent {
         if (data.customSectors) {
           this.service.customSectors.set(data.customSectors);
         }
-        if (data.personAName) {
+        if (data.personAName !== undefined) {
           this.service.personAName.set(data.personAName);
           this.personANameInput = data.personAName;
         }
-        if (data.personBName) {
+        if (data.personBName !== undefined) {
           this.service.personBName.set(data.personBName);
           this.personBNameInput = data.personBName;
         }
@@ -222,6 +224,9 @@ export class PricesComponent {
         }
         if (data.splitsCache) {
           localStorage.setItem('pt_splits_cache', JSON.stringify(data.splitsCache));
+        }
+        if (data.historicalPrices) {
+          this.service.historicalPrices.set(data.historicalPrices);
         }
         
         this.service.saveToStorage();
@@ -282,6 +287,73 @@ export class PricesComponent {
     }
   }
 
+  public updateTickerSplitRatio(ticker: string, value: string) {
+    const val = parseFloat(value);
+    if (!isNaN(val) && val > 0) {
+      const prev = this.service.tickerConfigs()[ticker] || {
+        ticker: ticker.toUpperCase(),
+        currentPrice: 0,
+        sector: 'Other',
+        name: ticker.toUpperCase()
+      };
+      this.service.updateTickerConfig(
+        ticker,
+        prev.currentPrice,
+        prev.sector,
+        prev.name,
+        prev.priceCurrency,
+        prev.logoData,
+        prev.yahooSymbol,
+        prev.customSector,
+        val,
+        prev.splitDate
+      );
+      this.service.saveToStorage();
+      this.service.showToast(`Updated split ratio for ${ticker} to ${val}`, 'success');
+    } else if (value === '') {
+      const prev = this.service.tickerConfigs()[ticker];
+      if (prev) {
+        this.service.tickerConfigs.update((p) => {
+          const updated = { ...p };
+          delete updated[ticker.toUpperCase()].splitRatio;
+          return updated;
+        });
+        this.service.saveToStorage();
+        this.service.showToast(`Cleared split ratio for ${ticker}`, 'info');
+      }
+    }
+  }
+
+  public updateTickerSplitDate(ticker: string, value: string) {
+    const prev = this.service.tickerConfigs()[ticker] || {
+      ticker: ticker.toUpperCase(),
+      currentPrice: 0,
+      sector: 'Other',
+      name: ticker.toUpperCase()
+    };
+    this.service.updateTickerConfig(
+      ticker,
+      prev.currentPrice,
+      prev.sector,
+      prev.name,
+      prev.priceCurrency,
+      prev.logoData,
+      prev.yahooSymbol,
+      prev.customSector,
+      prev.splitRatio,
+      value || undefined
+    );
+    if (!value) {
+      this.service.tickerConfigs.update((p) => {
+        const updated = { ...p };
+        delete updated[ticker.toUpperCase()].splitDate;
+        return updated;
+      });
+    }
+    this.service.saveToStorage();
+    this.service.showToast(`Updated split date for ${ticker} to ${value || 'none'}`, 'success');
+  }
+
   public async deleteTickerConfig(ticker: string) {
     const ok = await this.service.showConfirm('Delete Ticker Price', `Delete price/sector data for ${ticker}?`);
     if (ok) {
@@ -319,6 +391,42 @@ export class PricesComponent {
 
   public removeSector(index: number) {
     this.service.customSectors.update(s => s.filter((_, i) => i !== index));
+    this.service.saveToStorage();
+  }
+
+
+  public getMonthName(m: number): string {
+    const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return names[m - 1] || '';
+  }
+
+  public getDaysArray(): number[] {
+    const month = this.service.financialYearStartMonth();
+    let len = 31;
+    if (month === 2) len = 29;
+    else if ([4, 6, 9, 11].includes(month)) len = 30;
+    
+    const arr = [];
+    for (let i = 1; i <= len; i++) arr.push(i);
+    return arr;
+  }
+
+  public addVisibleCurrency() {
+    const code = this.newCurrencyCode.trim().toUpperCase();
+    if (!code) return;
+    
+    if (!this.service.visibleCurrencies().includes(code)) {
+      this.service.visibleCurrencies.update(c => [...c, code]);
+      this.service.saveToStorage();
+      this.service.loadExchangeRatesApi(true);
+    }
+    this.newCurrencyCode = '';
+  }
+
+  public removeVisibleCurrency(index: number) {
+    const current = this.service.visibleCurrencies();
+    if (current.length === 1) return;
+    this.service.visibleCurrencies.update(c => c.filter((_, i) => i !== index));
     this.service.saveToStorage();
   }
 

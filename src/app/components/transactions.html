@@ -94,16 +94,11 @@
         <label>Audit Currency</label>
         <div class="currency-toggle" style="margin-top: 0.25rem;">
           <button 
+            *ngFor="let curr of service.visibleCurrencies()"
             class="currency-btn" 
-            [class.active]="displayCurrency() === 'EUR'" 
-            (click)="displayCurrency.set('EUR')">
-            € EUR
-          </button>
-          <button 
-            class="currency-btn" 
-            [class.active]="displayCurrency() === 'USD'" 
-            (click)="displayCurrency.set('USD')">
-            $ USD
+            [class.active]="displayCurrency() === curr" 
+            (click)="displayCurrency.set(curr)">
+            {{ service.getCurrencyBtnLabel(curr) }}
           </button>
         </div>
       </div>
@@ -198,7 +193,7 @@
                     style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
                     {{ tx.ticker.slice(0, 2) }}
                   </div>
-                  <span>{{ tx.ticker || '-' }}</span>
+                  <a href="https://www.google.com/search?q={{ tx.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google" *ngIf="tx.ticker">{{ tx.ticker }}</a><span *ngIf="!tx.ticker">-</span>
                 </div>
               </td>
               <td class="text-sm text-muted" *ngIf="service.showNameTransactions()">{{ service.tickerConfigs()[tx.ticker]?.name || tx.ticker }}</td>

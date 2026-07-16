@@ -1,5 +1,5 @@
-import { Component, inject, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef, HostListener, untracked } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
 import { PortfolioPosition } from '../models/portfolio-position.model';
@@ -13,9 +13,18 @@ import { PersonPortfolioSummary } from '../models/portfolio-summary.model';
   styleUrl: './dashboard.css'
 })
 export class DashboardComponent implements AfterViewInit {
+  @HostListener('window:resize')
+  onResize() {
+    const assetData = this.assetChartData();
+    const sectorData = this.sectorChartData();
+    this.drawCharts(assetData, sectorData);
+  }
+
   public service = inject(PortfolioService);
   private cdr = inject(ChangeDetectorRef);
+  private datePipe = new DatePipe('en-US');
 
+  @ViewChild('chartSvg') chartSvg!: ElementRef<SVGElement>;
   @ViewChild('assetCanvas') assetCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('sectorCanvas') sectorCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('tableCard') tableCard!: ElementRef<HTMLElement>;
@@ -23,11 +32,120 @@ export class DashboardComponent implements AfterViewInit {
 
   // Combined, ownerA, or ownerB
   public activeView = signal<'combined' | 'ownerA' | 'ownerB'>('combined');
-  public displayCurrency = signal<'USD' | 'EUR' | 'native'>('native');
+  public displayCurrency = signal<string>('native');
+  public historyPeriod = signal<'all' | '1y' | '6m' | '3m' | '1m' | '1w'>('1m');
 
   // Hovered slice states (using Signals so calculated values updates are reactive)
   public hoveredAssetIndex = signal<number>(-1);
   public hoveredSectorIndex = signal<number>(-1);
+
+  // SVG Chart State Properties
+  public chartPoints: {
+    date: Date;
+    dateStr: string;
+    invested: number;
+    value: number;
+    shares?: number;
+    avgCost?: number;
+    x: number;
+    yInv: number;
+    yVal: number;
+  }[] = [];
+
+  public investedPath = '';
+  public valuePath = '';
+  public fillPath = '';
+  
+  public chartMinVal = 0;
+  public chartMaxVal = 100;
+  public yTicks: { valText: string; y: number }[] = [];
+  public xTicks: { dateStr: string; x: number }[] = [];
+  public svgThemeColor = '#10b981';
+  public svgFillGradStr = '16, 185, 129';
+  public hoveredPt: any = null;
+  public lineGradStops: { offset: string; color: string }[] = [];
+  public gradientId = 'chartLineGrad_0';
+  private gradientCounter = 0;
+  private chartLoadSession = 0;
+
+  public onChartMouseMove(event: MouseEvent) {
+    if (this.chartPoints.length === 0 || !this.chartSvg) return;
+    const svgElement = this.chartSvg.nativeElement as any;
+    const pt = svgElement.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const screenCTM = svgElement.getScreenCTM();
+    if (!screenCTM) return;
+    const svgPoint = pt.matrixTransform(screenCTM.inverse());
+    const svgX = svgPoint.x;
+
+    const svgY = svgPoint.y;
+
+    let pLeft = this.chartPoints[0];
+    let pRight = this.chartPoints[this.chartPoints.length - 1];
+
+    if (svgX < pLeft.x || svgX > pRight.x) {
+      this.hoveredPt = null;
+    } else {
+      for (let i = 0; i < this.chartPoints.length - 1; i++) {
+        const p1 = this.chartPoints[i];
+        const p2 = this.chartPoints[i + 1];
+        if (svgX >= p1.x && svgX <= p2.x) {
+          pLeft = p1;
+          pRight = p2;
+          break;
+        }
+      }
+
+      const t = (svgX - pLeft.x) / (pRight.x - pLeft.x || 1);
+      const interpolatedValue = pLeft.value + t * (pRight.value - pLeft.value);
+      const interpolatedInvested = pLeft.invested + t * (pRight.invested - pLeft.invested);
+      const interpolatedShares = (pLeft.shares || 0) + t * ((pRight.shares || 0) - (pLeft.shares || 0));
+      const interpolatedAvgCost = (pLeft.avgCost || 0) + t * ((pRight.avgCost || 0) - (pLeft.avgCost || 0));
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const w1 = 1 - 3 * t2 + 2 * t3;
+      const w2 = 3 * t2 - 2 * t3;
+      const interpolatedYVal = pLeft.yVal * w1 + pRight.yVal * w2;
+      const interpolatedYInv = pLeft.yInv * w1 + pRight.yInv * w2;
+
+      const interpolatedTime = pLeft.date.getTime() + t * (pRight.date.getTime() - pLeft.date.getTime());
+      const interpolatedDate = new Date(interpolatedTime);
+      const dateStr = this.datePipe.transform(interpolatedDate, this.service.dateFormat()) || '';
+
+      this.hoveredPt = {
+        date: interpolatedDate,
+        dateStr,
+        invested: interpolatedInvested,
+        value: interpolatedValue,
+        shares: interpolatedShares,
+        avgCost: interpolatedAvgCost,
+        x: svgX,
+        yInv: interpolatedYInv,
+        yVal: interpolatedYVal
+      };
+    }
+
+
+  }
+
+  public onChartMouseLeave() {
+    this.hoveredPt = null;
+  }
+
+  public getTooltipTop(hoveredPt: any, svgElement: any): number {
+    if (!hoveredPt || !svgElement) return 50;
+    const clientHeight = svgElement.clientHeight || 320;
+    const higherY = Math.min(hoveredPt.yVal, hoveredPt.yInv);
+    return (higherY / 320) * clientHeight;
+  }
+
+  public getTooltipLeft(hoveredPt: any, svgElement: any): number {
+    if (!hoveredPt || !svgElement) return 0;
+    const clientWidth = svgElement.clientWidth || 1000;
+    const screenX = hoveredPt.x * (clientWidth / 1000);
+    return Math.max(10, Math.min(clientWidth - 180, screenX - 85));
+  }
 
   // Filter and sort holdings state
   public filterTicker = signal<string>('');
@@ -101,6 +219,11 @@ export class DashboardComponent implements AfterViewInit {
         // Combined
         sharesAllocated = tx.quantity;
         costAllocated = tx.totalAmount;
+      }
+
+      const cfg = this.service.tickerConfigs()[ticker];
+      if (cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
+        sharesAllocated *= cfg.splitRatio;
       }
 
       // Base conversion rate (Tx to USD base)
@@ -206,21 +329,140 @@ export class DashboardComponent implements AfterViewInit {
     };
   });
 
+  public expandedRealizedTickers = signal<string[]>([]);
+
+  public toggleRealizedTicker(ticker: string) {
+    const list = this.expandedRealizedTickers();
+    if (list.includes(ticker)) {
+      this.expandedRealizedTickers.set(list.filter(t => t !== ticker));
+    } else {
+      this.expandedRealizedTickers.set([...list, ticker]);
+    }
+  }
+
+  public groupedRealizedGains = computed(() => {
+    const list = this.realizedGains();
+    const map = new Map<string, {
+      ticker: string;
+      name: string;
+      shares: number;
+      sellRevenue: number;
+      costBasis: number;
+      realizedGain: number;
+      currency: string;
+      sales: typeof list;
+    }>();
+
+    list.forEach(g => {
+      if (!map.has(g.ticker)) {
+        map.set(g.ticker, {
+          ticker: g.ticker,
+          name: g.name,
+          shares: 0,
+          sellRevenue: 0,
+          costBasis: 0,
+          realizedGain: 0,
+          currency: g.currency,
+          sales: []
+        });
+      }
+      const agg = map.get(g.ticker)!;
+      agg.shares += g.shares;
+      agg.sellRevenue += g.sellRevenue;
+      agg.costBasis += g.costBasis;
+      agg.realizedGain += g.realizedGain;
+      agg.sales.push(g);
+    });
+
+    const result = Array.from(map.values()).map(agg => {
+      const avgSellPrice = agg.shares > 0 ? (agg.sellRevenue / agg.shares) : 0;
+      const avgPurchasePrice = agg.shares > 0 ? (agg.costBasis / agg.shares) : 0;
+      const realizedGainPct = agg.costBasis > 0 ? (agg.realizedGain / agg.costBasis) * 100 : 0;
+      return {
+        ...agg,
+        sellPrice: avgSellPrice,
+        purchasePrice: avgPurchasePrice,
+        realizedGainPct
+      };
+    });
+
+    const field = this.sortByRealized();
+    const dir = this.sortDirectionRealized();
+
+    return result.sort((a: any, b: any) => {
+      let valA = a[field];
+      let valB = b[field];
+
+      if (field === 'realizedGain' && this.realizedLedgerSortMode() === 'pct') {
+        valA = a.realizedGainPct || 0;
+        valB = b.realizedGainPct || 0;
+      }
+
+      if (typeof valA === 'string') {
+        valA = valA.toUpperCase();
+        valB = (valB || '').toUpperCase();
+      }
+
+      if (valA < valB) return dir === 'asc' ? -1 : 1;
+      if (valA > valB) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  });
+
   public clearDateFilter() {
+    const txs = this.service.transactions();
+    if (txs.length > 0) {
+      const dates = txs.map(t => t.date ? t.date.slice(0, 10) : '').filter(Boolean).sort();
+      if (dates.length > 0) {
+        this.service.dateFrom.set(dates[0]);
+        this.service.dateTo.set(dates[dates.length - 1]);
+        return;
+      }
+    }
     this.service.dateFrom.set('');
     this.service.dateTo.set('');
   }
 
-  public setThisYear() {
-    const currentYear = new Date().getFullYear();
-    this.service.dateFrom.set(`${currentYear}-01-01`);
-    this.service.dateTo.set(`${currentYear}-12-31`);
+  public isAllTimeActive(): boolean {
+    const from = this.service.dateFrom();
+    const to = this.service.dateTo();
+    if (!from && !to) return true;
+    const txs = this.service.transactions();
+    if (txs.length > 0) {
+      const dates = txs.map(t => t.date ? t.date.slice(0, 10) : '').filter(Boolean).sort();
+      if (dates.length > 0) {
+        return from === dates[0] && to === dates[dates.length - 1];
+      }
+    }
+    return false;
   }
 
-  public setLastYear() {
-    const lastYear = new Date().getFullYear() - 1;
-    this.service.dateFrom.set(`${lastYear}-01-01`);
-    this.service.dateTo.set(`${lastYear}-12-31`);
+  public setThisYear() {
+    const range = this.service.getYearRange(0);
+    this.service.dateFrom.set(range.from);
+    this.service.dateTo.set(range.to);
+  }
+
+  public isThisYearActive(): boolean {
+    const range = this.service.getYearRange(0);
+    return this.service.dateFrom() === range.from && this.service.dateTo() === range.to;
+  }
+
+  public shiftYear(direction: number) {
+    const fromVal = this.service.dateFrom();
+    let currentYear = new Date().getFullYear();
+    if (fromVal) {
+      const parts = fromVal.split('-');
+      if (parts.length > 0) {
+        const y = parseInt(parts[0], 10);
+        if (!isNaN(y)) {
+          currentYear = y;
+        }
+      }
+    }
+    const targetYear = currentYear + direction;
+    this.service.dateFrom.set(`${targetYear}-01-01`);
+    this.service.dateTo.set(`${targetYear}-12-31`);
   }
 
   public toggleTable() {
@@ -552,10 +794,7 @@ export class DashboardComponent implements AfterViewInit {
     const displayCurr = this.displayCurrency();
     const targetCurr = displayCurr === 'native' ? (pos.currency || 'EUR') : displayCurr;
     const rate = this.service.getExchangeRate('USD', targetCurr);
-    const symbol = targetCurr === 'USD' ? '$' : (targetCurr === 'EUR' ? '€' : '£');
-    
-    const fxRate = this.displayCurrency() === 'USD' ? 1.0 : this.service.getExchangeRate('USD', 'EUR');
-    const displaySymbol = this.displayCurrency() === 'USD' ? '$' : '€';
+    const symbol = this.getCurrencySymbol(targetCurr);
     
     const isCost = this.allocationBasis() === 'cost';
     const rawVal = isCost ? pos.totalCost : pos.currentValue;
@@ -565,8 +804,10 @@ export class DashboardComponent implements AfterViewInit {
       name: pos.name,
       sector: pos.sector || 'Other',
       pct: data[idx].pct,
-      valueFormatted: displaySymbol + Math.round(rawVal * fxRate).toLocaleString(),
-      shares: pos.totalShares
+      valueFormatted: symbol + Math.round(rawVal * rate).toLocaleString(),
+      shares: pos.totalShares,
+      avgCostFormatted: symbol + (pos.averageCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      purchaseValueFormatted: symbol + Math.round(pos.totalShares * pos.averageCost * rate).toLocaleString()
     };
   });
 
@@ -613,27 +854,71 @@ export class DashboardComponent implements AfterViewInit {
       this.lastRefreshTime.set(parseInt(timeStr, 10));
     }
 
-    // Redraw charts when data changes or display currency toggles
+    // Fetch historical prices only when period, transactions, date filters, or view changes
     effect(() => {
-      // Trigger evaluation of dependencies
+      this.historyPeriod();
+      this.service.transactions();
+      this.activeView();
+      this.service.dateFrom();
+      this.service.dateTo();
+      untracked(() => {
+        this.loadHistoryForChart();
+      });
+    });
+
+    // Redraw charts when data changes, display currency toggles, or when historicalPrices cache resolves
+    effect(() => {
       const assetData = this.assetChartData();
       const sectorData = this.sectorChartData();
-      this.displayCurrency(); // Register dependency
-      this.allocationBasis(); // Force redraw on cost vs value toggle
-      this.service.useProperSectors(); // Force redraw on custom vs market sectors toggle
+      
       this.service.dateFrom(); // Re-draw when date filter changes
       this.service.dateTo();
+      this.historyPeriod(); // Register dependency
+      this.service.historicalPrices(); // Redraw chart when cache updates
       
       // Wait a tick for DOM updates
       setTimeout(() => {
         this.drawCharts(assetData, sectorData);
+        this.updateHistoryChartData();
       }, 50);
+    });
+    // Auto-fill All Time dates when transactions load for first time
+    effect(() => {
+      const txs = this.service.transactions();
+      untracked(() => {
+        const from = this.service.dateFrom();
+        const to = this.service.dateTo();
+        if (!from && !to && txs.length > 0) {
+          this.clearDateFilter();
+        }
+      });
     });
   }
 
   ngAfterViewInit() {
     this.drawCharts(this.assetChartData(), this.sectorChartData());
+    this.updateHistoryChartData();
     this.setupChartEvents();
+  }
+
+  public setHistoryPeriod(period: any) {
+    this.historyPeriod.set(period);
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    
+    let fromDate = new Date();
+    if (period === '1w') fromDate.setDate(today.getDate() - 7);
+    else if (period === '1m') fromDate.setDate(today.getDate() - 30);
+    else if (period === '3m') fromDate.setDate(today.getDate() - 90);
+    else if (period === '6m') fromDate.setDate(today.getDate() - 180);
+    else if (period === '1y') fromDate.setDate(today.getDate() - 365);
+    else {
+      this.clearDateFilter();
+      return;
+    }
+    
+    this.service.dateFrom.set(fromDate.toISOString().slice(0, 10));
+    this.service.dateTo.set(todayStr);
   }
 
   private setupChartEvents() {
@@ -706,24 +991,60 @@ export class DashboardComponent implements AfterViewInit {
         }
       });
     }
+
+
   }
 
-  public formatVal(val: number, fromCurrency: string = 'USD', decimals: number = 2, nativeCurrency?: string): string {
+  public getCurrencySymbol(curr: string): string {
+    return this.service.getCurrencySymbol(curr);
+  }
+
+  public getCurrencyBtnLabel(curr: string): string {
+    return this.service.getCurrencyBtnLabel(curr);
+  }
+
+  public getLocaleForCurrency(curr: string): string {
+    const locales: any = {
+      'INR': 'en-IN',
+      'EUR': 'en-IE',
+      'USD': 'en-US',
+      'GBP': 'en-GB',
+      'CHF': 'de-CH',
+      'CAD': 'en-CA',
+      'AUD': 'en-AU',
+      'JPY': 'ja-JP'
+    };
+    return locales[curr] || 'en-US';
+  }
+
+  public formatVal(val: number, fromCurrency: string = 'USD', decimals: number = 2, nativeCurrency?: string, forceSign: boolean = false): string {
     const displayCurr = this.displayCurrency();
     const targetCurr = displayCurr === 'native'
       ? (nativeCurrency || 'EUR')
       : displayCurr;
     const rate = this.service.getExchangeRate(fromCurrency, targetCurr);
     const converted = val * rate;
-    const symbol = targetCurr === 'USD' ? '$' : (targetCurr === 'EUR' ? '€' : '£');
+    const symbol = this.getCurrencySymbol(targetCurr);
     
     const isNegative = converted < 0;
     const absVal = Math.abs(converted);
-    const formatted = absVal.toLocaleString('en-US', {
+    const locale = this.getLocaleForCurrency(targetCurr);
+    const formatted = absVal.toLocaleString(locale, {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
     });
-    return (isNegative ? '-' : '') + symbol + formatted;
+    
+    if (forceSign) {
+      const arrow = isNegative ? '▼ ' : '▲ ';
+      return arrow + symbol + formatted;
+    }
+    
+    const sign = isNegative ? '-' : '';
+    return sign + symbol + formatted;
+  }
+
+  public getAbs(val: number): number {
+    return Math.abs(val);
   }
 
   public formatValShort(val: number, fromCurrency: string = 'USD'): string {
@@ -731,11 +1052,12 @@ export class DashboardComponent implements AfterViewInit {
     const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
     const rate = this.service.getExchangeRate(fromCurrency, targetCurr);
     const converted = val * rate;
-    const symbol = targetCurr === 'USD' ? '$' : (targetCurr === 'EUR' ? '€' : '£');
+    const symbol = this.getCurrencySymbol(targetCurr);
     
     const isNegative = converted < 0;
     const absVal = Math.abs(converted);
-    const formatted = Math.round(absVal).toLocaleString('en-US');
+    const locale = this.getLocaleForCurrency(targetCurr);
+    const formatted = Math.round(absVal).toLocaleString(locale);
     return (isNegative ? '-' : '') + symbol + formatted;
   }
 
@@ -786,7 +1108,7 @@ export class DashboardComponent implements AfterViewInit {
     addPositionsFromSummary(summaryA);
     addPositionsFromSummary(summaryB);
 
-    const positions = Array.from(positionsMap.values());
+    const positions = Array.from(positionsMap.values()).filter(p => p.totalShares > 0.0001);
     positions.sort((a, b) => b.currentValue - a.currentValue);
 
     return {
@@ -823,8 +1145,8 @@ export class DashboardComponent implements AfterViewInit {
 
     // Scale canvas to match high-resolution screens (Retina displays)
     const dpr = window.devicePixelRatio || 1;
-    const displayWidth = 500;
-    const displayHeight = 320;
+    const displayWidth = Math.min(460, canvas.parentElement?.clientWidth || 460);
+    const displayHeight = displayWidth < 380 ? 260 : 320;
 
     canvas.style.width = displayWidth + 'px';
     canvas.style.height = displayHeight + 'px';
@@ -949,8 +1271,10 @@ export class DashboardComponent implements AfterViewInit {
       startAngle = endAngle;
     });
 
-    const symbol = this.displayCurrency() === 'USD' ? '$' : '€';
-    const rate = this.displayCurrency() === 'USD' ? 1.0 : this.service.getExchangeRate('USD', 'EUR');
+    const displayCurr = this.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const symbol = this.getCurrencySymbol(targetCurr);
+    const rate = this.service.getExchangeRate('USD', targetCurr);
 
     if (hoveredIdx !== -1 && data[hoveredIdx]) {
       const hoveredItem = data[hoveredIdx];
@@ -991,5 +1315,466 @@ export class DashboardComponent implements AfterViewInit {
 
   public trackByPosition(index: number, item: any): string {
     return item.ticker;
+  }
+
+  private loadHistoryTimeout: any = null;
+
+  private loadHistoryForChart() {
+    this.chartLoadSession++;
+    const currentSession = this.chartLoadSession;
+
+    if (this.loadHistoryTimeout) {
+      clearTimeout(this.loadHistoryTimeout);
+    }
+    this.loadHistoryTimeout = setTimeout(async () => {
+      this.loadHistoryTimeout = null;
+
+      const period = this.historyPeriod();
+      const dateFrom = this.service.dateFrom();
+      const dateTo = this.service.dateTo();
+
+      let range = '1mo';
+      
+      // Determine target range start date based on the active top filter (capped at today)
+      let endDate = new Date();
+      if (dateTo) {
+        const parsedTo = new Date(dateTo);
+        if (parsedTo < endDate) {
+          endDate = parsedTo;
+        }
+      }
+      
+      let startDate = new Date(endDate);
+      
+      if (period === '1w') startDate.setDate(startDate.getDate() - 7);
+      else if (period === '1m') startDate.setDate(startDate.getDate() - 30);
+      else if (period === '3m') startDate.setDate(startDate.getDate() - 90);
+      else if (period === '6m') startDate.setDate(startDate.getDate() - 180);
+      else if (period === '1y') startDate.setDate(startDate.getDate() - 365);
+      else {
+        // 'all'
+        if (dateFrom) {
+          startDate = new Date(dateFrom);
+        } else {
+          const txs = this.service.transactions();
+          if (txs.length > 0) {
+            startDate = new Date(txs[0].date);
+          }
+        }
+      }
+      
+      // Days diff between today and target start date determines Yahoo API history range
+      const daysDiff = (new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysDiff <= 30) range = '1mo';
+      else if (daysDiff <= 90) range = '3mo';
+      else if (daysDiff <= 180) range = '6mo';
+      else if (daysDiff <= 365) range = '1y';
+      else if (daysDiff <= 730) range = '2y';
+      else if (daysDiff <= 1825) range = '5y';
+      else range = 'max';
+
+      const txs = this.service.transactions().filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL');
+      const tickers = Array.from(new Set(txs.map(t => t.ticker.toUpperCase().trim()).filter(Boolean)));
+      if (tickers.length > 0) {
+        await this.service.fetchHistoricalPricesForTickers(tickers, range);
+      }
+
+      if (currentSession === this.chartLoadSession) {
+        this.updateHistoryChartData();
+      }
+    }, 200);
+  }
+
+  public calculateHistoricalData(): any[] {
+    const cache = this.service.historicalPrices();
+    const activeView = this.activeView();
+    const filterTkr = this.filterTicker().toUpperCase().trim();
+    let txs = [...this.service.transactions()];
+    txs = txs.filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL');
+    if (filterTkr) {
+      txs = txs.filter(t => (t.ticker || '').toUpperCase().trim() === filterTkr);
+    }
+
+    if (activeView === 'ownerA') {
+      txs = txs.filter(t => t.personAShares > 0);
+    } else if (activeView === 'ownerB') {
+      txs = txs.filter(t => t.personBShares > 0);
+    }
+
+    txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (txs.length === 0) return [];
+
+    const configs = this.service.tickerConfigs();
+
+    // Determine start/end of the chart period
+    const dateFrom = this.service.dateFrom();
+    const dateTo = this.service.dateTo();
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    let endDate = new Date(today);
+    if (dateTo) {
+      const parsedTo = new Date(dateTo);
+      if (parsedTo < today) {
+        endDate = parsedTo;
+      }
+    }
+    endDate.setHours(23, 59, 59, 999);
+
+    const period = this.historyPeriod();
+    let startDate = new Date(endDate); // Offset from the active year end date
+
+    if (period === '1w') startDate.setDate(endDate.getDate() - 7);
+    else if (period === '1m') startDate.setDate(endDate.getDate() - 30);
+    else if (period === '3m') startDate.setDate(endDate.getDate() - 90);
+    else if (period === '6m') startDate.setDate(endDate.getDate() - 180);
+    else if (period === '1y') startDate.setDate(endDate.getDate() - 365);
+    else {
+      // 'all'
+      if (dateFrom) {
+        startDate = new Date(dateFrom);
+      } else {
+        startDate = new Date(txs[0].date);
+      }
+    }
+    startDate.setHours(0, 0, 0, 0);
+
+    const getLocalDateStr = (d: Date): string => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const todayStr = getLocalDateStr(new Date());
+
+    // Generate target dates to calculate and plot (optimizing points for longer ranges)
+    const targetDates: Date[] = [];
+    let step = 1;
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (period === '3m') step = 2;
+    else if (period === '6m') step = 4;
+    else if (period === '1y') step = 7;
+    else if (period === 'all') {
+      if (totalDays > 365) {
+        step = Math.ceil(totalDays / 60); // approx 60 points max
+      } else {
+        step = 2;
+      }
+    }
+
+    // Always start with startDate
+    targetDates.push(new Date(startDate));
+
+    let temp = new Date(startDate);
+    while (true) {
+      temp.setDate(temp.getDate() + step);
+      if (temp >= endDate) {
+        break;
+      }
+      targetDates.push(new Date(temp));
+    }
+
+    // Always end with endDate
+    targetDates.push(new Date(endDate));
+
+    // Ensure unique date strings
+    const uniqueDates: Date[] = [];
+    const seenDateStrings = new Set<string>();
+    targetDates.forEach(d => {
+      const s = getLocalDateStr(d);
+      if (!seenDateStrings.has(s)) {
+        seenDateStrings.add(s);
+        uniqueDates.push(d);
+      }
+    });
+
+    const sharesMap = new Map<string, number>();
+    const posCostMap = new Map<string, number>();
+    const lastTxPriceMap = new Map<string, number>();
+    
+    let txIdx = 0;
+    const allPoints: any[] = [];
+
+    // Single linear pass over target dates and transactions
+    for (const targetDate of uniqueDates) {
+      const curDateStr = getLocalDateStr(targetDate);
+
+      // Apply all transactions that occurred on or before curDateStr
+      while (txIdx < txs.length && (txs[txIdx].date || '').slice(0, 10) <= curDateStr) {
+        const tx = txs[txIdx];
+        const ticker = (tx.ticker || '').toUpperCase().trim();
+        const type = tx.type.toUpperCase();
+
+        const rateToUsd = tx.currency.toUpperCase() === 'USD'
+          ? 1.0
+          : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.service.getExchangeRate(tx.currency, 'USD'));
+
+        let actualShares = 0;
+        let actualCostBasis = 0;
+
+        if (activeView === 'ownerA') {
+          actualShares = tx.personAShares;
+          actualCostBasis = tx.personACostBasis * rateToUsd;
+        } else if (activeView === 'ownerB') {
+          actualShares = tx.personBShares;
+          actualCostBasis = tx.personBCostBasis * rateToUsd;
+        } else {
+          actualShares = (tx.personAShares || 0) + (tx.personBShares || 0);
+          actualCostBasis = ((tx.personACostBasis || 0) + (tx.personBCostBasis || 0)) * rateToUsd;
+        }
+
+        const cfg = configs[ticker];
+        if (cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
+          actualShares *= cfg.splitRatio;
+        }
+
+        if (type === 'BUY') {
+          if (ticker) {
+            sharesMap.set(ticker, (sharesMap.get(ticker) || 0) + actualShares);
+            posCostMap.set(ticker, (posCostMap.get(ticker) || 0) + actualCostBasis);
+            lastTxPriceMap.set(ticker, (tx.price || 0) * rateToUsd);
+          }
+        } else if (type === 'SELL') {
+          if (ticker) {
+            const currentShares = sharesMap.get(ticker) || 0;
+            const currentCost = posCostMap.get(ticker) || 0;
+            const avgCost = currentShares > 0 ? (currentCost / currentShares) : 0;
+            const costOfSharesSold = actualShares * avgCost;
+
+            sharesMap.set(ticker, Math.max(0, currentShares - actualShares));
+            posCostMap.set(ticker, Math.max(0, currentCost - costOfSharesSold));
+            lastTxPriceMap.set(ticker, (tx.price || 0) * rateToUsd);
+          }
+        }
+        txIdx++;
+      }
+
+      // Compute value and cost basis for targetDate
+      let dailyCostBasisUsd = 0;
+      posCostMap.forEach((c) => {
+        dailyCostBasisUsd += c;
+      });
+
+      let dailyValuationUsd = 0;
+
+      sharesMap.forEach((shares, tkr) => {
+        if (shares <= 0) return;
+
+        const isToday = curDateStr === todayStr;
+        let priceNative = null;
+
+        if (!isToday) {
+          const tickerCache = cache[tkr];
+          if (tickerCache) {
+            if (tickerCache[curDateStr] !== undefined) {
+              priceNative = tickerCache[curDateStr];
+            } else {
+              const cacheDates = Object.keys(tickerCache).filter(d => d <= curDateStr).sort();
+              if (cacheDates.length > 0) {
+                priceNative = tickerCache[cacheDates[cacheDates.length - 1]];
+              }
+            }
+          }
+        }
+
+        let priceUsd = 0;
+        if (priceNative !== null) {
+          const cfg = configs[tkr];
+          const priceCurr = cfg?.priceCurrency || 'USD';
+          const priceRate = this.service.getExchangeRate(priceCurr, 'USD');
+          priceUsd = priceNative * priceRate;
+        } else {
+          priceUsd = lastTxPriceMap.get(tkr) || 0;
+          if (priceUsd === 0 || isToday) {
+            const cfg = configs[tkr];
+            if (cfg) {
+              const priceCurr = cfg.priceCurrency || 'USD';
+              const priceRate = this.service.getExchangeRate(priceCurr, 'USD');
+              priceUsd = cfg.currentPrice * priceRate;
+            }
+          }
+        }
+
+        dailyValuationUsd += shares * priceUsd;
+      });
+
+      allPoints.push({
+        date: new Date(targetDate),
+        invested: dailyCostBasisUsd,
+        value: dailyValuationUsd,
+        shares: sharesMap.get(filterTkr) || 0,
+        avgCost: (sharesMap.get(filterTkr) || 0) > 0 ? (posCostMap.get(filterTkr) || 0) / (sharesMap.get(filterTkr) || 0) : 0
+      });
+    }
+
+    const displayCurr = this.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const rateToTarget = this.service.getExchangeRate('USD', targetCurr);
+
+    const finalPoints = allPoints.map(p => ({
+      date: p.date,
+      invested: parseFloat((p.invested * rateToTarget).toFixed(2)),
+      value: parseFloat((p.value * rateToTarget).toFixed(2)),
+      shares: p.shares,
+      avgCost: parseFloat((p.avgCost * rateToTarget).toFixed(4))
+    }));
+
+    return finalPoints;
+  }
+
+  public updateHistoryChartData() {
+    const points = this.calculateHistoricalData();
+    this.gradientCounter++;
+    this.gradientId = `chartLineGrad_${this.gradientCounter}`;
+    if (points.length === 0) {
+      this.chartPoints = [];
+      this.investedPath = '';
+      this.valuePath = '';
+      this.fillPath = '';
+      return;
+    }
+
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    points.forEach(p => {
+      minVal = Math.min(minVal, p.invested, p.value);
+      maxVal = Math.max(maxVal, p.invested, p.value);
+    });
+
+    if (minVal === Infinity || maxVal === -Infinity) {
+      minVal = 0;
+      maxVal = 100;
+    } else {
+      const diff = maxVal - minVal;
+      if (diff === 0) {
+        minVal = Math.max(0, minVal * 0.9);
+        maxVal = maxVal * 1.1;
+      } else {
+        minVal = Math.max(0, minVal - diff * 0.1);
+        maxVal = maxVal + diff * 0.15;
+      }
+    }
+
+    this.chartMinVal = minVal;
+    this.chartMaxVal = maxVal;
+
+    const minTime = points[0].date.getTime();
+    const maxTime = points[points.length - 1].date.getTime();
+    const timeSpan = maxTime - minTime || 1;
+
+    const paddingLeft = 0;
+    const paddingRight = 0;
+    const paddingTop = 30;
+    const paddingBottom = 40;
+    const chartWidth = 1000 - paddingLeft - paddingRight;
+    const chartHeight = 320 - paddingTop - paddingBottom;
+
+    const getX = (t: number) => paddingLeft + ((t - minTime) / timeSpan) * chartWidth;
+    const getY = (v: number) => paddingTop + chartHeight - ((v - minVal) / (maxVal - minVal)) * chartHeight;
+
+    this.chartPoints = points.map(p => {
+      const x = getX(p.date.getTime());
+      const yInv = getY(p.invested);
+      const yVal = getY(p.value);
+      const dateStr = this.datePipe.transform(p.date, this.service.dateFormat()) || '';
+      return {
+        date: p.date,
+        dateStr,
+        invested: p.invested,
+        value: p.value,
+        shares: p.shares,
+        avgCost: p.avgCost,
+        x,
+        yInv,
+        yVal
+      };
+    });
+
+    const getBezierPath = (pts: { x: number; y: number }[]): string => {
+      if (pts.length === 0) return '';
+      let d = `M ${pts[0].x} ${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const cp1x = prev.x + (curr.x - prev.x) / 2;
+        const cp1y = prev.y;
+        const cp2x = prev.x + (curr.x - prev.x) / 2;
+        const cp2y = curr.y;
+        d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
+      }
+      return d;
+    };
+
+    const valPoints = this.chartPoints.map(p => ({ x: p.x, y: p.yVal }));
+    const invPoints = this.chartPoints.map(p => ({ x: p.x, y: p.yInv }));
+
+    this.valuePath = getBezierPath(valPoints);
+    this.investedPath = getBezierPath(invPoints);
+
+    if (this.chartPoints.length > 0) {
+      const first = this.chartPoints[0];
+      const last = this.chartPoints[this.chartPoints.length - 1];
+      const bottomY = paddingTop + chartHeight;
+      this.fillPath = `M ${first.x} ${bottomY} L ${first.x} ${first.yVal}` +
+        this.valuePath.substring(1) +
+        ` L ${last.x} ${bottomY} Z`;
+    } else {
+      this.fillPath = '';
+    }
+
+    const lastPt = points[points.length - 1];
+    const isOverallProfit = lastPt.value >= lastPt.invested;
+    this.svgThemeColor = isOverallProfit ? '#10b981' : '#ef4444';
+    this.svgFillGradStr = isOverallProfit ? '16, 185, 129' : '239, 68, 68';
+
+    this.lineGradStops = [];
+    if (this.chartPoints.length > 0) {
+      const minX = this.chartPoints[0].x;
+      const maxX = this.chartPoints[this.chartPoints.length - 1].x;
+      const totalWidth = maxX - minX || 1;
+
+      this.chartPoints.forEach((p) => {
+        const pct = ((p.x - minX) / totalWidth) * 100;
+        const isProfit = p.value >= p.invested;
+        const color = isProfit ? '#10b981' : '#ef4444';
+        
+        this.lineGradStops.push({
+          offset: `${pct}%`,
+          color: color
+        });
+      });
+    }
+
+    const yTicksCount = 5;
+    this.yTicks = [];
+    const displayCurr = this.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const symbol = this.getCurrencySymbol(targetCurr);
+
+    for (let i = 0; i <= yTicksCount; i++) {
+      const val = minVal + (maxVal - minVal) * (i / yTicksCount);
+      const y = getY(val);
+      let valText = symbol + Math.round(val).toLocaleString();
+      if (val >= 1000000) {
+        valText = symbol + (val / 1000000).toFixed(1) + 'M';
+      } else if (val >= 1000) {
+        valText = symbol + (val / 1000).toFixed(1) + 'k';
+      }
+      this.yTicks.push({ valText, y });
+    }
+
+    const xTicksCount = 5;
+    this.xTicks = [];
+    for (let i = 0; i < xTicksCount; i++) {
+      const targetTime = minTime + (maxTime - minTime) * (i / (xTicksCount - 1));
+      const tickDate = new Date(targetTime);
+      const x = getX(targetTime);
+      const dateStr = this.datePipe.transform(tickDate, 'MMM d, yyyy') || '';
+      this.xTicks.push({ dateStr, x });
+    }
+    this.cdr.detectChanges();
   }
 }

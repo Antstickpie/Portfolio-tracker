@@ -32,6 +32,39 @@
           <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
         </select>
       </div>
+      <div class="form-group" style="margin-top: 1.2rem;">
+        <label>Year Basis (for "This Year" / "Last Year" filters)</label>
+        <select 
+          [ngModel]="service.yearBasis()" 
+          (ngModelChange)="service.yearBasis.set($event); service.saveToStorage()"
+          style="width: 100%; padding: 0.55rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer;">
+          <option value="calendar" style="background: #0d1117;">Calendar Year (Jan 1 - Dec 31)</option>
+          <option value="financial" style="background: #0d1117;">Financial Year (Custom Start)</option>
+        </select>
+      </div>
+
+      <div *ngIf="service.yearBasis() === 'financial'" style="margin-top: 1rem; padding: 0.8rem; background: rgba(255, 255, 255, 0.01); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 1rem; align-items: center;">
+        <div style="flex: 1;">
+          <label style="font-size: 0.75rem; color: var(--text-muted);">Start Month</label>
+          <select 
+            [ngModel]="service.financialYearStartMonth()" 
+            (ngModelChange)="service.financialYearStartMonth.set(+$event); service.saveToStorage()"
+            style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
+            <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m" style="background: #0d1117;">
+              {{ getMonthName(m) }}
+            </option>
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 0.75rem; color: var(--text-muted);">Start Day</label>
+          <select 
+            [ngModel]="service.financialYearStartDay()" 
+            (ngModelChange)="service.financialYearStartDay.set(+$event); service.saveToStorage()"
+            style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
+            <option *ngFor="let d of getDaysArray()" [value]="d" style="background: #0d1117;">{{ d }}</option>
+          </select>
+        </div>
+      </div>
       
       <div style="margin-top: 1.8rem; margin-bottom: 0.5rem; display: flex; justify-content: flex-start;">
         <button class="btn btn-primary btn-sm" (click)="saveOwnerNames()">Save Settings</button>
@@ -225,6 +258,37 @@
     </div>
   </div>
 
+  <!-- Dashboard Currencies card -->
+  <div class="glass-card" style="margin-top: 1.5rem;">
+    <div>
+      <h3 style="margin: 0;">Dashboard Currencies</h3>
+      <p class="subtitle" style="margin: 0.2rem 0 0; font-size: 0.78rem;">Define the currencies available in the dashboard toggle bar. (Native is always present)</p>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1rem; margin-bottom: 1rem;">
+      <span
+        *ngFor="let curr of service.visibleCurrencies(); let i = index"
+        style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-main);">
+        {{ service.getCurrencyBtnLabel(curr) }}
+        <button
+          (click)="removeVisibleCurrency(i)"
+          style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; transition: color 0.15s;"
+          onmouseover="this.style.color='#ef4444'"
+          onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+      </span>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <input
+        type="text"
+        [(ngModel)]="newCurrencyCode"
+        placeholder="e.g. GBP, CHF, CAD, JPY…"
+        (keydown.enter)="addVisibleCurrency()"
+        style="flex: 1; max-width: 240px; padding: 0.4rem 0.7rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); outline: none; font-size: 0.82rem; text-transform: uppercase;">
+      <button class="btn btn-primary btn-sm" (click)="addVisibleCurrency()" [disabled]="!newCurrencyCode.trim()">+ Add</button>
+    </div>
+  </div>
+
   <!-- Ticker Metadata Pricing Card -->
   <div class="glass-card prices-card">
     <div class="prices-header">
@@ -278,6 +342,8 @@
             <th style="text-align: left; min-width: 140px;">
               Yahoo Symbol <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; margin-top: 0.1rem; text-transform: none;">(override suffix e.g. SEC0.DE)</span>
             </th>
+            <th>Split Date</th>
+            <th>Split Ratio</th>
           </tr>
         </thead>
         <tbody>
@@ -296,7 +362,7 @@
                   style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
                   {{ t.ticker.slice(0, 2) }}
                 </div>
-                <span>{{ t.ticker }}</span>
+                <a href="https://www.google.com/search?q={{ t.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ t.ticker }}</a>
               </div>
             </td>
             <td class="num font-mono bold">
@@ -322,9 +388,26 @@
                 onfocus="this.style.borderColor='var(--primary)'"
                 onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
             </td>
+            <td>
+              <input
+                type="date"
+                [ngModel]="t.splitDate || ''"
+                (ngModelChange)="updateTickerSplitDate(t.ticker, $event)"
+                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.75rem; padding: 0.2rem 0.4rem; outline: none; width: 110px; text-align: center;">
+            </td>
+            <td>
+              <input
+                type="number"
+                step="any"
+                [ngModel]="t.splitRatio || ''"
+                (blur)="updateTickerSplitRatio(t.ticker, $any($event.target).value)"
+                (keydown.enter)="updateTickerSplitRatio(t.ticker, $any($event.target).value); $any($event.target).blur()"
+                placeholder="e.g. 2"
+                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 60px; text-align: center;">
+            </td>
           </tr>
           <tr *ngIf="filteredTickerConfigsList().length === 0">
-            <td [attr.colspan]="service.showNameColumn() ? 5 : 4" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
+            <td [attr.colspan]="service.showNameColumn() ? 7 : 6" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
           </tr>
         </tbody>
       </table>

@@ -7,4 +7,6 @@ export interface TickerConfig {
   logoData?: string;
   yahooSymbol?: string;
   customSector?: string;
+  splitRatio?: number;
+  splitDate?: string;
 }

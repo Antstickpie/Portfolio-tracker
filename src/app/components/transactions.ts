@@ -34,7 +34,7 @@ export class TransactionsComponent {
   // Track expanded transaction row
   public expandedTxId = signal<string | null>(null);
 
-  public displayCurrency = signal<'USD' | 'EUR'>('EUR');
+  public displayCurrency = signal<string>(this.service.visibleCurrencies()[0] || 'EUR');
 
   public getAccountCurrentValue(accountName: string): string {
     const txs = this.service.transactions().filter(t => (t.source || 'Manual Entries') === accountName);
@@ -77,7 +77,7 @@ export class TransactionsComponent {
     const targetCurr = this.displayCurrency();
     const rate = this.service.getExchangeRate('USD', targetCurr);
     const converted = totalUsd * rate;
-    const symbol = targetCurr === 'USD' ? '$' : '€';
+    const symbol = this.service.getCurrencySymbol(targetCurr);
     return symbol + converted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 

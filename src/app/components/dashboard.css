@@ -500,3 +500,114 @@
   font-weight: 600;
   font-family: 'Consolas', monospace;
 }
+
+/* --- RESPONSIVE MEDIA QUERIES (XS, S, M) --- */
+
+/* Medium (Tablets, max 1024px) */
+@media (max-width: 1024px) {
+  .dashboard-header {
+    gap: 1.2rem;
+  }
+  .header-right {
+    gap: 1rem;
+  }
+}
+
+/* Small (Mobile landscape, max 768px) */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 1rem !important;
+    margin-bottom: 1.5rem;
+  }
+  .header-left h1 {
+    font-size: 1.6rem;
+  }
+  .header-right {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .date-range-container {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.4rem;
+  }
+  .date-picker-wrapper {
+    width: 100%;
+    justify-content: space-between;
+    padding-right: 1.5rem;
+    box-sizing: border-box;
+  }
+  .premium-date-input {
+    width: 45%;
+  }
+  .currency-toggle, .tabs-control {
+    width: 100%;
+    justify-content: space-around;
+  }
+  .currency-btn, .tab-btn {
+    flex: 1;
+    text-align: center;
+    padding: 0 0.5rem;
+    font-size: 0.8rem;
+  }
+  .chart-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .chart-legend {
+    max-height: 180px;
+  }
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+  .table-header div {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .dashboard-search-input {
+    width: 100% !important;
+  }
+  .control-divider {
+    display: none !important;
+  }
+}
+
+/* Extra Small (Mobile portrait, max 480px) */
+@media (max-width: 480px) {
+  .dashboard-header {
+    padding: 0.8rem !important;
+  }
+  .header-left h1 {
+    font-size: 1.4rem;
+  }
+  .date-picker-wrapper {
+    padding: 0 0.5rem;
+    padding-right: 1.5rem;
+  }
+  .premium-date-input {
+    font-size: 0.78rem;
+  }
+  .currency-btn, .tab-btn {
+    font-size: 0.72rem;
+    padding: 0 0.25rem;
+  }
+  .tab-btn {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sector-hover-overlay, .asset-hover-overlay {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    top: auto !important;
+    bottom: 12px !important;
+    width: 92% !important;
+    max-width: 320px !important;
+    box-shadow: var(--shadow-lg), 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+    background: rgba(13, 18, 35, 0.96) !important;
+  }
+}

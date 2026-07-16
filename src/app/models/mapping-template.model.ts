@@ -4,6 +4,7 @@ export interface MappingTemplate {
   hasHeader: boolean;
   mappings: {
     date: number;
+    time?: number;
     ticker: number;
     type: number;
     quantity: number;

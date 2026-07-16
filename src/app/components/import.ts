@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
 import { Transaction } from '../models/transaction.model';
 import { MappingTemplate } from '../models/mapping-template.model';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-import',
@@ -22,6 +23,12 @@ export class ImportComponent {
   
   public selectedTemplateName = signal<string>('');
   public newTemplateName = '';
+  public uploadedFileName = signal<string>('');
+
+  // XLSX Sheet State
+  public sheetNames = signal<string[]>([]);
+  public selectedSheetName = signal<string>('');
+  private currentWorkbook: XLSX.WorkBook | null = null;
 
   // Default owner for transactions batch
   public defaultOwner = 'ownerA';
@@ -34,6 +41,7 @@ export class ImportComponent {
   // Column Mappings Model
   public columnMappings: Record<string, number> = {
     date: -1,
+    time: -1,
     ticker: -1,
     type: -1,
     quantity: -1,
@@ -47,6 +55,7 @@ export class ImportComponent {
   // Target database fields
   public targetFields = [
     { key: 'date', label: 'Date / Time', required: true },
+    { key: 'time', label: 'Time (Optional)', required: false },
     { key: 'ticker', label: 'Ticker Symbol', required: false },
     { key: 'type', label: 'Transaction Type', required: true },
     { key: 'quantity', label: 'Quantity (Shares)', required: false },
@@ -95,13 +104,77 @@ export class ImportComponent {
     if (!input.files || input.files.length === 0) return;
     
     const file = input.files[0];
+    const isXlsx = file.name.endsWith('.xlsx');
+    this.uploadedFileName.set(file.name);
+
+    // Default batch name to filename without extension if not already set by the user
+    if (!this.accountName || !this.accountName.trim()) {
+      const extIdx = file.name.lastIndexOf('.');
+      this.accountName = extIdx !== -1 ? file.name.substring(0, extIdx) : file.name;
+    }
+
+    // Auto-select Vested Statement template if file name contains "vested"
+    if (file.name.toLowerCase().includes('vested')) {
+      const vestedTmpl = this.service.templates().find(t => t.name.toLowerCase().includes('vested'));
+      if (vestedTmpl) {
+        this.loadTemplateByName(vestedTmpl.name);
+      }
+    }
+
     const reader = new FileReader();
-    reader.onload = (e) => {
-      this.rawText = e.target?.result as string;
+    if (isXlsx) {
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          this.currentWorkbook = workbook;
+          this.sheetNames.set(workbook.SheetNames);
+          
+          const defaultSheet = workbook.SheetNames.includes('Trades') 
+            ? 'Trades' 
+            : (workbook.SheetNames[0] || '');
+          this.selectedSheetName.set(defaultSheet);
+          this.parseSelectedSheet();
+        } catch (err) {
+          this.service.showToast('Error reading Excel file.', 'error');
+        }
+        input.value = ''; // reset file input
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Clear Excel state
+      this.currentWorkbook = null;
+      this.sheetNames.set([]);
+      this.selectedSheetName.set('');
+      
+      reader.onload = (e) => {
+        this.rawText = e.target?.result as string;
+        this.parsePreview();
+        input.value = ''; // reset file input
+      };
+      reader.readAsText(file);
+    }
+  }
+
+  public onSheetChange(sheetName: string) {
+    this.selectedSheetName.set(sheetName);
+    this.parseSelectedSheet();
+  }
+
+  private parseSelectedSheet() {
+    if (!this.currentWorkbook) return;
+    try {
+      const sheet = this.currentWorkbook.Sheets[this.selectedSheetName()];
+      if (!sheet) return;
+      // Convert sheet to CSV format
+      const csv = XLSX.utils.sheet_to_csv(sheet);
+      this.rawText = csv;
+      this.delimiter = ',';
+      this.hasHeader = true;
       this.parsePreview();
-      input.value = ''; // reset file input
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      this.service.showToast('Error parsing Excel sheet.', 'error');
+    }
   }
 
   public onParserSettingsChange() {
@@ -157,7 +230,7 @@ export class ImportComponent {
     this.selectedTemplateName.set(name);
     if (!name) {
       // Clear mappings for manual selection
-      this.columnMappings = { date: -1, ticker: -1, type: -1, quantity: -1, price: -1, totalAmount: -1, currency: -1, fxRate: -1, fees: -1 };
+      this.columnMappings = { date: -1, time: -1, ticker: -1, type: -1, quantity: -1, price: -1, totalAmount: -1, currency: -1, fxRate: -1, fees: -1 };
       return;
     }
     
@@ -165,7 +238,10 @@ export class ImportComponent {
     if (t) {
       this.delimiter = t.delimiter;
       this.hasHeader = t.hasHeader;
-      this.columnMappings = { ...t.mappings };
+      this.columnMappings = Object.assign(
+        { date: -1, time: -1, ticker: -1, type: -1, quantity: -1, price: -1, totalAmount: -1, currency: -1, fxRate: -1, fees: -1 },
+        t.mappings
+      );
     }
   }
 
@@ -179,6 +255,7 @@ export class ImportComponent {
       hasHeader: this.hasHeader,
       mappings: {
         date: this.columnMappings['date'],
+        time: this.columnMappings['time'],
         ticker: this.columnMappings['ticker'],
         type: this.columnMappings['type'],
         quantity: this.columnMappings['quantity'],
@@ -206,6 +283,7 @@ export class ImportComponent {
       hasHeader: this.hasHeader,
       mappings: {
         date: this.columnMappings['date'],
+        time: this.columnMappings['time'],
         ticker: this.columnMappings['ticker'],
         type: this.columnMappings['type'],
         quantity: this.columnMappings['quantity'],
@@ -233,6 +311,7 @@ export class ImportComponent {
   public clearRawInput() {
     this.rawText = '';
     this.parsedLines.set([]);
+    this.uploadedFileName.set('');
   }
 
   public async importData() {
@@ -263,7 +342,30 @@ export class ImportComponent {
       if (line.length <= 1) continue;
 
       // Extract values based on mapping
-      const dateVal = line[this.columnMappings['date']] || new Date().toISOString();
+      const dateRaw = line[this.columnMappings['date']] || '';
+      const timeRaw = this.columnMappings['time'] !== -1 ? (line[this.columnMappings['time']] || '') : '';
+      
+      let dateVal = '';
+      if (dateRaw) {
+        let combined = dateRaw.trim();
+        if (timeRaw) {
+          combined += ' ' + timeRaw.trim();
+        }
+        
+        try {
+          const parsedDate = new Date(combined);
+          if (!isNaN(parsedDate.getTime())) {
+            dateVal = parsedDate.toISOString();
+          } else {
+            const fallbackDate = new Date(dateRaw.trim());
+            dateVal = !isNaN(fallbackDate.getTime()) ? fallbackDate.toISOString() : new Date().toISOString();
+          }
+        } catch (e) {
+          dateVal = new Date().toISOString();
+        }
+      } else {
+        dateVal = new Date().toISOString();
+      }
       const tickerVal = this.columnMappings['ticker'] !== -1 ? (line[this.columnMappings['ticker']] || '') : '';
       const typeVal = line[this.columnMappings['type']] || 'BUY';
       

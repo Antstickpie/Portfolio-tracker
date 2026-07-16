@@ -64,12 +64,23 @@
 
       <h3>2. Paste or Upload Broker File</h3>
       <div class="import-form-group">
-        <label>Upload Statement File (.csv, .tsv, .txt)</label>
+        <label>Upload Statement File (.csv, .tsv, .txt, .xlsx)</label>
         <input 
           type="file" 
-          accept=".csv,.tsv,.txt" 
+          accept=".csv,.tsv,.txt,.xlsx" 
           (change)="onFileUploaded($event)"
           class="import-file-input">
+        <p class="file-hint animate-fade-in" *ngIf="uploadedFileName()" style="margin-top: 0.4rem; color: var(--success); font-size: 0.8rem; font-weight: 500;">
+          ✓ Selected: {{ uploadedFileName() }}
+        </p>
+      </div>
+
+      <!-- Sheet selector dropdown (only for XLSX files) -->
+      <div class="import-form-group animate-fade-in" *ngIf="sheetNames().length > 0" style="margin-bottom: 1.2rem;">
+        <label>Select Sheet from Excel File</label>
+        <select [ngModel]="selectedSheetName()" (ngModelChange)="onSheetChange($event)">
+          <option *ngFor="let name of sheetNames()" [value]="name">{{ name }}</option>
+        </select>
       </div>
       
       <div class="form-group">

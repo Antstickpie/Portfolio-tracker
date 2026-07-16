@@ -13,7 +13,7 @@ A sleek, private investment portfolio tracker. No accounts. No subscriptions. Yo
 ### Dashboard
 ![Dashboard](docs/screenshots/dashboard.png)
 
-### Holdings & Realized Gains
+### Holdings & Allocations
 ![Holdings](docs/screenshots/holdings.png)
 
 ### Import Data
