@@ -9,4 +9,5 @@ export interface TickerConfig {
   customSector?: string;
   splitRatio?: number;
   splitDate?: string;
+  splits?: { date: string; ratio: number; }[];
 }

@@ -32,4 +32,18 @@ export class App {
   public switchTab(tab: 'dashboard' | 'import' | 'ledger' | 'prices') {
     this.activeTab.set(tab);
   }
+
+  public formatSyncTime(timestamp: number): string {
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return new Date(timestamp).toLocaleDateString();
+  }
+
+  public forceSyncPrices() {
+    this.service.refreshMarketData(true);
+  }
 }

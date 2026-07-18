@@ -33,12 +33,31 @@
       </button>
     </nav>
 
+    <!-- Live Prices Sync Status in Top Bar -->
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem 0.7rem; border-radius: 20px; color: var(--text-muted); flex-shrink: 0;">
+      <span [style.color]="service.lastRefreshTime() ? 'var(--success)' : 'var(--text-muted)'" style="font-size: 0.65rem; line-height: 1;">●</span>
+      <span style="color: var(--text-main); font-weight: 500;">Live Prices</span>
+      <span style="font-size: 0.72rem; opacity: 0.8;">
+        (Synced: {{ service.getSyncedTimeAgoText() }})
+      </span>
+      <button 
+        (click)="forceSyncPrices()" 
+        title="Force sync of stock prices and FX rates"
+        style="background: transparent; border: none; outline: none; padding: 0; margin-left: 0.25rem; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; opacity: 0.4; transition: opacity 0.2s;"
+        onmouseover="this.style.opacity='1'"
+        onmouseout="this.style.opacity='0.4'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [style.animation]="service.isSyncing() ? 'spin 1.2s linear infinite' : 'none'">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+      </button>
+    </div>
+
     <!-- Help link -->
     <a
       href="https://github.com/Antstickpie/Portfolio-tracker#readme"
       target="_blank"
       title="User Guide & Documentation"
-      style="margin-left: auto; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--text-muted); text-decoration: none; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s; flex-shrink: 0;"
+      style="margin-left: 0.75rem; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--text-muted); text-decoration: none; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s; flex-shrink: 0;"
       onmouseover="this.style.color='var(--primary)';this.style.borderColor='var(--primary)';this.style.background='rgba(99,102,241,0.08)'"
       onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='rgba(255,255,255,0.1)';this.style.background='transparent'">
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

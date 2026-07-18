@@ -344,6 +344,7 @@
             </th>
             <th>Split Date</th>
             <th>Split Ratio</th>
+            <th>Auto Splits</th>
           </tr>
         </thead>
         <tbody>
@@ -405,12 +406,58 @@
                 placeholder="e.g. 2"
                 style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 60px; text-align: center;">
             </td>
+            <td>
+              <div *ngIf="t.splits && t.splits.length > 0" style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                <span *ngFor="let sp of t.splits" class="sector-badge" style="font-size: 0.68rem; padding: 0.15rem 0.4rem;" [title]="sp.ratio + ':1 on ' + sp.date">
+                  {{ sp.ratio }}:1 ({{ sp.date.slice(0,4) }})
+                </span>
+              </div>
+              <span *ngIf="!t.splits || t.splits.length === 0" style="color: var(--text-muted); font-size: 0.72rem;">—</span>
+            </td>
           </tr>
           <tr *ngIf="filteredTickerConfigsList().length === 0">
-            <td [attr.colspan]="service.showNameColumn() ? 7 : 6" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
+            <td [attr.colspan]="service.showNameColumn() ? 8 : 7" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Cost Basis Method Toggle -->
+  <div class="glass-card" style="margin-top: 1.5rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <h3 style="margin: 0 0 0.25rem;">Cost Basis Method</h3>
+        <p class="subtitle" style="margin: 0;">FIFO (First In, First Out) is the standard for tax reporting. Average cost uses weighted average of all shares.</p>
+      </div>
+      <div style="display: flex; background: rgba(15, 23, 42, 0.6); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; flex-shrink: 0;">
+        <button 
+          style="background: transparent; border: none; outline: none; padding: 0 1rem; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
+          [style.background]="service.costBasisMethod() === 'fifo' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
+          [style.color]="service.costBasisMethod() === 'fifo' ? '#fff' : 'var(--text-muted)'"
+          (click)="setCostBasisMethod('fifo')">
+          FIFO
+        </button>
+        <button 
+          style="background: transparent; border: none; outline: none; padding: 0 1rem; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
+          [style.background]="service.costBasisMethod() === 'avg' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
+          [style.color]="service.costBasisMethod() === 'avg' ? '#fff' : 'var(--text-muted)'"
+          (click)="setCostBasisMethod('avg')">
+          Average Cost
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split-Adjusted Sources Toggle -->
+  <div class="glass-card" style="margin-top: 1.5rem;" *ngIf="allSources().length > 0">
+    <h3 style="margin: 0 0 0.5rem;">Split-Adjusted Sources</h3>
+    <p class="subtitle" style="margin: 0 0 1rem;">Mark sources/brokers that already report split-adjusted share counts. Splits will NOT be applied to transactions from these sources.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+      <label *ngFor="let src of allSources()" style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem; transition: all 0.15s;" [style.borderColor]="isSplitAdjusted(src) ? 'var(--primary)' : 'rgba(255,255,255,0.08)'" [style.background]="isSplitAdjusted(src) ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)'">
+        <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
+        <span>{{ src }}</span>
+      </label>
     </div>
   </div>
 </div>

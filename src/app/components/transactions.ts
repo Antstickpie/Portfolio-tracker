@@ -181,7 +181,9 @@ export class TransactionsComponent {
       groups[acc].push(tx);
     });
     
-    return Object.entries(groups).map(([name, list]) => ({ name, list }));
+    return Object.entries(groups)
+      .map(([name, list]) => ({ name, list }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   });
 
   public getTypeBadgeClass(type: string): string {
@@ -374,5 +376,41 @@ export class TransactionsComponent {
     const tzoffset = (new Date()).getTimezoneOffset() * 60000;
     const localISOTime = (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
     return localISOTime;
+  }
+
+  public isSourceDisabled(source: string): boolean {
+    return this.service.disabledSources().includes(source);
+  }
+
+  public toggleSourceDisabled(source: string) {
+    const current = this.service.disabledSources();
+    if (current.includes(source)) {
+      this.service.disabledSources.set(current.filter(s => s !== source));
+      this.service.showToast(`Enabled account: ${source}`, 'success');
+    } else {
+      this.service.disabledSources.set([...current, source]);
+      this.service.showToast(`Disabled account: ${source}`, 'info');
+    }
+    this.service.saveToStorage();
+  }
+
+  public deleteAccount(source: string) {
+    const count = this.service.transactions().filter(tx => (tx.source || 'Manual Entries') === source).length;
+    if (confirm(`Delete all ${count} transactions from "${source}"? This cannot be undone.`)) {
+      const remaining = this.service.transactions().filter(tx => (tx.source || 'Manual Entries') !== source);
+      this.service.transactions.set(remaining);
+      // Also remove from disabled sources if it was there
+      this.service.disabledSources.set(this.service.disabledSources().filter(s => s !== source));
+      this.service.saveToStorage();
+      this.service.showToast(`Deleted ${count} transactions from "${source}"`, 'success');
+    }
+  }
+
+  public trackByAccount(index: number, item: any): string {
+    return item.name;
+  }
+
+  public trackByTx(index: number, item: any): string {
+    return item.id;
   }
 }

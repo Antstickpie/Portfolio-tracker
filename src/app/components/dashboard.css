@@ -366,6 +366,9 @@
   border-bottom: 2px solid var(--card-border);
   color: var(--text-main);
 }
+.totals-row td.text-success { color: var(--success); }
+.totals-row td.text-danger { color: var(--danger); }
+.totals-row td.text-accent { color: var(--accent); }
 
 .empty-state {
   text-align: center;

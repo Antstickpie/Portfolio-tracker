@@ -29,12 +29,15 @@ A sleek, private investment portfolio tracker. No accounts. No subscriptions. Yo
 
 ## Features
 
-- **Dashboard** — Total value, unrealized & realized gains, dividends, asset allocation charts
-- **Holdings** — Live P&L per position with sorting by gain/loss
-- **Transactions** — Full ledger with CSV import from Trading212, Revolut, and custom formats
+- **Dashboard** — Total value, unrealized & realized gains, dividends, asset allocation charts, and historical performance timeline
+- **Holdings** — Live P&L per position with sorting by gain/loss, and live FX rate visibility
+- **Transactions** — Full ledger with CSV/Excel import from Trading212, Revolut, Vested, and custom formats
+- **Cost Basis Methods** — Toggle between FIFO (First-In, First-Out) and Average Cost basis calculations
+- **Stock Splits** — Auto-fetching and caching of historical stock splits, with per-source split-adjustment settings
+- **Account Management** — Temporarily disable or delete specific account sources directly from the ledger
 - **Multi-owner** — Split portfolios between two people (e.g. you and a partner)
 - **Google Drive Sync** — Auto-backup to your private Google Drive, accessible from any device
-- **Market Prices** — Fetch live prices & exchange rates automatically
+- **Market Prices** — Centralized live prices & exchange rates status in the navbar with manual force sync
 - **Sectors** — Auto-classify stocks into sectors for allocation charts
 
 ---
@@ -77,6 +80,7 @@ Track two separate portfolios in one app — each person sees their own P&L.
 |---|---|
 | **Trading212** | Account → History → Export as CSV |
 | **Revolut** | Stocks → Statements → Export CSV |
+| **Vested** | Profile → Reports → Transactions (Export Excel) |
 
 Select the source type in the dropdown → paste or upload the file → click **Parse & Preview** → **Import**.
 

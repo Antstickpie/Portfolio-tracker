@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef, HostListener, untracked } from '@angular/core';
+import { Component, inject, signal, computed, effect, ElementRef, ViewChild, AfterViewInit, OnDestroy, ChangeDetectorRef, HostListener, untracked } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
@@ -12,7 +12,14 @@ import { PersonPortfolioSummary } from '../models/portfolio-summary.model';
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
 })
-export class DashboardComponent implements AfterViewInit {
+export class DashboardComponent implements AfterViewInit, OnDestroy {
+  private activeIntervalId: any = null;
+  private timeAgoIntervalId: any = null;
+  private handleVisibilityChangeBind = this.handleVisibilityChange.bind(this);
+  private lastActivityTime = Date.now();
+  private onUserActivity = () => {
+    this.lastActivityTime = Date.now();
+  };
   @HostListener('window:resize')
   onResize() {
     const assetData = this.assetChartData();
@@ -163,8 +170,7 @@ export class DashboardComponent implements AfterViewInit {
   public currentYear = new Date().getFullYear();
   public isCollapsed = signal<boolean>(false);
   public isRealizedCollapsed = signal<boolean>(false);
-  public isRefreshing = signal<boolean>(false);
-  public lastRefreshTime = signal<number | null>(null);
+  public isRefreshing = this.service.isSyncing;
 
   // Computed signal to calculate detailed realized gain events (chronologically correct avg cost, filtered by date)
   public realizedGains = computed(() => {
@@ -174,7 +180,9 @@ export class DashboardComponent implements AfterViewInit {
     const view = this.activeView();
     
     // Sort all transactions chronologically (oldest first) to compute running avg costs correctly
-    const txs = [...rawTxs].sort((a, b) => {
+    const txs = [...rawTxs]
+      .filter(tx => !this.service.disabledSources().includes(tx.source || ''))
+      .sort((a, b) => {
       const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
       if (diff !== 0) return diff;
       const typeOrder = { 'BUY': 1, 'SELL': 2, 'DIVIDEND': 3 } as any;
@@ -185,6 +193,9 @@ export class DashboardComponent implements AfterViewInit {
 
     const runningShares = {} as Record<string, number>;
     const runningCost = {} as Record<string, number>; // in USD
+    // FIFO lot tracking for realized gains ledger
+    const fifoLots = {} as Record<string, { shares: number; costPerShare: number }[]>;
+    const useFifo = this.service.costBasisMethod() === 'fifo';
 
     const events: Array<{
       id: string;
@@ -222,14 +233,21 @@ export class DashboardComponent implements AfterViewInit {
       }
 
       const cfg = this.service.tickerConfigs()[ticker];
-      if (cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
+      // Apply stock splits — skip for sources marked as split-adjusted
+      const isSplitAdjustedSource = this.service.splitAdjustedSources().includes(tx.source || '');
+      if (!isSplitAdjustedSource && cfg?.splits?.length && tx.date) {
+        for (const sp of cfg.splits) {
+          if (tx.date.slice(0, 10) < sp.date) {
+            sharesAllocated *= sp.ratio;
+          }
+        }
+      } else if (!isSplitAdjustedSource && cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
         sharesAllocated *= cfg.splitRatio;
       }
 
-      // Base conversion rate (Tx to USD base)
       const rateToUsd = tx.currency.toUpperCase() === 'USD'
         ? 1.0
-        : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.service.getExchangeRate(tx.currency, 'USD'));
+        : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.service.getExchangeRate(tx.currency, 'USD', tx.date));
 
       const baseCost = costAllocated * rateToUsd;
 
@@ -237,14 +255,37 @@ export class DashboardComponent implements AfterViewInit {
         if (sharesAllocated > 0) {
           runningShares[ticker] = (runningShares[ticker] || 0) + sharesAllocated;
           runningCost[ticker] = (runningCost[ticker] || 0) + baseCost;
+          if (useFifo) {
+            if (!fifoLots[ticker]) fifoLots[ticker] = [];
+            fifoLots[ticker].push({ shares: sharesAllocated, costPerShare: baseCost / sharesAllocated });
+          }
         }
       } else if (tx.type.toUpperCase() === 'SELL') {
         if (sharesAllocated > 0) {
           const currentShares = runningShares[ticker] || 0;
           const currentCost = runningCost[ticker] || 0;
           
-          const avgCostBeforeSell = currentShares > 0 ? (currentCost / currentShares) : 0;
-          const costOfSharesSold = sharesAllocated * avgCostBeforeSell;
+          let costOfSharesSold = 0;
+          let avgCostBeforeSell = 0;
+
+          if (useFifo) {
+            const lots = fifoLots[ticker] || [];
+            let remaining = sharesAllocated;
+            while (remaining > 0 && lots.length > 0) {
+              const lot = lots[0];
+              const take = Math.min(remaining, lot.shares);
+              costOfSharesSold += take * lot.costPerShare;
+              lot.shares -= take;
+              remaining -= take;
+              if (lot.shares <= 0.000001) {
+                lots.shift();
+              }
+            }
+            avgCostBeforeSell = sharesAllocated > 0 ? costOfSharesSold / sharesAllocated : 0;
+          } else {
+            avgCostBeforeSell = currentShares > 0 ? (currentCost / currentShares) : 0;
+            costOfSharesSold = sharesAllocated * avgCostBeforeSell;
+          }
           
           runningShares[ticker] = Math.max(0, currentShares - sharesAllocated);
           runningCost[ticker] = Math.max(0, currentCost - costOfSharesSold);
@@ -499,19 +540,7 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   public async refreshMarketData() {
-    this.isRefreshing.set(true);
-    try {
-      this.service.showToast('Forcing refresh of all market prices and FX rates...', 'info');
-      await this.service.loadMarketPricesApi(true); // force
-      await this.service.loadExchangeRatesApi(true); // force
-      const now = Date.now();
-      this.lastRefreshTime.set(now);
-      this.service.showToast('All prices and exchange rates up to date!', 'success');
-    } catch (e) {
-      this.service.showToast('Refresh failed.', 'error');
-    } finally {
-      this.isRefreshing.set(false);
-    }
+    await this.service.refreshMarketData(true);
   }
 
   public setSort(field: string) {
@@ -686,6 +715,29 @@ export class DashboardComponent implements AfterViewInit {
     });
   });
 
+  public tableTotals = computed(() => {
+    let cost = 0;
+    let value = 0;
+    let dividends = 0;
+    let realized = 0;
+    this.filteredPositions().forEach(pos => {
+      cost += pos.totalCost;
+      value += pos.currentValue;
+      dividends += pos.dividends;
+      realized += pos.realizedProfit;
+    });
+    const unrealized = value - cost;
+    const totalReturn = unrealized + realized + dividends;
+    return {
+      cost,
+      value,
+      dividends,
+      realized,
+      unrealized,
+      totalReturn
+    };
+  });
+
   // Compute active summary based on activeView
   public summary = computed<PersonPortfolioSummary>(() => {
     const view = this.activeView();
@@ -848,10 +900,39 @@ export class DashboardComponent implements AfterViewInit {
     return this.getColor(index + 5);
   }
 
-  constructor() {
+   constructor() {
+    const savedView = localStorage.getItem('pt_dash_active_view');
+    if (savedView) {
+      this.activeView.set(savedView as any);
+    }
+    const savedCurrency = localStorage.getItem('pt_dash_display_currency');
+    if (savedCurrency) {
+      this.displayCurrency.set(savedCurrency);
+    }
+    const savedPeriod = localStorage.getItem('pt_dash_history_period');
+    if (savedPeriod) {
+      this.historyPeriod.set(savedPeriod as any);
+    }
+
+    effect(() => {
+      localStorage.setItem('pt_dash_active_view', this.activeView());
+    });
+    effect(() => {
+      localStorage.setItem('pt_dash_display_currency', this.displayCurrency());
+    });
+    effect(() => {
+      localStorage.setItem('pt_dash_history_period', this.historyPeriod());
+    });
+
     const timeStr = localStorage.getItem('pt_last_refresh_time');
     if (timeStr) {
-      this.lastRefreshTime.set(parseInt(timeStr, 10));
+      const parsedTime = parseInt(timeStr, 10);
+      this.service.lastRefreshTime.set(parsedTime);
+      if (Date.now() - parsedTime > 180000) {
+        this.refreshMarketDataSilently();
+      }
+    } else {
+      this.refreshMarketDataSilently();
     }
 
     // Fetch historical prices only when period, transactions, date filters, or view changes
@@ -861,6 +942,7 @@ export class DashboardComponent implements AfterViewInit {
       this.activeView();
       this.service.dateFrom();
       this.service.dateTo();
+      this.service.disabledSources();
       untracked(() => {
         this.loadHistoryForChart();
       });
@@ -875,6 +957,7 @@ export class DashboardComponent implements AfterViewInit {
       this.service.dateTo();
       this.historyPeriod(); // Register dependency
       this.service.historicalPrices(); // Redraw chart when cache updates
+      this.service.disabledSources();
       
       // Wait a tick for DOM updates
       setTimeout(() => {
@@ -892,6 +975,28 @@ export class DashboardComponent implements AfterViewInit {
           this.clearDateFilter();
         }
       });
+    });
+
+    document.addEventListener('visibilitychange', this.handleVisibilityChangeBind);
+    this.startAutoRefreshInterval();
+
+    this.timeAgoIntervalId = setInterval(() => {
+      this.cdr.detectChanges();
+    }, 15000);
+
+    ['click', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+      document.addEventListener(event, this.onUserActivity, { passive: true });
+    });
+  }
+
+  ngOnDestroy() {
+    this.stopAutoRefreshInterval();
+    if (this.timeAgoIntervalId) {
+      clearInterval(this.timeAgoIntervalId);
+    }
+    document.removeEventListener('visibilitychange', this.handleVisibilityChangeBind);
+    ['click', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+      document.removeEventListener(event, this.onUserActivity);
     });
   }
 
@@ -1045,6 +1150,12 @@ export class DashboardComponent implements AfterViewInit {
 
   public getAbs(val: number): number {
     return Math.abs(val);
+  }
+
+  public getRowFxRate(fromCurrency: string, date?: string): number {
+    const displayCurr = this.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? fromCurrency : displayCurr;
+    return this.service.getExchangeRate(fromCurrency, targetCurr, date);
   }
 
   public formatValShort(val: number, fromCurrency: string = 'USD'): string {
@@ -1317,6 +1428,14 @@ export class DashboardComponent implements AfterViewInit {
     return item.ticker;
   }
 
+  public trackByRealizedGroup(index: number, item: any): string {
+    return item.ticker;
+  }
+
+  public trackByRealizedSale(index: number, item: any): string {
+    return item.id;
+  }
+
   private loadHistoryTimeout: any = null;
 
   private loadHistoryForChart() {
@@ -1373,8 +1492,12 @@ export class DashboardComponent implements AfterViewInit {
       else if (daysDiff <= 1825) range = '5y';
       else range = 'max';
 
-      const txs = this.service.transactions().filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL');
+      const txs = this.service.transactions()
+        .filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL')
+        .filter(t => !this.service.disabledSources().includes(t.source || ''));
       const tickers = Array.from(new Set(txs.map(t => t.ticker.toUpperCase().trim()).filter(Boolean)));
+      tickers.push('USDINR=X');
+      tickers.push('USDEUR=X');
       if (tickers.length > 0) {
         await this.service.fetchHistoricalPricesForTickers(tickers, range);
       }
@@ -1391,6 +1514,7 @@ export class DashboardComponent implements AfterViewInit {
     const filterTkr = this.filterTicker().toUpperCase().trim();
     let txs = [...this.service.transactions()];
     txs = txs.filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL');
+    txs = txs.filter(t => !this.service.disabledSources().includes(t.source || ''));
     if (filterTkr) {
       txs = txs.filter(t => (t.ticker || '').toUpperCase().trim() === filterTkr);
     }
@@ -1414,7 +1538,7 @@ export class DashboardComponent implements AfterViewInit {
     today.setHours(23, 59, 59, 999);
 
     let endDate = new Date(today);
-    if (dateTo) {
+    if (dateTo && !this.isAllTimeActive()) {
       const parsedTo = new Date(dateTo);
       if (parsedTo < today) {
         endDate = parsedTo;
@@ -1634,6 +1758,9 @@ export class DashboardComponent implements AfterViewInit {
       this.investedPath = '';
       this.valuePath = '';
       this.fillPath = '';
+      this.yTicks = [];
+      this.xTicks = [];
+      this.cdr.detectChanges();
       return;
     }
 
@@ -1673,7 +1800,11 @@ export class DashboardComponent implements AfterViewInit {
     const chartHeight = 320 - paddingTop - paddingBottom;
 
     const getX = (t: number) => paddingLeft + ((t - minTime) / timeSpan) * chartWidth;
-    const getY = (v: number) => paddingTop + chartHeight - ((v - minVal) / (maxVal - minVal)) * chartHeight;
+    const getY = (v: number) => {
+      const denom = maxVal - minVal;
+      if (denom === 0) return paddingTop + chartHeight;
+      return paddingTop + chartHeight - ((v - minVal) / denom) * chartHeight;
+    };
 
     this.chartPoints = points.map(p => {
       const x = getX(p.date.getTime());
@@ -1776,5 +1907,54 @@ export class DashboardComponent implements AfterViewInit {
       this.xTicks.push({ dateStr, x });
     }
     this.cdr.detectChanges();
+  }
+
+  private startAutoRefreshInterval() {
+    this.stopAutoRefreshInterval();
+    // Auto-refresh every 3 minutes (180,000 ms) while visible (avoids rate limits/getting banned)
+    this.activeIntervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        this.refreshMarketDataSilently();
+      }
+    }, 180000);
+  }
+
+  private stopAutoRefreshInterval() {
+    if (this.activeIntervalId) {
+      clearInterval(this.activeIntervalId);
+      this.activeIntervalId = null;
+    }
+  }
+
+  private handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      const last = this.service.lastRefreshTime() || 0;
+      const now = Date.now();
+      // If last refresh was > 5 minutes (300,000 ms) ago, sync prices on tab return
+      if (now - last > 300000) {
+        this.refreshMarketDataSilently();
+      }
+      this.startAutoRefreshInterval();
+    } else {
+      this.stopAutoRefreshInterval();
+    }
+  }
+
+  private async refreshMarketDataSilently() {
+    // Skip if user has been inactive for > 3 minutes (180,000 ms)
+    if (Date.now() - this.lastActivityTime > 180000) {
+      return;
+    }
+
+    // Skip refreshing if there are no movements/positions to sync
+    if (this.filteredPositions().length === 0) {
+      return;
+    }
+
+    await this.service.refreshMarketData(false);
+  }
+
+  public getSyncedTimeAgoText(): string {
+    return this.service.getSyncedTimeAgoText();
   }
 }

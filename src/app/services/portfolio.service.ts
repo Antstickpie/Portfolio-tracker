@@ -21,12 +21,35 @@ export class PortfolioService {
   public customSectors = signal<string[]>(['Technology', 'Financials', 'Healthcare', 'Consumer', 'Energy', 'Industrials', 'ETFs', 'Chips', 'Tech (Mag 7)', 'Crypto', 'Other', 'SPAC']);
   public dateFrom = signal<string>('');
   public dateTo = signal<string>('');
+  public isAllTimeActive = computed(() => {
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    if (!from && !to) return true;
+    const txs = this.transactions();
+    if (txs.length === 0) return true;
+    const dates = txs.map(t => t.date ? t.date.slice(0, 10) : '').filter(Boolean).sort();
+    if (dates.length === 0) return true;
+    return from === dates[0] && to === dates[dates.length - 1];
+  });
+  public isPastPeriodActive = computed(() => {
+    const to = this.dateTo();
+    if (!to) return false;
+    // Get calendar year of the end filter date
+    const toYear = new Date(to).getFullYear();
+    const currentYear = new Date().getFullYear();
+    return toYear < currentYear;
+  });
   public dateFormat = signal<string>('MMMM d, yyyy');
   public yearBasis = signal<'calendar' | 'financial'>('calendar');
   public financialYearStartMonth = signal<number>(4);
   public financialYearStartDay = signal<number>(6);
 
   public useProperSectors = signal<boolean>(false);
+  public splitAdjustedSources = signal<string[]>([]);
+  public costBasisMethod = signal<'fifo' | 'avg'>('fifo');
+  public disabledSources = signal<string[]>([]);
+  public lastRefreshTime = signal<number | null>(null);
+  public isSyncing = signal<boolean>(false);
 
   // Predefined map of sectors for autodiscovery
   public sectorMap: Record<string, string> = {
@@ -227,12 +250,19 @@ export class PortfolioService {
   constructor() {
     this.loadFromStorage();
 
+    // Default to current calendar year if no dates set
+    if (!this.dateFrom()) {
+      const yr = new Date().getFullYear();
+      this.dateFrom.set(`${yr}-01-01`);
+    }
+    if (!this.dateTo()) {
+      const yr = new Date().getFullYear();
+      this.dateTo.set(`${yr}-12-31`);
+    }
+
     effect(() => {
       this.transactions();
       untracked(() => {
-        this.lastFetchTimeMap.clear();
-        this.lastDailyFetchMap.clear();
-        this.maxFetchedRangeLevelMap.clear();
         this.failedTickers.clear();
       });
     });
@@ -385,7 +415,22 @@ export class PortfolioService {
       if (!meta) {
         meta = localStorage.getItem('pt_ticker_meta');
       }
-      if (meta) this.tickerConfigs.set(JSON.parse(meta));
+      if (meta) {
+        this.tickerConfigs.set(JSON.parse(meta));
+        // Migrate old splitRatio/splitDate to splits[] array
+        const configs = this.tickerConfigs();
+        let migrated = false;
+        const updatedCfg = { ...configs };
+        Object.entries(updatedCfg).forEach(([key, cfg]) => {
+          if (cfg.splitRatio && cfg.splitDate && (!cfg.splits || cfg.splits.length === 0)) {
+            updatedCfg[key] = { ...cfg, splits: [{ date: cfg.splitDate, ratio: cfg.splitRatio }] };
+            migrated = true;
+          }
+        });
+        if (migrated) {
+          this.tickerConfigs.set(updatedCfg);
+        }
+      }
 
       const pA = localStorage.getItem('pt_person_a_name');
       if (pA !== null) this.personAName.set(pA);
@@ -432,6 +477,27 @@ export class PortfolioService {
       const vc = localStorage.getItem('pt_visible_currencies');
       if (vc) this.visibleCurrencies.set(JSON.parse(vc));
 
+      // Load persisted fetch maps
+      const ldfm = localStorage.getItem('pt_last_daily_fetch_map');
+      if (ldfm) {
+        try {
+          const obj = JSON.parse(ldfm) as Record<string, string>;
+          this.lastDailyFetchMap = new Map(Object.entries(obj));
+        } catch (e) {
+          console.error('Failed to parse lastDailyFetchMap', e);
+        }
+      }
+
+      const mfrlm = localStorage.getItem('pt_max_fetched_range_level_map');
+      if (mfrlm) {
+        try {
+          const obj = JSON.parse(mfrlm) as Record<string, number>;
+          this.maxFetchedRangeLevelMap = new Map(Object.entries(obj).map(([k, v]) => [k, Number(v)]));
+        } catch (e) {
+          console.error('Failed to parse maxFetchedRangeLevelMap', e);
+        }
+      }
+
       const savedHist = localStorage.getItem('pt_historical_prices');
       if (savedHist) {
         this.historicalPrices.set(JSON.parse(savedHist));
@@ -461,6 +527,18 @@ export class PortfolioService {
       const gsync = localStorage.getItem('pt_last_google_sync');
       if (gsync) this.lastGoogleSyncTime.set(parseInt(gsync, 10));
 
+      const sas = localStorage.getItem('pt_split_adjusted_sources');
+      if (sas) this.splitAdjustedSources.set(JSON.parse(sas));
+
+      const cbm = localStorage.getItem('pt_cost_basis_method');
+      if (cbm === 'fifo' || cbm === 'avg') this.costBasisMethod.set(cbm);
+
+      const ds = localStorage.getItem('pt_disabled_sources');
+      if (ds) this.disabledSources.set(JSON.parse(ds));
+
+      const lrt = localStorage.getItem('pt_last_refresh_time');
+      if (lrt) this.lastRefreshTime.set(parseInt(lrt, 10));
+
       const lu = localStorage.getItem('pt_last_updated');
       if (lu) this.lastUpdated.set(parseInt(lu, 10));
     } catch (e) {
@@ -484,6 +562,20 @@ export class PortfolioService {
     localStorage.setItem('pt_person_a_name', this.personAName());
     localStorage.setItem('pt_person_b_name', this.personBName());
     localStorage.setItem('pt_date_format', this.dateFormat());
+
+    // Persist fetch maps
+    const ldfmObj: Record<string, string> = {};
+    this.lastDailyFetchMap.forEach((value, key) => {
+      ldfmObj[key] = value;
+    });
+    localStorage.setItem('pt_last_daily_fetch_map', JSON.stringify(ldfmObj));
+
+    const mfrlmObj: Record<string, number> = {};
+    this.maxFetchedRangeLevelMap.forEach((value, key) => {
+      mfrlmObj[key] = value;
+    });
+    localStorage.setItem('pt_max_fetched_range_level_map', JSON.stringify(mfrlmObj));
+
     localStorage.setItem('pt_year_basis', this.yearBasis());
     localStorage.setItem('pt_fy_start_month', this.financialYearStartMonth().toString());
     localStorage.setItem('pt_fy_start_day', this.financialYearStartDay().toString());
@@ -501,6 +593,9 @@ export class PortfolioService {
       localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
     }
 
+    localStorage.setItem('pt_split_adjusted_sources', JSON.stringify(this.splitAdjustedSources()));
+    localStorage.setItem('pt_cost_basis_method', this.costBasisMethod());
+    localStorage.setItem('pt_disabled_sources', JSON.stringify(this.disabledSources()));
   }
 
   // Update a single transaction allocation and recalculate shares
@@ -775,14 +870,41 @@ export class PortfolioService {
     return Array.from(tickers);
   });
 
-  public getExchangeRate(from: string, to: string): number {
+  public getExchangeRate(from: string, to: string, date?: string): number {
     const f = from.toUpperCase();
     const t = to.toUpperCase();
     if (f === t) return 1.0;
     
     const rates = this.exchangeRates();
 
+    const getHistoricalRateVal = (base: string, quote: string, dateVal: string): number | null => {
+      const formattedDate = dateVal.slice(0, 10);
+      const symbol = `${base}${quote}=X`;
+      const history = this.historicalPrices()[symbol];
+      if (history) {
+        const availableDates = Object.keys(history).sort();
+        let matchedDate = '';
+        for (let i = availableDates.length - 1; i >= 0; i--) {
+          if (availableDates[i] <= formattedDate) {
+            matchedDate = availableDates[i];
+            break;
+          }
+        }
+        if (matchedDate && history[matchedDate] > 0) {
+          return history[matchedDate];
+        }
+      }
+      return null;
+    };
+
     const getRateVal = (base: string, quote: string): number | null => {
+      if (date) {
+        const histDirect = getHistoricalRateVal(base, quote, date);
+        if (histDirect !== null) return histDirect;
+        const histInverse = getHistoricalRateVal(quote, base, date);
+        if (histInverse !== null && histInverse > 0) return 1.0 / histInverse;
+      }
+
       const keys = [
         `${base}/${quote}`,
         `${base}${quote}`,
@@ -852,6 +974,7 @@ export class PortfolioService {
     // BUT keep transactions BEFORE 'from' because they establish cost basis!
     const txs = [...rawTxs]
       .filter(tx => !tx.date || !to || tx.date.slice(0, 10) <= to)
+      .filter(tx => !this.disabledSources().includes(tx.source || ''))
       .sort((a, b) => {
         const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
         if (diff !== 0) return diff;
@@ -872,6 +995,10 @@ export class PortfolioService {
       rateToUsd: number;
     }>();
 
+    // FIFO lot tracking: per-ticker array of {shares, costPerShare}
+    const fifoLots = new Map<string, { shares: number; costPerShare: number }[]>();
+    const useFifo = this.costBasisMethod() === 'fifo';
+
     let totalFees = 0;
 
     for (const tx of txs) {
@@ -884,7 +1011,16 @@ export class PortfolioService {
       const costAllocated = owner === 'A' ? tx.personACostBasis : tx.personBCostBasis;
       let totalShares = tx.quantity || 0;
 
-      if (cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
+      // Apply stock splits — skip for sources marked as split-adjusted
+      const isSplitAdjustedSource = this.splitAdjustedSources().includes(tx.source || '');
+      if (!isSplitAdjustedSource && cfg?.splits?.length && tx.date) {
+        for (const sp of cfg.splits) {
+          if (tx.date.slice(0, 10) < sp.date) {
+            sharesAllocated *= sp.ratio;
+            totalShares *= sp.ratio;
+          }
+        }
+      } else if (!isSplitAdjustedSource && cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
         sharesAllocated *= cfg.splitRatio;
         totalShares *= cfg.splitRatio;
       }
@@ -892,7 +1028,7 @@ export class PortfolioService {
       // FX Rate translates Tx currency to Base (USD): Base = Tx * rateToUsd
       const rateToUsd = tx.currency.toUpperCase() === 'USD'
         ? 1.0
-        : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.getExchangeRate(tx.currency, 'USD'));
+        : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.getExchangeRate(tx.currency, 'USD', tx.date));
 
       const baseCost = costAllocated * rateToUsd;
 
@@ -916,18 +1052,43 @@ export class PortfolioService {
           rateToUsd: rateToUsd
         });
       }
+      if (!fifoLots.has(ticker)) {
+        fifoLots.set(ticker, []);
+      }
       const pos = positionsMap.get(ticker)!;
+      const lots = fifoLots.get(ticker)!;
       pos.rateToUsd = rateToUsd;
 
       if (tx.type.toUpperCase() === 'BUY') {
         if (sharesAllocated > 0) {
           pos.shares += sharesAllocated;
           pos.totalCost += baseCost;
+          if (useFifo) {
+            lots.push({ shares: sharesAllocated, costPerShare: baseCost / sharesAllocated });
+          }
         }
       } else if (tx.type.toUpperCase() === 'SELL') {
         if (sharesAllocated > 0) {
-          const avgCostBeforeSell = pos.shares > 0 ? (pos.totalCost / pos.shares) : 0;
-          const costOfSharesSold = sharesAllocated * avgCostBeforeSell;
+          let costOfSharesSold = 0;
+
+          if (useFifo) {
+            // FIFO: consume oldest lots first
+            let remaining = sharesAllocated;
+            while (remaining > 0 && lots.length > 0) {
+              const lot = lots[0];
+              const take = Math.min(remaining, lot.shares);
+              costOfSharesSold += take * lot.costPerShare;
+              lot.shares -= take;
+              remaining -= take;
+              if (lot.shares <= 0.000001) {
+                lots.shift();
+              }
+            }
+          } else {
+            // Average cost method
+            const avgCostBeforeSell = pos.shares > 0 ? (pos.totalCost / pos.shares) : 0;
+            costOfSharesSold = sharesAllocated * avgCostBeforeSell;
+          }
           
           pos.shares = Math.max(0, pos.shares - sharesAllocated);
           pos.totalCost = Math.max(0, pos.totalCost - costOfSharesSold);
@@ -979,10 +1140,10 @@ export class PortfolioService {
         );
         storedPriceCurrency = allSameCurrency ? pos.currency : 'USD';
       }
-      const liveRateToUsd = this.getExchangeRate(storedPriceCurrency, 'USD');
+      const liveRateToUsd = this.getExchangeRate(storedPriceCurrency, 'USD', to);
 
       let currentPriceNative = priceData.currentPrice || 0;
-      if (to) {
+      if (to && this.isPastPeriodActive()) {
         const history = this.historicalPrices()[ticker];
         if (history) {
           const availableDates = Object.keys(history).sort();
@@ -1044,7 +1205,9 @@ export class PortfolioService {
     const activePositions = positions.filter(p => p.totalShares > 0.0001);
     activePositions.sort((a, b) => b.currentValue - a.currentValue);
 
-    const totalReturn = totalUnrealized + totalRealized + totalDividends;
+    const totalReturn = !this.isPastPeriodActive()
+      ? totalUnrealized + totalRealized + totalDividends
+      : totalRealized + totalDividends;
 
     return {
       ownerName: owner === 'A' ? this.personAName() : this.personBName(),
@@ -1309,8 +1472,6 @@ export class PortfolioService {
   // Query a free API to update current stock prices
   public async loadMarketPricesApi(force: boolean = false, silent: boolean = false) {
     if (force) {
-      this.historicalPrices.set({});
-      localStorage.removeItem('pt_historical_prices');
       this.failedTickers.clear();
       this.lastFetchTimeMap.clear();
       this.lastDailyFetchMap.clear();
@@ -1323,22 +1484,7 @@ export class PortfolioService {
       return;
     }
 
-    // Check cache rate limit unless force is true
-    const now = Date.now();
-    const lastRefreshStr = localStorage.getItem('pt_last_refresh_time');
-    if (!force && lastRefreshStr) {
-      const lastRefresh = parseInt(lastRefreshStr, 10);
-      const elapsedMs = now - lastRefresh;
-      const cooldownMs = silent ? 5 * 60 * 1000 : 20 * 60 * 1000;
-      
-      if (elapsedMs < cooldownMs) {
-        if (!silent) {
-          const remainingMinutes = Math.ceil((cooldownMs - elapsedMs) / 60000);
-          this.showToast(`Prices refreshed recently. Next update in ${remainingMinutes} min. Click 'Force Refresh' to update now.`, 'info');
-        }
-        return;
-      }
-    }
+
 
     if (!silent) this.showToast('Fetching real-time market rates with autocomplete discovery...', 'info');
 
@@ -1446,7 +1592,7 @@ export class PortfolioService {
           }
 
           const cleanResolved = encodeURIComponent(resolvedSymbol);
-          const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanResolved}?includePrePost=true`;
+          const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanResolved}?includePrePost=true&events=split`;
           
           const chartResponse = await this.fetchWithProxy(chartTarget, true);
           if (!chartResponse.ok) return null;
@@ -1472,6 +1618,29 @@ export class PortfolioService {
               if (currency === 'GBP' || chartMeta.currency === 'GBp') {
                 if (chartMeta.currency === 'GBp') price = price / 100;
                 currency = 'GBP';
+              }
+
+              // Extract splits from Yahoo chart response
+              const events = result?.events;
+              if (events?.splits) {
+                const splitsArr: { date: string; ratio: number }[] = [];
+                Object.values(events.splits).forEach((s: any) => {
+                  if (s.numerator && s.denominator) {
+                    const d = new Date(s.date * 1000);
+                    const dateStr = d.toISOString().slice(0, 10);
+                    splitsArr.push({ date: dateStr, ratio: s.numerator / s.denominator });
+                  }
+                });
+                if (splitsArr.length > 0) {
+                  splitsArr.sort((a, b) => a.date.localeCompare(b.date));
+                  const existingCfg = this.tickerConfigs()[cleanTicker];
+                  if (!existingCfg?.splits || JSON.stringify(existingCfg.splits) !== JSON.stringify(splitsArr)) {
+                    this.tickerConfigs.update(p => ({
+                      ...p,
+                      [cleanTicker]: { ...(p[cleanTicker] || {}), splits: splitsArr }
+                    }));
+                  }
+                }
               }
 
               const logoData = meta[cleanTicker]?.logoData;
@@ -1581,22 +1750,7 @@ export class PortfolioService {
 
   public async loadExchangeRatesApi(force: boolean = false, silent: boolean = false) {
     const pairs = this.getExchangeRatePairs();
-    const now = Date.now();
-    const lastRefreshStr = localStorage.getItem('pt_last_rates_refresh_time');
-    
-    if (!force && lastRefreshStr) {
-      const lastRefresh = parseInt(lastRefreshStr, 10);
-      const elapsedMs = now - lastRefresh;
-      const cooldownMs = silent ? 5 * 60 * 1000 : 20 * 60 * 1000;
-      
-      if (elapsedMs < cooldownMs) {
-        if (!silent) {
-          const remainingMinutes = Math.ceil((cooldownMs - elapsedMs) / 60000);
-          this.showToast(`Rates refreshed recently. Next update in ${remainingMinutes} min. Click 'Force Refresh' to update now.`, 'info');
-        }
-        return;
-      }
-    }
+
 
     if (!silent) this.showToast('Fetching current exchange rates...', 'info');
 
@@ -1610,7 +1764,7 @@ export class PortfolioService {
           const ticker = `${parts[0]}${parts[1]}=X`;
           const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
           
-          const response = await this.fetchWithProxy(chartTarget);
+          const response = await this.fetchWithProxy(chartTarget, true);
           if (response.ok) {
             const data = await response.json();
             const chartMeta = data?.chart?.result?.[0]?.meta;
@@ -2044,8 +2198,8 @@ export class PortfolioService {
         const config = meta[ticker];
         let resolvedSymbol = (config && config.yahooSymbol) ? config.yahooSymbol : ticker;
 
-        let targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d`;
-        let resp = await this.fetchWithProxy(targetUrl);
+        let targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
+        let resp = await this.fetchWithProxy(targetUrl, true);
 
         // If direct fetch fails, and it's not rate-limited, and no custom symbol override was set, try search discovery
         if (!resp.ok && resp.status !== 429 && !(config && config.yahooSymbol)) {
@@ -2057,8 +2211,8 @@ export class PortfolioService {
             const quote = quotes.find((q: any) => q.isEquity || q.quoteType === 'EQUITY' || q.quoteType === 'ETF');
             if (quote) {
               resolvedSymbol = quote.symbol.toUpperCase();
-              targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d`;
-              resp = await this.fetchWithProxy(targetUrl);
+              targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
+              resp = await this.fetchWithProxy(targetUrl, true);
             }
           } else {
             this.failedTickers.add(ticker);
@@ -2177,5 +2331,41 @@ export class PortfolioService {
 
     // 3. Try direct fetch as last resort
     return fetch(targetUrl, options);
+  }
+
+  public async refreshMarketData(force: boolean = false) {
+    if (this.isSyncing()) return;
+    this.isSyncing.set(true);
+    try {
+      if (force) {
+        this.showToast('Forcing refresh of all market prices and FX rates...', 'info');
+      }
+      await this.loadMarketPricesApi(force);
+      await this.loadExchangeRatesApi(force);
+      const now = Date.now();
+      localStorage.setItem('pt_last_refresh_time', now.toString());
+      this.lastRefreshTime.set(now);
+      if (force) {
+        this.showToast('All prices and exchange rates up to date!', 'success');
+      }
+    } catch (e) {
+      if (force) {
+        this.showToast('Refresh failed.', 'error');
+      }
+      console.warn('Market sync failed:', e);
+    } finally {
+      this.isSyncing.set(false);
+    }
+  }
+
+  public getSyncedTimeAgoText(): string {
+    const last = this.lastRefreshTime();
+    if (!last) return 'Never';
+    const seconds = Math.floor((Date.now() - last) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
   }
 }

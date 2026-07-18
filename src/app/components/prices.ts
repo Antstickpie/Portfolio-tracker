@@ -450,6 +450,8 @@ export class PricesComponent {
     );
   }
 
+
+
   public updateTickerYahooSymbol(ticker: string, symbol: string) {
     const current = this.service.tickerConfigs()[ticker.toUpperCase()] || {
       ticker: ticker.toUpperCase(),
@@ -494,5 +496,32 @@ export class PricesComponent {
 
   public trackByTicker(index: number, item: any): string {
     return item.ticker;
+  }
+
+  public allSources = computed(() => {
+    const srcs = new Set<string>();
+    this.service.transactions().forEach(tx => {
+      if (tx.source) srcs.add(tx.source);
+    });
+    return Array.from(srcs).sort();
+  });
+
+  public isSplitAdjusted(source: string): boolean {
+    return this.service.splitAdjustedSources().includes(source);
+  }
+
+  public toggleSplitAdjusted(source: string) {
+    const current = this.service.splitAdjustedSources();
+    if (current.includes(source)) {
+      this.service.splitAdjustedSources.set(current.filter(s => s !== source));
+    } else {
+      this.service.splitAdjustedSources.set([...current, source]);
+    }
+    this.service.saveToStorage();
+  }
+
+  public setCostBasisMethod(method: 'fifo' | 'avg') {
+    this.service.costBasisMethod.set(method);
+    this.service.saveToStorage();
   }
 }

@@ -117,21 +117,33 @@
   <!-- Metrics Grid -->
   <div class="metrics-grid">
     <!-- Net Worth / Current Value -->
-    <div class="glass-card metric-card glow-primary" (click)="scrollToTable()" title="View holdings table">
+    <div class="glass-card metric-card" [class.glow-primary]="!service.isPastPeriodActive()" style="position: relative;" (click)="scrollToTable()" title="View holdings table">
+      <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.75); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 5; border-radius: 12px; pointer-events: none;">
+        <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.2rem;">Not Applicable</div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 0 0.5rem; line-height: 1.2;">
+          For active periods only
+        </div>
+      </div>
       <div class="label">Net Worth (Stocks)</div>
       <div class="value">{{ formatVal(summary().totalValue, 'USD') }}</div>
       <div class="sub-value">
         <span style="color:var(--text-muted)">Cost Basis:</span>
         <span class="white-text" style="font-weight:600;color:var(--text-main)">{{ formatVal(summary().totalCostBasis, 'USD') }}</span>
       </div>
-      <div class="metric-hint">▼ Holdings</div>
+      <div class="metric-hint">▼ Holdings Analysis</div>
     </div>
 
     <!-- Unrealized PnL -->
     <div class="glass-card metric-card"
-         [class.card-danger]="summary().totalUnrealized < 0"
-         [class.card-success]="summary().totalUnrealized >= 0"
-         (click)="scrollToTable()" title="View holdings table">
+         [class.card-danger]="!service.isPastPeriodActive() && summary().totalUnrealized < 0"
+         [class.card-success]="!service.isPastPeriodActive() && summary().totalUnrealized >= 0"
+         style="position: relative;" (click)="scrollToTable()" title="View holdings table">
+      <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.75); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 5; border-radius: 12px; pointer-events: none;">
+        <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.2rem;">Not Applicable</div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center; padding: 0 0.5rem; line-height: 1.2;">
+          For active periods only
+        </div>
+      </div>
       <div class="label">Unrealized Gain / Loss</div>
       <div class="value" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
         {{ formatVal(summary().totalUnrealized, 'USD', 2, undefined, true) }}
@@ -141,7 +153,7 @@
           {{ summary().totalUnrealized >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(unrealizedPercentage()) | number:'1.2-2' }}%
         </span>
       </div>
-      <div class="metric-hint">▼ Holdings</div>
+      <div class="metric-hint">▼ Holdings Analysis</div>
     </div>
 
     <!-- Realized PnL -->
@@ -154,7 +166,7 @@
         {{ formatVal(summary().totalRealized, 'USD', 2, undefined, true) }}
       </div>
       <div class="sub-value">From completed sales</div>
-      <div class="metric-hint">▼ Realized Ledger</div>
+      <div class="metric-hint">▼ Realized Gains Ledger</div>
     </div>
 
     <!-- Accumulated Dividends -->
@@ -165,7 +177,7 @@
         <span>Paid out by holdings</span>
         <span style="font-size:0.72rem">Total Fees: <span style="color:#f43f5e;font-weight:600">{{ formatVal(summary().totalFees || 0, 'USD') }}</span></span>
       </div>
-      <div class="metric-hint">▼ Holdings</div>
+      <div class="metric-hint">▼ Holdings Analysis</div>
     </div>
 
     <!-- Total Return -->
@@ -179,7 +191,7 @@
         {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
       </div>
       <div class="sub-value">
-        {{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge badge-info">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span>
+        {{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
@@ -189,7 +201,7 @@
 
   <!-- Portfolio History Line Chart -->
   <div class="glass-card chart-card" style="margin-top: 1.5rem; width: 100%; box-sizing: border-box; display: block; margin-bottom: 1.5rem; position: relative;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: nowrap; gap: 0.5rem;">
       <div>
         <h3 style="margin: 0;">Historical Performance</h3>
         <p class="subtitle" style="margin: 0.2rem 0 0;">Timeline of total invested capital vs. stock portfolio valuation.</p>
@@ -210,6 +222,13 @@
     <div style="width: 100%; display: flex; justify-content: center; position: relative; margin-top: 0.5rem; min-height: 320px;">
       <!-- SVG Chart -->
       <div style="position: relative; width: 100%; height: 320px;">
+        <!-- No Data Overlay -->
+        <div *ngIf="chartPoints.length === 0" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(5px); border-radius: 12px; z-index: 10; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05);">
+          <span style="font-size: 2.2rem; margin-bottom: 0.6rem; opacity: 0.85;">📊</span>
+          <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-main);">No Performance Data</h4>
+          <p class="subtitle" style="margin: 0.3rem 0 0; font-size: 0.8rem; max-width: 290px; line-height: 1.4;">Enable accounts or import transactions to plot history.</p>
+        </div>
+
         <svg #chartSvg
              viewBox="0 0 1000 320" 
              preserveAspectRatio="none"
@@ -376,30 +395,7 @@
       </button>
     </div>
 
-    <!-- Vertical Divider -->
-    <div class="control-divider" style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); align-self: center;"></div>
 
-    <!-- Sync Button -->
-    <button 
-      class="currency-btn" 
-      (click)="refreshMarketData()" 
-      [disabled]="isRefreshing()"
-      style="display: flex; align-items: center; gap: 0.4rem; border-radius: 8px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); height: 38px;"
-      title="Sync prices and FX rates from Yahoo Finance">
-      <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="width: 13px; height: 13px; color: var(--text-main);" *ngIf="isRefreshing()">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" style="opacity: 0.25;"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" style="opacity: 0.75;"></path>
-      </svg>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 13px; height: 13px;" *ngIf="!isRefreshing()">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-      </svg>
-      <span>
-        {{ isRefreshing() ? 'Syncing...' : ('Sync' + (lastRefreshTime() ? ' (' + (lastRefreshTime() | date: 'h:mm a') + ')' : '')) }}
-      </span>
-    </button>
-
-    <!-- Vertical Divider -->
-    <div class="control-divider" style="width: 1px; height: 16px; background: rgba(255, 255, 255, 0.15); align-self: center;"></div>
 
     <!-- Valuation Basis Toggle -->
     <div class="currency-toggle" style="margin: 0;">
@@ -423,6 +419,12 @@
   <div class="charts-row">
     <div class="glass-card chart-card" style="position: relative;">
       <h3>Asset Allocation</h3>
+      <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+        <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.4rem;">Not Applicable</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 250px; padding: 0 1rem; line-height: 1.4;">
+          Allocation analysis is only applicable for active periods.
+        </div>
+      </div>
       <div class="chart-content">
         <div class="canvas-wrapper">
           <canvas #assetCanvas width="460" height="320"></canvas>
@@ -466,6 +468,12 @@
 
     <div class="glass-card chart-card" style="position: relative;">
       <h3>Sector Allocation</h3>
+      <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+        <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.4rem;">Not Applicable</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 250px; padding: 0 1rem; line-height: 1.4;">
+          Sector analysis is only applicable for active periods.
+        </div>
+      </div>
       <div class="chart-content">
         <div class="canvas-wrapper">
           <canvas #sectorCanvas width="460" height="320"></canvas>
@@ -494,7 +502,7 @@
 
 
   <!-- Portfolio Table -->
-  <div class="glass-card table-card" #tableCard>
+  <div class="glass-card table-card" #tableCard style="position: relative;">
     <div class="table-header">
       <h2 (click)="toggleTable()" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
         Holdings Analysis
@@ -521,47 +529,56 @@
           onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'">
       </div>
     </div>
-    <div class="table-container" *ngIf="!isCollapsed()">
+    <div class="table-container" *ngIf="!isCollapsed()" style="position: relative; min-height: 200px;">
+      <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5; border-radius: 8px;">
+        <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.4rem;">Not Applicable</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 320px; padding: 0 1rem; line-height: 1.4;">
+          Holdings analysis is only applicable for active periods.
+        </div>
+      </div>
       <table>
         <thead>
           <tr>
-            <th (click)="setSort('name'); scrollToTable()" style="cursor: pointer; user-select: none;" *ngIf="service.showNameHoldings()">
+            <th (click)="setSort('name')" style="cursor: pointer; user-select: none;" *ngIf="service.showNameHoldings()">
               Name <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'name'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th (click)="setSort('ticker'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
               Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('currentPrice'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th class="num" (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none;">
               Current Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('averageCost'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th class="num" (click)="setSort('averageCost')" style="cursor: pointer; user-select: none;">
               Avg Cost {{ sortBy() === 'averageCost' ? (averageCostSortMode() === 'pct' ? '(%)' : '($)') : '' }}
               <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'averageCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('totalShares'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th class="num" style="color: var(--text-muted); font-size: 0.72rem; font-weight: normal;" *ngIf="displayCurrency() !== 'native'">
+              FX Rate
+            </th>
+            <th class="num" (click)="setSort('totalShares')" style="cursor: pointer; user-select: none;">
               Shares <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalShares'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th (click)="setSort('sector'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th (click)="setSort('sector')" style="cursor: pointer; user-select: none;">
               Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('totalCost'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th class="num" (click)="setSort('totalCost')" style="cursor: pointer; user-select: none;">
               Investment <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('currentValue'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th class="num" (click)="setSort('currentValue')" style="cursor: pointer; user-select: none;">
               Current Value <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentValue'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('dividends'); scrollToTable()" style="cursor: pointer; user-select: none;">
+            <th class="num" (click)="setSort('dividends')" style="cursor: pointer; user-select: none;">
               Dividends <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'dividends'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('unrealizedProfit'); scrollToTable()" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+            <th class="num" (click)="setSort('unrealizedProfit')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
               Unrealized {{ sortBy() === 'unrealizedProfit' ? (unrealizedSortMode() === 'pct' ? '(%)' : '($)') : '' }}
               <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'unrealizedProfit'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('realizedProfit'); scrollToTable()" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+            <th class="num" (click)="setSort('realizedProfit')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
               Realized {{ sortBy() === 'realizedProfit' ? (realizedSortMode() === 'pct' ? '(%)' : '($)') : '' }}
               <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'realizedProfit'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('totalReturn'); scrollToTable()" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+            <th class="num" (click)="setSort('totalReturn')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
               Total {{ sortBy() === 'totalReturn' ? (totalReturnSortMode() === 'pct' ? '(%)' : '($)') : '' }}
               <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalReturn'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
@@ -587,41 +604,58 @@
               </div>
             </td>
             <td class="num font-mono">{{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}</td>
-            <td class="num font-mono" style="white-space: nowrap;">{{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}<span [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-left: 0.25rem; font-weight: 500;">({{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%)</span></td>
+            <td class="num font-mono">
+              {{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}
+              <div [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-top: 2px; font-weight: 500;">{{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%</div>
+            </td>
+            <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
+              {{ pos.currency !== displayCurrency() ? (getRowFxRate(pos.currency) | number:'1.4-4') : '—' }}
+            </td>
             <td class="num font-mono">{{ pos.totalShares | number:'1.0-6' }}</td>
             <td style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pos.sector }}"><span class="sector-badge" style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ pos.sector }}</span></td>
-            <td class="num font-mono">{{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}</td>
-            <td class="num bold font-mono">{{ formatVal(pos.currentValue, 'USD', 2, pos.currency) }}</td>
+            <td class="num font-mono" title="% of total portfolio cost">
+              {{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}
+              <div style="font-size:0.72rem; margin-top:2px; color: var(--text-muted);">{{ getAbs((pos.totalCost / tableTotals().cost) * 100) | number:'1.1-1' }}% of cost</div>
+            </td>
+            <td class="num bold font-mono" title="% of total portfolio value">
+              {{ formatVal(pos.currentValue, 'USD', 2, pos.currency) }}
+              <div style="font-size:0.72rem; margin-top:2px; color: var(--text-muted);">{{ getAbs((pos.currentValue / tableTotals().value) * 100) | number:'1.1-1' }}% of value</div>
+            </td>
             <td class="num text-accent font-mono">{{ formatVal(pos.dividends, 'USD', 2, pos.currency) }}</td>
             <td class="num font-mono" [ngClass]="pos.unrealizedProfit >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
-              {{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.unrealizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%)</span>
+              <div>{{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency, true) }}</div>
+              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;">{{ pos.unrealizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%</div>
             </td>
             <td class="num font-mono" [ngClass]="pos.realizedProfit >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
-              {{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="pos.realizedReturnPct !== 0">({{ pos.realizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.realizedReturnPct || 0) | number:'1.1-1' }}%)</span>
+              <div>{{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency, true) }}</div>
+              <div style="font-size: 0.72rem; margin-top: 2px;">{{ pos.realizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.realizedReturnPct || 0) | number:'1.1-1' }}%</div>
             </td>
             <td class="num font-mono bold" [ngClass]="pos.totalReturn >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
-              {{ formatVal(pos.totalReturn, 'USD', 2, pos.currency, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;">({{ pos.totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.totalReturnPct || 0) | number:'1.1-1' }}%)</span>
+              <div>{{ formatVal(pos.totalReturn, 'USD', 2, pos.currency, true) }}</div>
+              <div style="font-size: 0.72rem; margin-top: 2px;">{{ pos.totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.totalReturnPct || 0) | number:'1.1-1' }}%</div>
             </td>
           </tr>
           <!-- Totals row -->
-          <tr *ngIf="summary().positions.length > 0" class="totals-row">
+          <tr *ngIf="filteredPositions().length > 0" class="totals-row">
             <td [attr.colspan]="service.showNameHoldings() ? 3 : 2">Total Portfolio</td>
-            <td colspan="3"></td>
-            <td class="num bold font-mono">{{ formatVal(summary().totalCostBasis, 'USD') }}</td>
-            <td class="num bold font-mono">{{ formatVal(summary().totalValue, 'USD') }}</td>
-            <td class="num text-accent font-mono">{{ formatVal(summary().totalDividends, 'USD') }}</td>
-            <td class="num font-mono" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
-              {{ formatVal(summary().totalUnrealized, 'USD', 2, undefined, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{summary().totalUnrealized >= 0 ? '▲ ' : '▼ '}}{{getAbs((summary().totalUnrealized / summary().totalCostBasis) * 100) | number:'1.1-1'}}%)</span>
+            <td [attr.colspan]="displayCurrency() !== 'native' ? 4 : 3"></td>
+            <td class="num bold font-mono">{{ formatVal(tableTotals().cost, 'USD') }}</td>
+            <td class="num bold font-mono">{{ formatVal(tableTotals().value, 'USD') }}</td>
+            <td class="num text-accent font-mono">{{ formatVal(tableTotals().dividends, 'USD') }}</td>
+            <td class="num font-mono" [ngClass]="tableTotals().unrealized >= 0 ? 'text-success' : 'text-danger'">
+              {{ formatVal(tableTotals().unrealized, 'USD', 2, undefined, true) }}
+              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;" *ngIf="tableTotals().cost > 0">{{tableTotals().unrealized >= 0 ? '▲ ' : '▼ '}}{{getAbs((tableTotals().unrealized / tableTotals().cost) * 100) | number:'1.1-1'}}%</div>
             </td>
-            <td class="num font-mono" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
-              {{ formatVal(summary().totalRealized, 'USD', 2, undefined, true) }}
+            <td class="num font-mono" [ngClass]="tableTotals().realized >= 0 ? 'text-success' : 'text-danger'">
+              {{ formatVal(tableTotals().realized, 'USD', 2, undefined, true) }}
             </td>
-            <td class="num font-mono bold" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
-              {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}<span style="font-size: 0.72rem; margin-left: 0.25rem; color: inherit;" *ngIf="summary().totalCostBasis > 0">({{summary().totalReturn >= 0 ? '▲ ' : '▼ '}}{{getAbs((summary().totalReturn / summary().totalCostBasis) * 100) | number:'1.1-1'}}%)</span>
+            <td class="num font-mono bold" [ngClass]="tableTotals().totalReturn >= 0 ? 'text-success' : 'text-danger'">
+              {{ formatVal(tableTotals().totalReturn, 'USD', 2, undefined, true) }}
+              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;" *ngIf="tableTotals().cost > 0">{{tableTotals().totalReturn >= 0 ? '▲ ' : '▼ '}}{{getAbs((tableTotals().totalReturn / tableTotals().cost) * 100) | number:'1.1-1'}}%</div>
             </td>
           </tr>
           <tr *ngIf="summary().positions.length === 0">
-            <td [attr.colspan]="service.showNameHoldings() ? 12 : 11" class="empty-state">No holdings available. Paste some transaction sources or configure mock data!</td>
+            <td [attr.colspan]="displayCurrency() !== 'native' ? (service.showNameHoldings() ? 13 : 12) : (service.showNameHoldings() ? 12 : 11)" class="empty-state">No holdings data. Enable accounts or import transactions to view holdings.</td>
           </tr>
         </tbody>
       </table>
@@ -675,6 +709,9 @@
             <th class="num" (click)="setSortRealized('purchasePrice')" style="cursor: pointer; user-select: none;">
               Avg Cost <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'purchasePrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
             </th>
+            <th class="num" style="color: var(--text-muted); font-size: 0.72rem; font-weight: normal;" *ngIf="displayCurrency() !== 'native'">
+              FX Rate
+            </th>
             <th class="num" (click)="setSortRealized('shares')" style="cursor: pointer; user-select: none;">
               Shares <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'shares'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
             </th>
@@ -691,7 +728,7 @@
           </tr>
         </thead>
         <tbody>
-          <ng-container *ngFor="let g of groupedRealizedGains()">
+          <ng-container *ngFor="let g of groupedRealizedGains(); trackBy: trackByRealizedGroup">
             <!-- Main Grouped Ticker Row -->
             <tr [style.cursor]="g.sales.length > 1 ? 'pointer' : 'default'" 
                 (click)="g.sales.length > 1 ? toggleRealizedTicker(g.ticker) : null" 
@@ -721,18 +758,21 @@
               </td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, g.currency, 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
+              <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
+                {{ (g.currency !== displayCurrency() && g.sales.length === 1) ? (getRowFxRate(g.currency, g.sales[0].date) | number:'1.4-4') : '—' }}
+              </td>
               <td class="num font-mono" style="vertical-align: middle;">{{ g.shares | number:'1.0-6' }}</td>
               <td class="num font-mono" style="vertical-align: middle;">{{ formatVal(g.sellRevenue, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono" style="vertical-align: middle;">{{ formatVal(g.costBasis, 'USD', 2, g.currency) }}</td>
-              <td class="num font-mono bold" [ngClass]="g.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap; vertical-align: middle;">
-                {{ formatVal(g.realizedGain, 'USD', 2, g.currency, true) }}
-                <span class="cell-pct">({{ g.realizedGain >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(g.realizedGainPct || 0) | number:'1.1-1' }}%)</span>
+              <td class="num font-mono bold" [ngClass]="g.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="vertical-align: middle;">
+                <div>{{ formatVal(g.realizedGain, 'USD', 2, g.currency, true) }}</div>
+                <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;">{{ g.realizedGain >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(g.realizedGainPct || 0) | number:'1.1-1' }}%</div>
               </td>
             </tr>
 
             <!-- Expanded Individual Sale Details directly inline as table rows -->
             <ng-container *ngIf="expandedRealizedTickers().includes(g.ticker) && g.sales.length > 1">
-              <tr *ngFor="let s of g.sales" style="background: rgba(255, 255, 255, 0.035); font-size: 0.85rem;" class="hover-bg-light">
+              <tr *ngFor="let s of g.sales; trackBy: trackByRealizedSale" style="background: rgba(255, 255, 255, 0.035); font-size: 0.85rem;" class="hover-bg-light">
                 <td class="text-muted font-mono" style="padding-left: 1.25rem; vertical-align: middle;">
                   <span style="color: var(--text-muted); opacity: 0.6; margin-right: 0.2rem;">↳</span>
                   {{ s.date | date:service.dateFormat() }}
@@ -743,12 +783,15 @@
                 </td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, s.currency, 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.purchasePrice, 'USD', 2, s.currency) }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
+                  {{ s.currency !== displayCurrency() ? (getRowFxRate(s.currency, s.date) | number:'1.4-4') : '—' }}
+                </td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ s.shares | number:'1.0-6' }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellRevenue, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.costBasis, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono bold text-muted" [ngClass]="s.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="vertical-align: middle;">
-                  {{ formatVal(s.realizedGain, 'USD', 2, s.currency, true) }}
-                  <span class="cell-pct">({{ s.realizedGain >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(s.realizedGainPct || 0) | number:'1.1-1' }}%)</span>
+                  <div>{{ formatVal(s.realizedGain, 'USD', 2, s.currency, true) }}</div>
+                  <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;">{{ s.realizedGain >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(s.realizedGainPct || 0) | number:'1.1-1' }}%</div>
                 </td>
               </tr>
             </ng-container>
@@ -756,17 +799,18 @@
           <!-- Totals row -->
           <tr *ngIf="realizedGains().length > 0" class="totals-row">
             <td [attr.colspan]="service.showNameRealized() ? 3 : 2">Total Realized</td>
-            <td colspan="2"></td>
+            <td [attr.colspan]="displayCurrency() !== 'native' ? 3 : 2"></td>
             <td class="num bold font-mono">{{ realizedGainsTotals().shares | number:'1.0-6' }}</td>
             <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().revenue, 'USD') }}</td>
             <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().costBasis, 'USD') }}</td>
-            <td class="num font-mono bold" [ngClass]="realizedGainsTotals().realizedGain >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
+            <td class="num font-mono bold" [ngClass]="realizedGainsTotals().realizedGain >= 0 ? 'text-success' : 'text-danger'">
               {{ formatVal(realizedGainsTotals().realizedGain, 'USD', 2, undefined, true) }}
-              <span class="cell-pct" *ngIf="realizedGainsTotals().costBasis > 0">({{realizedGainsTotals().realizedGain >= 0 ? '▲ ' : '▼ '}}{{getAbs((realizedGainsTotals().realizedGain / realizedGainsTotals().costBasis) * 100) | number:'1.1-1'}}%)</span>
             </td>
           </tr>
           <tr *ngIf="realizedGains().length === 0">
-            <td [attr.colspan]="service.showNameRealized() ? 9 : 8" class="empty-state">No realized gains/losses recorded in this period.</td>
+            <td [attr.colspan]="displayCurrency() !== 'native' ? (service.showNameRealized() ? 10 : 9) : (service.showNameRealized() ? 9 : 8)" class="empty-state">
+              No realized data. Enable accounts or import transactions to view realized gains/losses.
+            </td>
           </tr>
         </tbody>
       </table>
