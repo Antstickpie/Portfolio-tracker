@@ -51,6 +51,7 @@ export class PortfolioService {
   public lastRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
+  public nextSyncCountdown = signal<string>('3m 00s');
 
   // Predefined map of sectors for autodiscovery
   public sectorMap: Record<string, string> = {
@@ -349,11 +350,30 @@ export class PortfolioService {
       }
     }
 
-    // Silent auto-refresh prices and exchange rates every 5 minutes in background
+    // Smart auto-refresh prices and countdown loop (runs every second)
     setInterval(() => {
-      this.loadMarketPricesApi(false, true);
-      this.loadExchangeRatesApi(false, true);
-    }, 5 * 60 * 1000);
+      if (this.isSyncing()) {
+        this.nextSyncCountdown.set('Syncing...');
+        return;
+      }
+      const last = this.lastRefreshTime();
+      if (!last) {
+        this.refreshMarketData(false);
+        this.nextSyncCountdown.set('3m 00s');
+        return;
+      }
+      const elapsed = Date.now() - last;
+      const intervalMs = 3 * 60 * 1000;
+      if (elapsed >= intervalMs) {
+        this.refreshMarketData(false);
+        this.nextSyncCountdown.set('3m 00s');
+      } else {
+        const remaining = intervalMs - elapsed;
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        this.nextSyncCountdown.set(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
+      }
+    }, 1000);
   }
 
   public sanitizeTransactions(list: Transaction[]): Transaction[] {

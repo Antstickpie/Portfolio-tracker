@@ -36,9 +36,8 @@
     <!-- Live Prices Sync Status in Top Bar -->
     <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem 0.7rem; border-radius: 20px; color: var(--text-muted); flex-shrink: 0;">
       <span [style.color]="service.lastRefreshTime() ? 'var(--success)' : 'var(--text-muted)'" style="font-size: 0.65rem; line-height: 1;">●</span>
-      <span style="color: var(--text-main); font-weight: 500;">Live Prices</span>
-      <span style="font-size: 0.72rem; opacity: 0.8;">
-        (Synced: {{ service.getSyncedTimeAgoText() }})
+      <span style="color: var(--text-main); font-weight: 500; font-size: 0.74rem;">
+        Live: <span style="color: var(--text-muted); font-weight: 400; margin-left: 0.1rem; font-family: monospace; font-variant-numeric: tabular-nums; font-size: 0.72rem;">{{ service.getSyncedTimeAgoText() }} | Next: {{ service.nextSyncCountdown() }}</span>
       </span>
       <button 
         (click)="forceSyncPrices()" 
