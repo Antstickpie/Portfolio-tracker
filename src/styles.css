@@ -6,7 +6,20 @@
   --bg-grid-color: rgba(20, 26, 40, 0.4);
   --card-bg: rgba(17, 24, 39, 0.6);
   --card-border: rgba(255, 255, 255, 0.05);
+  --card-border-hover: rgba(255, 255, 255, 0.08);
   --card-glow: rgba(99, 102, 241, 0.03);
+  --bg-header-solid: #111622;
+  --input-bg: rgba(17, 24, 39, 0.5);
+  --input-bg-focus: rgba(17, 24, 39, 0.8);
+  --input-border: rgba(255, 255, 255, 0.1);
+  --row-hover-bg: rgba(255, 255, 255, 0.015);
+  
+  --button-group-bg: rgba(15, 23, 42, 0.6);
+  --button-active-text: #0b0f19;
+  --drawer-bg: rgba(15, 23, 42, 0.8);
+  --totals-row-bg: rgba(15, 23, 42, 0.5);
+  --tag-bg: rgba(255, 255, 255, 0.04);
+  --tag-border: rgba(255, 255, 255, 0.06);
   
   --primary: hsl(190, 90%, 50%); /* Vibrant Cyan */
   --primary-rgb: 0, 229, 255;
@@ -31,6 +44,46 @@
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.light-theme {
+  --bg-color: #f1f5f9; /* Slate 100 */
+  --bg-grid-color: rgba(226, 232, 240, 0.4); /* Slate 200 */
+  --card-bg: rgba(255, 255, 255, 0.7); /* Clean white glass */
+  --card-border: rgba(15, 23, 42, 0.07); /* Darker border */
+  --card-border-hover: rgba(15, 23, 42, 0.12);
+  --card-glow: rgba(99, 102, 241, 0.02);
+  --bg-header-solid: #e2e8f0; /* Slate 200 */
+  --input-bg: rgba(255, 255, 255, 0.85);
+  --input-bg-focus: #ffffff;
+  --input-border: rgba(15, 23, 42, 0.12);
+  --row-hover-bg: rgba(15, 23, 42, 0.025);
+
+  --button-group-bg: rgba(15, 23, 42, 0.06);
+  --button-active-text: #ffffff;
+  --drawer-bg: rgba(15, 23, 42, 0.03);
+  --totals-row-bg: rgba(15, 23, 42, 0.04);
+  --tag-bg: rgba(15, 23, 42, 0.04);
+  --tag-border: rgba(15, 23, 42, 0.08);
+
+  --primary: hsl(190, 85%, 38%); /* Slightly darker Cyan for contrast */
+  --primary-rgb: 0, 172, 193;
+  --secondary: hsl(260, 75%, 52%); /* Electric Indigo for light mode */
+  --secondary-rgb: 109, 40, 217;
+  --accent: hsl(280, 70%, 48%);
+
+  --text-main: #0f172a; /* Slate 900 */
+  --text-muted: #475569; /* Slate 600 */
+  --text-dark: #94a3b8; /* Slate 400 */
+
+  --success: hsl(142, 72%, 28%); /* Darker green */
+  --success-bg: rgba(22, 163, 74, 0.08);
+  --danger: hsl(350, 74%, 38%); /* Darker red */
+  --danger-bg: rgba(220, 38, 38, 0.08);
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -49,6 +102,13 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body.light-theme {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.04) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.04) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.03) 0px, transparent 50%);
 }
 
 /* Custom Scrollbar */
@@ -99,15 +159,14 @@ body {
 }
 
 .glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: var(--card-border-hover);
   box-shadow: var(--shadow-lg), 0 0 20px -5px var(--card-glow);
 }
 
 /* Inputs & Form Elements */
 input, select, textarea {
-  background: rgba(17, 24, 39, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   color: var(--text-main);
   font-family: var(--font-sans);
   font-size: 0.95rem;
@@ -119,7 +178,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.15);
-  background: rgba(17, 24, 39, 0.8);
+  background: var(--input-bg-focus);
 }
 
 input::placeholder {
@@ -225,7 +284,7 @@ thead th {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #111622 !important; /* solid color to prevent visual overlap */
+  background: var(--bg-header-solid) !important; /* solid color to prevent visual overlap */
 }
 
 th {
@@ -282,7 +341,7 @@ td {
 }
 
 tr:hover td {
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--row-hover-bg);
 }
 
 th.num, td.num {

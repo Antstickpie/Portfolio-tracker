@@ -50,6 +50,7 @@ export class PortfolioService {
   public disabledSources = signal<string[]>([]);
   public lastRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
+  public theme = signal<'dark' | 'light'>('dark');
 
   // Predefined map of sectors for autodiscovery
   public sectorMap: Record<string, string> = {
@@ -249,6 +250,9 @@ export class PortfolioService {
 
   constructor() {
     this.loadFromStorage();
+    const savedTheme = (localStorage.getItem('pt_theme') as 'dark' | 'light') || 'dark';
+    this.theme.set(savedTheme);
+    this.applyTheme(savedTheme);
 
     // Default to current calendar year if no dates set
     if (!this.dateFrom()) {
@@ -2355,6 +2359,24 @@ export class PortfolioService {
       console.warn('Market sync failed:', e);
     } finally {
       this.isSyncing.set(false);
+    }
+  }
+
+  public toggleTheme() {
+    const next = this.theme() === 'dark' ? 'light' : 'dark';
+    this.theme.set(next);
+    localStorage.setItem('pt_theme', next);
+    this.applyTheme(next);
+  }
+
+  public applyTheme(theme: 'dark' | 'light') {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light-theme');
+      document.body.classList.add('light-theme');
+    } else {
+      root.classList.remove('light-theme');
+      document.body.classList.remove('light-theme');
     }
   }
 

@@ -156,7 +156,7 @@
 
 /* Expandable row content */
 .drawer-row {
-  background: rgba(15, 23, 42, 0.8) !important;
+  background: var(--drawer-bg) !important;
 }
 
 .drawer-content {
@@ -200,7 +200,7 @@
 /* Segmented Control Mode Selector */
 .segmented-control {
   display: flex;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--button-group-bg);
   padding: 0.25rem;
   border-radius: 8px;
   border: 1px solid var(--card-border);
@@ -222,7 +222,7 @@
 
 .segment-btn.active {
   background: var(--primary);
-  color: #0b0f19;
+  color: var(--button-active-text);
   font-weight: 600;
 }
 
@@ -360,7 +360,7 @@
 }
 
 .currency-toggle {
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--button-group-bg);
   padding: 0.2rem;
   border-radius: 8px;
   display: flex;
@@ -387,6 +387,6 @@
 
 .currency-btn.active {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: #0b0f19;
+  color: var(--button-active-text);
   font-weight: 600;
 }

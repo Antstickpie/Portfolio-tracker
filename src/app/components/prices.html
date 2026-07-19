@@ -73,7 +73,7 @@
         <!-- Cost basis toggler -->
         <div style="margin-top: 1.25rem;">
           <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Tax Tracking Method</label>
-          <div style="display: flex; background: rgba(15, 23, 42, 0.6); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; width: 100%;">
+          <div style="display: flex; background: var(--button-group-bg); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; width: 100%;">
             <button 
               style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
               [style.background]="service.costBasisMethod() === 'fifo' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"

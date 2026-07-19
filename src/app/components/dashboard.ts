@@ -958,6 +958,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       this.historyPeriod(); // Register dependency
       this.service.historicalPrices(); // Redraw chart when cache updates
       this.service.disabledSources();
+      this.service.theme(); // Redraw on theme change
       
       // Wait a tick for DOM updates
       setTimeout(() => {
@@ -1355,12 +1356,13 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         ctx.moveTo(sx, sy);
         ctx.lineTo(ex, finalY);
         ctx.lineTo(tx, ty);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        const isLight = this.service.theme() === 'light';
+        ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.2)' : 'rgba(255, 255, 255, 0.25)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
         // Draw label text next to line end
-        ctx.fillStyle = '#9ca3af';
+        ctx.fillStyle = isLight ? '#475569' : '#9ca3af';
         ctx.font = '500 9px Outfit';
         ctx.textAlign = isRight ? 'left' : 'right';
         ctx.textBaseline = 'middle';
@@ -1374,7 +1376,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         ctx.beginPath();
         ctx.moveTo(cx + innerRadius * Math.cos(startAngle), cy + innerRadius * Math.sin(startAngle));
         ctx.lineTo(cx + radius * Math.cos(startAngle), cy + radius * Math.sin(startAngle));
-        ctx.strokeStyle = '#080c14'; // match page bg
+        ctx.strokeStyle = isLight ? '#f1f5f9' : '#080c14'; // match page bg
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -1386,11 +1388,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
     const symbol = this.getCurrencySymbol(targetCurr);
     const rate = this.service.getExchangeRate('USD', targetCurr);
+    const isLightMode = this.service.theme() === 'light';
 
     if (hoveredIdx !== -1 && data[hoveredIdx]) {
       const hoveredItem = data[hoveredIdx];
       // Draw hovered slice label
-      ctx.fillStyle = '#f3f4f6';
+      ctx.fillStyle = isLightMode ? '#0f172a' : '#f3f4f6';
       ctx.font = '700 17px Outfit';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1409,13 +1412,13 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       ctx.fillText(`${valStr} (${pctStr})`, cx, cy + 12);
     } else {
       // Draw center label
-      ctx.fillStyle = '#f3f4f6';
+      ctx.fillStyle = isLightMode ? '#0f172a' : '#f3f4f6';
       ctx.font = '600 17px Outfit';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(centerText, cx, cy - 10);
 
-      ctx.fillStyle = '#9ca3af';
+      ctx.fillStyle = isLightMode ? '#475569' : '#9ca3af';
       ctx.font = '400 12px Outfit';
       
       let totalVal = data.reduce((sum, item) => sum + item.value, 0);
