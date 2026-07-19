@@ -1,295 +1,301 @@
 <div class="animate-fade-in">
   <div class="glass-card settings-header">
-    <h1>Settings & Market Rates</h1>
-    <p class="subtitle">Customize portfolio owner names, manage stock pricing, and set sector classifications.</p>
+    <h1>Settings & Preferences</h1>
+    <p class="subtitle">Configure owner names, calculation engines, manage cloud sync, and customize asset parameters.</p>
   </div>
 
-  <div class="settings-grid">
-    <!-- General Settings Manager -->
-    <div class="glass-card names-card">
-      <h3>General Settings</h3>
-      <p class="subtitle">Customize owner names and global preferences.</p>
-      
-      <div class="form-group">
-        <label>Person A Name</label>
-        <input type="text" [(ngModel)]="personANameInput" placeholder="Person A">
-      </div>
-      
-      <div class="form-group" style="margin-top: 1.2rem;">
-        <label>Person B Name</label>
-        <input type="text" [(ngModel)]="personBNameInput" placeholder="Person B">
-      </div>
-      
-      <div class="form-group" style="margin-top: 1.2rem;">
-        <label>Date Format</label>
-        <select 
-          [ngModel]="service.dateFormat()" 
-          (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()"
-          style="width: 100%; padding: 0.55rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer;">
-          <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
-          <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
-          <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
-          <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin-top: 1.2rem;">
-        <label>Year Basis (for "This Year" / "Last Year" filters)</label>
-        <select 
-          [ngModel]="service.yearBasis()" 
-          (ngModelChange)="service.yearBasis.set($event); service.saveToStorage()"
-          style="width: 100%; padding: 0.55rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer;">
-          <option value="calendar" style="background: #0d1117;">Calendar Year (Jan 1 - Dec 31)</option>
-          <option value="financial" style="background: #0d1117;">Financial Year (Custom Start)</option>
-        </select>
+  <!-- SECTION 1: SETTINGS DASHBOARD GRID -->
+  <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));">
+    <!-- Card 1: Preferences & Calculations -->
+    <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+      <div>
+        <h3>Preferences & Calculations</h3>
+        <p class="subtitle">Set owner names, date formats, and tax/split engine methods.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Person A Name</label>
+            <input type="text" [(ngModel)]="personANameInput" placeholder="Person A" style="width: 100%; padding: 0.45rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none;">
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Person B Name</label>
+            <input type="text" [(ngModel)]="personBNameInput" placeholder="Person B" style="width: 100%; padding: 0.45rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none;">
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Date Format</label>
+            <select 
+              [ngModel]="service.dateFormat()" 
+              (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()"
+              style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
+              <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
+              <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
+              <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
+              <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
+            </select>
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Year Basis</label>
+            <select 
+              [ngModel]="service.yearBasis()" 
+              (ngModelChange)="service.yearBasis.set($event); service.saveToStorage()"
+              style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
+              <option value="calendar" style="background: #0d1117;">Calendar Year</option>
+              <option value="financial" style="background: #0d1117;">Financial Year</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Financial year month/day detail inline -->
+        <div *ngIf="service.yearBasis() === 'financial'" style="margin-top: 1rem; padding: 0.8rem; background: rgba(255, 255, 255, 0.01); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 1rem; align-items: center;">
+          <div style="flex: 1;">
+            <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Start Month</label>
+            <select 
+              [ngModel]="service.financialYearStartMonth()" 
+              (ngModelChange)="service.financialYearStartMonth.set(+$event); service.saveToStorage()"
+              style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
+              <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m" style="background: #0d1117;">{{ getMonthName(m) }}</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Start Day</label>
+            <select 
+              [ngModel]="service.financialYearStartDay()" 
+              (ngModelChange)="service.financialYearStartDay.set(+$event); service.saveToStorage()"
+              style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
+              <option *ngFor="let d of getDaysArray()" [value]="d" style="background: #0d1117;">{{ d }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Cost basis toggler -->
+        <div style="margin-top: 1.25rem;">
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Tax Tracking Method</label>
+          <div style="display: flex; background: rgba(15, 23, 42, 0.6); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; width: 100%;">
+            <button 
+              style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
+              [style.background]="service.costBasisMethod() === 'fifo' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
+              [style.color]="service.costBasisMethod() === 'fifo' ? '#fff' : 'var(--text-muted)'"
+              (click)="setCostBasisMethod('fifo')">
+              FIFO Lots
+            </button>
+            <button 
+              style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
+              [style.background]="service.costBasisMethod() === 'avg' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
+              [style.color]="service.costBasisMethod() === 'avg' ? '#fff' : 'var(--text-muted)'"
+              (click)="setCostBasisMethod('avg')">
+              Average Cost
+            </button>
+          </div>
+        </div>
+
+        <!-- Split-adjusted toggles -->
+        <div style="margin-top: 1.25rem;" *ngIf="allSources().length > 0">
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Split-Adjusted Accounts</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+            <label *ngFor="let src of allSources()" style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem; transition: all 0.15s;" [style.borderColor]="isSplitAdjusted(src) ? 'var(--primary)' : 'rgba(255,255,255,0.06)'" [style.background]="isSplitAdjusted(src) ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.01)'">
+              <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
+              <span>{{ src }}</span>
+            </label>
+          </div>
+        </div>
       </div>
 
-      <div *ngIf="service.yearBasis() === 'financial'" style="margin-top: 1rem; padding: 0.8rem; background: rgba(255, 255, 255, 0.01); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 1rem; align-items: center;">
-        <div style="flex: 1;">
-          <label style="font-size: 0.75rem; color: var(--text-muted);">Start Month</label>
-          <select 
-            [ngModel]="service.financialYearStartMonth()" 
-            (ngModelChange)="service.financialYearStartMonth.set(+$event); service.saveToStorage()"
-            style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
-            <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m" style="background: #0d1117;">
-              {{ getMonthName(m) }}
-            </option>
-          </select>
-        </div>
-        <div style="flex: 1;">
-          <label style="font-size: 0.75rem; color: var(--text-muted);">Start Day</label>
-          <select 
-            [ngModel]="service.financialYearStartDay()" 
-            (ngModelChange)="service.financialYearStartDay.set(+$event); service.saveToStorage()"
-            style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
-            <option *ngFor="let d of getDaysArray()" [value]="d" style="background: #0d1117;">{{ d }}</option>
-          </select>
-        </div>
-      </div>
-      
-      <div style="margin-top: 1.8rem; margin-bottom: 0.5rem; display: flex; justify-content: flex-start;">
-        <button class="btn btn-primary btn-sm" (click)="saveOwnerNames()">Save Settings</button>
+      <div style="display: flex; justify-content: flex-start; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
+        <button class="btn btn-primary btn-sm" (click)="saveOwnerNames()">Save Names & Preferences</button>
       </div>
     </div>
 
-    <!-- Backup & Restore Manager -->
-    <div class="glass-card backup-card">
-      <h3>Backup & Restore Database</h3>
-      <p class="subtitle">Download all transaction ledgers and settings to a JSON file, or restore from a backup.</p>
-      
-      <div class="settings-action-row">
-        <div class="action-details">
-          <h4>Export Portfolio</h4>
-          <p class="action-desc">Download a copy of your transactions and settings as a JSON file.</p>
+    <!-- Card 2: Data & Backup -->
+    <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+      <div>
+        <h3>Data & Cloud Sync</h3>
+        <p class="subtitle">Access your data securely across devices or download backups locally.</p>
+        
+        <!-- Google Sync Area -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.75rem; border-radius: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="-21 0 130 80" width="18" height="18" style="display: block;">
+                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 3.15.85 6.1 2.6 8.85z" fill="#0066da"/>
+                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.45h27.5z" fill="#00ac47"/>
+                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.9 1.2-4.45h-27.5l5.85 11.5z" fill="#ea4335"/>
+                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-3.15-.85-6.1-2.6-8.85z" fill="#ffba00"/>
+              </svg>
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">Google Drive Sync</span>
+            </div>
+            <span *ngIf="service.isGoogleConnected()" style="color: #0f9d58; font-size: 0.75rem; font-weight: bold;">● Connected</span>
+            <span *ngIf="!service.isGoogleConnected()" style="color: var(--text-muted); font-size: 0.75rem;">○ Disconnected</span>
+          </div>
+
+          <div *ngIf="service.isGoogleConnected() && service.lastGoogleSyncTime()" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.5rem; padding-left: 0.1rem;">
+            Last backup: {{ formatSyncTime(service.lastGoogleSyncTime()!) }}
+          </div>
+
+          <div>
+            <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Sync File Name</label>
+            <input
+              type="text"
+              [ngModel]="service.googleFileName()"
+              (ngModelChange)="service.googleFileName.set($event)"
+              placeholder="portfolio_tracker_transactions.json"
+              style="font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; width: 100%;">
+          </div>
+
+          <div style="margin-top: 0.75rem; display: flex; gap: 0.4rem; justify-content: flex-end;">
+            <ng-container *ngIf="service.isGoogleConnected()">
+              <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.disconnectGoogleDrive()">Disconnect</button>
+              <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">Load Data</button>
+              <button class="btn btn-primary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">Backup Now</button>
+            </ng-container>
+            <ng-container *ngIf="!service.isGoogleConnected()">
+              <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;" (click)="service.connectGoogleDrive()">Connect Account</button>
+            </ng-container>
+          </div>
         </div>
-        <button class="btn btn-primary btn-sm" (click)="exportPortfolioBackup()">
-          Download Backup (.json)
+
+        <!-- Local Database Backup -->
+        <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.25rem;">
+          <h4 style="font-size: 0.88rem; margin: 0 0 0.5rem; font-weight: 600;">Local JSON Database</h4>
+          
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Export database</span>
+              <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()">Download (.json)</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
+              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.5rem;">Import backup</span>
+              <input 
+                type="file" 
+                accept=".json" 
+                (change)="importPortfolioBackup($event)"
+                class="file-input"
+                style="width: 140px; padding: 0.2rem; font-size: 0.7rem;"
+                id="backup-upload">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Sector & Currencies -->
+    <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+      <div>
+        <h3>Sectors & Currencies</h3>
+        <p class="subtitle">Customize labels for stock sectors and toggle active dashboard exchange currencies.</p>
+        
+        <!-- Sector classification -->
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Sectors</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+            <span
+              *ngFor="let s of service.customSectors(); let i = index"
+              style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.55rem; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: var(--text-main);">
+              {{ s }}
+              <button
+                (click)="removeSector(i)"
+                style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0; transition: color 0.15s;"
+                onmouseover="this.style.color='#ef4444'"
+                onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+            </span>
+          </div>
+          <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.5rem;">
+            <input
+              type="text"
+              [(ngModel)]="newSectorName"
+              placeholder="New sector..."
+              (keydown.enter)="addSector()"
+              style="flex: 1; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; font-size: 0.78rem;">
+            <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.6rem;" (click)="addSector()" [disabled]="!newSectorName.trim()">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Dashboard currency toggle list -->
+        <div style="margin-top: 1.25rem;">
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Dashboard Currencies</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+            <span
+              *ngFor="let curr of service.visibleCurrencies(); let i = index"
+              style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.55rem; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: var(--text-main);">
+              {{ service.getCurrencyBtnLabel(curr) }}
+              <button
+                (click)="removeVisibleCurrency(i)"
+                style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0; transition: color 0.15s;"
+                onmouseover="this.style.color='#ef4444'"
+                onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+            </span>
+          </div>
+          <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.5rem;">
+            <input
+              type="text"
+              [(ngModel)]="newCurrencyCode"
+              placeholder="e.g. CAD, JPY..."
+              (keydown.enter)="addVisibleCurrency()"
+              style="flex: 1; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; font-size: 0.78rem; text-transform: uppercase;">
+            <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.6rem;" (click)="addVisibleCurrency()" [disabled]="!newCurrencyCode.trim()">+ Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: EXCHANGE RATES (FULL WIDTH) -->
+  <div class="glass-card rates-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
+      <h3 (click)="isRatesCollapsed.set(!isRatesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+        Currency Exchange Rates
+        <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isRatesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+      </h3>
+      <div style="display: flex; gap: 0.5rem;" *ngIf="!isRatesCollapsed()">
+        <button class="btn btn-secondary btn-sm" (click)="loadExchangeRatesApi(false)">Refresh Rates</button>
+        <button class="btn btn-primary btn-sm" (click)="loadExchangeRatesApi(true)">Force Refresh</button>
+        <button 
+          class="btn btn-sm" 
+          [class.btn-primary]="isEditingRates()" 
+          [class.btn-secondary]="!isEditingRates()"
+          (click)="isEditingRates.set(!isEditingRates())">
+          {{ isEditingRates() ? 'Save' : 'Edit Override' }}
         </button>
       </div>
-
-      <div class="settings-action-row" style="margin-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1.5rem;">
-         <div class="action-details">
-           <h4>Import Backup</h4>
-           <p class="action-desc">Restore transaction ledgers and templates from a backup file.</p>
-         </div>
-         <div class="file-upload-wrapper">
-           <input 
-             type="file" 
-             accept=".json" 
-             (change)="importPortfolioBackup($event)"
-             class="file-input"
-             id="backup-upload">
-         </div>
-      </div>
     </div>
-
-
-    <!-- Currency Exchange Rates Manager -->
-    <div class="glass-card rates-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
-        <h3 (click)="isRatesCollapsed.set(!isRatesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-          Currency Exchange Rates
-          <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isRatesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
-        </h3>
-        <div style="display: flex; gap: 0.5rem;" *ngIf="!isRatesCollapsed()">
-          <button class="btn btn-secondary btn-sm" (click)="loadExchangeRatesApi(false)">Refresh Rates</button>
-          <button class="btn btn-primary btn-sm" (click)="loadExchangeRatesApi(true)">Force Refresh</button>
-          <button 
-            class="btn btn-sm" 
-            [class.btn-primary]="isEditingRates()" 
-            [class.btn-secondary]="!isEditingRates()"
-            (click)="isEditingRates.set(!isEditingRates())">
-            {{ isEditingRates() ? 'Save' : 'Edit' }}
-          </button>
-        </div>
-      </div>
-      <p class="subtitle" *ngIf="!isRatesCollapsed()">Customize or refresh the conversion rates between USD, EUR, and GBP dynamically.</p>
-      
-      <div class="table-container rates-table" style="margin-top: 1rem; max-height: 250px; overflow-y: auto;" *ngIf="!isRatesCollapsed()">
-        <table>
-          <thead>
-            <tr>
-              <th>Currency Pair</th>
-              <th style="text-align: right; padding-right: 1.5rem;">Exchange Rate</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let pair of exchangeRatePairs()">
-              <td class="bold-ticker">{{ pair.name }}</td>
-              <td style="text-align: right; padding-right: 1.5rem; vertical-align: middle;">
-                <input 
-                  *ngIf="isEditingRates()"
-                  type="number" 
-                  step="0.0001"
-                  [ngModel]="pair.rate" 
-                  (ngModelChange)="updateExchangeRate(pair.key, $event)"
-                  class="table-inline-input price-input"
-                  style="width: 100px; text-align: right; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 0.2rem 0.4rem; color: #fff;">
-                <span *ngIf="!isEditingRates()" class="font-mono" style="font-size: 0.9rem; padding-right: 0.4rem; font-weight: bold; color: var(--text-main);">
-                  {{ pair.rate.toFixed(4) }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <p class="subtitle" *ngIf="!isRatesCollapsed()">Customize or fetch current conversion rates between major currencies.</p>
+    
+    <div class="table-container rates-table" style="margin-top: 1rem; max-height: 250px; overflow-y: auto;" *ngIf="!isRatesCollapsed()">
+      <table>
+        <thead>
+          <tr>
+            <th>Currency Pair</th>
+            <th style="text-align: right; padding-right: 1.5rem;">Exchange Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let pair of exchangeRatePairs()">
+            <td class="bold-ticker">{{ pair.name }}</td>
+            <td style="text-align: right; padding-right: 1.5rem; vertical-align: middle;">
+              <input 
+                *ngIf="isEditingRates()"
+                type="number" 
+                step="0.0001"
+                [ngModel]="pair.rate" 
+                (ngModelChange)="updateExchangeRate(pair.key, $event)"
+                class="table-inline-input price-input"
+                style="width: 100px; text-align: right; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 0.2rem 0.4rem; color: #fff;">
+              <span *ngIf="!isEditingRates()" class="font-mono" style="font-size: 0.9rem; padding-right: 0.4rem; font-weight: bold; color: var(--text-main);">
+                {{ pair.rate.toFixed(4) }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- Google Drive Cloud Sync - Full Width -->
-  <div class="glass-card" style="margin-top: 1.5rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
-      <!-- Left: Branding + status -->
-      <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 220px;">
-        <div style="width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; align-self: center;">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="-21 0 130 80" width="36" height="36" style="display: block;">
-            <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 3.15.85 6.1 2.6 8.85z" fill="#0066da"/>
-            <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.45h27.5z" fill="#00ac47"/>
-            <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.9 1.2-4.45h-27.5l5.85 11.5z" fill="#ea4335"/>
-            <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
-            <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
-            <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-3.15-.85-6.1-2.6-8.85z" fill="#ffba00"/>
-          </svg>
-        </div>
-        <div>
-          <h3 style="margin: 0; font-size: 1rem;">Google Drive Sync</h3>
-          <p class="subtitle" style="margin: 0.15rem 0 0; font-size: 0.78rem;">Your portfolio is privately backed up to your own Google Drive.</p>
-        </div>
-      </div>
-
-      <!-- Middle: Status / File name -->
-      <div style="flex: 1; min-width: 200px;">
-        <div *ngIf="service.isGoogleConnected()" style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="color: #0f9d58; font-size: 1rem;">●</span>
-          <span style="font-size: 0.82rem; color: var(--text-main); font-weight: 500;">Connected</span>
-          <span *ngIf="service.lastGoogleSyncTime()" style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">
-            Last sync: {{ formatSyncTime(service.lastGoogleSyncTime()!) }}
-          </span>
-        </div>
-        <div *ngIf="!service.isGoogleConnected()" style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="color: var(--text-muted); font-size: 1rem;">○</span>
-          <span style="font-size: 0.82rem; color: var(--text-muted);">Not connected</span>
-        </div>
-        <div style="margin-top: 0.5rem;">
-          <input
-            type="text"
-            [ngModel]="service.googleFileName()"
-            (ngModelChange)="service.googleFileName.set($event)"
-            placeholder="portfolio_tracker_transactions.json"
-            style="font-size: 0.78rem; padding: 0.3rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; width: 100%;">
-        </div>
-      </div>
-
-      <!-- Right: Actions -->
-      <div style="display: flex; gap: 0.6rem; flex-shrink: 0; align-items: center;">
-        <ng-container *ngIf="service.isGoogleConnected()">
-          <button
-            class="btn btn-primary btn-sm"
-            (click)="service.uploadToGoogleDrive()"
-            [disabled]="service.isGoogleSyncing()"
-            title="Upload local data → overwrites Drive backup">
-            {{ service.isGoogleSyncing() ? 'Working…' : '↑ Upload to Drive' }}
-          </button>
-          <button
-            class="btn btn-secondary btn-sm"
-            (click)="service.downloadFromGoogleDrive()"
-            [disabled]="service.isGoogleSyncing()"
-            title="Download from Drive → overwrites local data">
-            ↓ Load from Drive
-          </button>
-          <button class="btn btn-secondary btn-sm" (click)="service.disconnectGoogleDrive()">Disconnect</button>
-        </ng-container>
-        <ng-container *ngIf="!service.isGoogleConnected()">
-          <button class="btn btn-primary btn-sm" (click)="service.connectGoogleDrive()">Connect Google Drive</button>
-        </ng-container>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sector Manager -->
-  <div class="glass-card" style="margin-top: 1.5rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-      <div>
-        <h3 style="margin: 0;">Sector Labels</h3>
-        <p class="subtitle" style="margin: 0.2rem 0 0; font-size: 0.78rem;">Define the sectors available in the dropdown below.</p>
-      </div>
-    </div>
-
-    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
-      <span
-        *ngFor="let s of service.customSectors(); let i = index"
-        style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-main);">
-        {{ s }}
-        <button
-          (click)="removeSector(i)"
-          style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; transition: color 0.15s;"
-          onmouseover="this.style.color='#ef4444'"
-          onmouseout="this.style.color='var(--text-muted)'">&times;</button>
-      </span>
-    </div>
-
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <input
-        type="text"
-        [(ngModel)]="newSectorName"
-        placeholder="New sector name…"
-        (keydown.enter)="addSector()"
-        style="flex: 1; max-width: 240px; padding: 0.4rem 0.7rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); outline: none; font-size: 0.82rem;">
-      <button class="btn btn-primary btn-sm" (click)="addSector()" [disabled]="!newSectorName.trim()">+ Add</button>
-    </div>
-  </div>
-
-  <!-- Dashboard Currencies card -->
-  <div class="glass-card" style="margin-top: 1.5rem;">
-    <div>
-      <h3 style="margin: 0;">Dashboard Currencies</h3>
-      <p class="subtitle" style="margin: 0.2rem 0 0; font-size: 0.78rem;">Define the currencies available in the dashboard toggle bar. (Native is always present)</p>
-    </div>
-
-    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1rem; margin-bottom: 1rem;">
-      <span
-        *ngFor="let curr of service.visibleCurrencies(); let i = index"
-        style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; color: var(--text-main);">
-        {{ service.getCurrencyBtnLabel(curr) }}
-        <button
-          (click)="removeVisibleCurrency(i)"
-          style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; transition: color 0.15s;"
-          onmouseover="this.style.color='#ef4444'"
-          onmouseout="this.style.color='var(--text-muted)'">&times;</button>
-      </span>
-    </div>
-
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <input
-        type="text"
-        [(ngModel)]="newCurrencyCode"
-        placeholder="e.g. GBP, CHF, CAD, JPY…"
-        (keydown.enter)="addVisibleCurrency()"
-        style="flex: 1; max-width: 240px; padding: 0.4rem 0.7rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); outline: none; font-size: 0.82rem; text-transform: uppercase;">
-      <button class="btn btn-primary btn-sm" (click)="addVisibleCurrency()" [disabled]="!newCurrencyCode.trim()">+ Add</button>
-    </div>
-  </div>
-
-  <!-- Ticker Metadata Pricing Card -->
+  <!-- SECTION 3: STOCK PRICE CATALOG (FULL WIDTH) -->
   <div class="glass-card prices-card">
     <div class="prices-header">
       <div>
@@ -387,7 +393,7 @@
                 placeholder="e.g. {{ t.ticker }}.DE"
                 style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 110px; transition: border-color 0.15s; text-align: center;"
                 onfocus="this.style.borderColor='var(--primary)'"
-                onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+                onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'">
             </td>
             <td>
               <input
@@ -420,44 +426,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- Cost Basis Method Toggle -->
-  <div class="glass-card" style="margin-top: 1.5rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-      <div>
-        <h3 style="margin: 0 0 0.25rem;">Cost Basis Method</h3>
-        <p class="subtitle" style="margin: 0;">FIFO (First In, First Out) is the standard for tax reporting. Average cost uses weighted average of all shares.</p>
-      </div>
-      <div style="display: flex; background: rgba(15, 23, 42, 0.6); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; flex-shrink: 0;">
-        <button 
-          style="background: transparent; border: none; outline: none; padding: 0 1rem; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
-          [style.background]="service.costBasisMethod() === 'fifo' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
-          [style.color]="service.costBasisMethod() === 'fifo' ? '#fff' : 'var(--text-muted)'"
-          (click)="setCostBasisMethod('fifo')">
-          FIFO
-        </button>
-        <button 
-          style="background: transparent; border: none; outline: none; padding: 0 1rem; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
-          [style.background]="service.costBasisMethod() === 'avg' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
-          [style.color]="service.costBasisMethod() === 'avg' ? '#fff' : 'var(--text-muted)'"
-          (click)="setCostBasisMethod('avg')">
-          Average Cost
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Split-Adjusted Sources Toggle -->
-  <div class="glass-card" style="margin-top: 1.5rem;" *ngIf="allSources().length > 0">
-    <h3 style="margin: 0 0 0.5rem;">Split-Adjusted Sources</h3>
-    <p class="subtitle" style="margin: 0 0 1rem;">Mark sources/brokers that already report split-adjusted share counts. Splits will NOT be applied to transactions from these sources.</p>
-    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-      <label *ngFor="let src of allSources()" style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem; transition: all 0.15s;" [style.borderColor]="isSplitAdjusted(src) ? 'var(--primary)' : 'rgba(255,255,255,0.08)'" [style.background]="isSplitAdjusted(src) ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)'">
-        <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
-        <span>{{ src }}</span>
-      </label>
     </div>
   </div>
 </div>
