@@ -252,8 +252,6 @@
         <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isRatesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
       </h3>
       <div style="display: flex; gap: 0.5rem;" *ngIf="!isRatesCollapsed()">
-        <button class="btn btn-secondary btn-sm" (click)="loadExchangeRatesApi(false)">Refresh Rates</button>
-        <button class="btn btn-primary btn-sm" (click)="loadExchangeRatesApi(true)">Force Refresh</button>
         <button 
           class="btn btn-sm" 
           [class.btn-primary]="isEditingRates()" 
@@ -323,8 +321,6 @@
           style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text-main); font-size: 0.8rem; width: 140px; outline: none; transition: border-color 0.2s;"
           onfocus="this.style.borderColor='var(--primary)'"
           onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'">
-        <button class="btn btn-secondary btn-sm" (click)="loadMarketPricesApi(false)">Refresh Prices</button>
-        <button class="btn btn-primary btn-sm" (click)="loadMarketPricesApi(true)">Force Refresh</button>
       </div>
     </div>
 
@@ -370,6 +366,9 @@
                   {{ t.ticker.slice(0, 2) }}
                 </div>
                 <a href="https://www.google.com/search?q={{ t.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ t.ticker }}</a>
+                <span *ngIf="service.tickerConfigs()[t.ticker]?.notFound" style="color: var(--danger); font-size: 0.68rem; padding: 0.15rem 0.35rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); font-weight: bold; margin-left: 0.4rem; display: inline-flex; align-items: center; gap: 0.2rem;" title="Ticker not found on Yahoo. Click magnifying glass next to override to search/fix.">
+                  ⚠️ Error
+                </span>
               </div>
             </td>
             <td class="num font-mono bold">
@@ -385,15 +384,24 @@
               </select>
             </td>
             <td>
-              <input
-                type="text"
-                [ngModel]="t.yahooSymbol || ''"
-                (blur)="updateTickerYahooSymbol(t.ticker, $any($event.target).value)"
-                (keydown.enter)="updateTickerYahooSymbol(t.ticker, $any($event.target).value); $any($event.target).blur()"
-                placeholder="e.g. {{ t.ticker }}.DE"
-                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 110px; transition: border-color 0.15s; text-align: center;"
-                onfocus="this.style.borderColor='var(--primary)'"
-                onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'">
+              <div style="display: flex; gap: 0.2rem; align-items: center; justify-content: center;">
+                <input
+                  type="text"
+                  [ngModel]="t.yahooSymbol || ''"
+                  (blur)="updateTickerYahooSymbol(t.ticker, $any($event.target).value)"
+                  (keydown.enter)="updateTickerYahooSymbol(t.ticker, $any($event.target).value); $any($event.target).blur()"
+                  placeholder="e.g. {{ t.ticker }}.DE"
+                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 85px; transition: border-color 0.15s; text-align: center;"
+                  onfocus="this.style.borderColor='var(--primary)'"
+                  onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'">
+                <button 
+                  class="btn btn-secondary btn-xs" 
+                  style="padding: 0.3rem; line-height: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center;"
+                  title="Search Yahoo Symbol"
+                  (click)="searchYahooSymbol(t.ticker)">
+                  🔍
+                </button>
+              </div>
             </td>
             <td>
               <input

@@ -214,8 +214,12 @@ export class PortfolioService {
     let changed = false;
     Object.keys(configs).forEach((t) => {
       if (!active.has(t)) {
-        delete configs[t];
-        changed = true;
+        const c = configs[t];
+        // Only delete if it has no custom overrides or configs to preserve settings
+        if (c && !c.yahooSymbol && !c.customSector && !c.splits?.length && !c.notFound && !c.splitRatio) {
+          delete configs[t];
+          changed = true;
+        }
       }
     });
     if (changed) {
@@ -350,30 +354,37 @@ export class PortfolioService {
       }
     }
 
+    // Initialize countdown immediately
+    this.updateNextSyncCountdown();
+
     // Smart auto-refresh prices and countdown loop (runs every second)
     setInterval(() => {
-      if (this.isSyncing()) {
-        this.nextSyncCountdown.set('Syncing...');
-        return;
-      }
-      const last = this.lastRefreshTime();
-      if (!last) {
-        this.refreshMarketData(false);
-        this.nextSyncCountdown.set('3m 00s');
-        return;
-      }
-      const elapsed = Date.now() - last;
-      const intervalMs = 3 * 60 * 1000;
-      if (elapsed >= intervalMs) {
-        this.refreshMarketData(false);
-        this.nextSyncCountdown.set('3m 00s');
-      } else {
-        const remaining = intervalMs - elapsed;
-        const minutes = Math.floor(remaining / 60000);
-        const seconds = Math.floor((remaining % 60000) / 1000);
-        this.nextSyncCountdown.set(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
-      }
+      this.updateNextSyncCountdown();
     }, 1000);
+  }
+
+  private updateNextSyncCountdown() {
+    if (this.isSyncing()) {
+      this.nextSyncCountdown.set('Syncing...');
+      return;
+    }
+    const last = this.lastRefreshTime();
+    if (!last) {
+      this.refreshMarketData(false);
+      this.nextSyncCountdown.set('3m 00s');
+      return;
+    }
+    const elapsed = Date.now() - last;
+    const intervalMs = 3 * 60 * 1000;
+    if (elapsed >= intervalMs) {
+      this.refreshMarketData(false);
+      this.nextSyncCountdown.set('3m 00s');
+    } else {
+      const remaining = intervalMs - elapsed;
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      this.nextSyncCountdown.set(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
+    }
   }
 
   public sanitizeTransactions(list: Transaction[]): Transaction[] {
@@ -810,7 +821,7 @@ export class PortfolioService {
     const existingLogo = prev[ticker.toUpperCase()]?.logoData;
     const finalLogo = logoData || existingLogo;
     const existingYahooSymbol = prev[ticker.toUpperCase()]?.yahooSymbol;
-    const finalYahooSymbol = yahooSymbol !== undefined ? yahooSymbol : existingYahooSymbol;
+    const finalYahooSymbol = yahooSymbol !== undefined ? (yahooSymbol.trim() || undefined) : existingYahooSymbol;
     const existingCustomSector = prev[ticker.toUpperCase()]?.customSector;
     const finalCustomSector = customSector !== undefined ? customSector : existingCustomSector;
 
@@ -835,10 +846,29 @@ export class PortfolioService {
           yahooSymbol: finalYahooSymbol,
           customSector: finalCustomSector,
           splitRatio: splitRatio !== undefined ? splitRatio : p[ticker.toUpperCase()]?.splitRatio,
-          splitDate: splitDate !== undefined ? splitDate : p[ticker.toUpperCase()]?.splitDate
+          splitDate: splitDate !== undefined ? splitDate : p[ticker.toUpperCase()]?.splitDate,
+          notFound: false,
+          notFoundTime: undefined
         }
       };
       return updated;
+    });
+    this.saveToStorage();
+  }
+
+  public markTickerNotFound(ticker: string) {
+    const t = ticker.toUpperCase().trim();
+    this.tickerConfigs.update((p) => {
+      const prev = p[t] || { ticker: t, currentPrice: 0, priceCurrency: 'USD', sector: 'Other', name: t };
+      return {
+        ...p,
+        [t]: {
+          ...prev,
+          currentPrice: 0,
+          notFound: true,
+          notFoundTime: Date.now()
+        }
+      };
     });
     this.saveToStorage();
   }
@@ -1400,12 +1430,18 @@ export class PortfolioService {
     resolve: () => void;
   } | null>(null);
 
-  public showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+  public searchSymbolModal = signal<{
+    ticker: string;
+    results: { symbol: string; name: string; exchange: string; quoteType: string; price?: number | null; currency?: string }[];
+    resolve: (symbol: string | null) => void;
+  } | null>(null);
+
+  public showToast(message: string, type: 'success' | 'error' | 'info' = 'success', duration = 3500) {
     const id = 'toast-' + Math.random().toString(36).substring(2, 9);
     this.toasts.update((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       this.toasts.update((prev) => prev.filter((t) => t.id !== id));
-    }, 3500);
+    }, duration);
   }
 
   public showConfirm(title: string, message: string): Promise<boolean> {
@@ -1426,6 +1462,77 @@ export class PortfolioService {
         resolve: () => {
           this.alertModal.set(null);
           resolve();
+        }
+      });
+    });
+  }
+
+  public async selectYahooSymbol(ticker: string): Promise<string | null> {
+    const cleanTicker = ticker.toUpperCase().trim();
+    const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
+    const searchResponse = await this.fetchWithProxy(searchTarget, true);
+    if (!searchResponse.ok) {
+      this.showToast('Could not fetch search results from Yahoo.', 'error');
+      return null;
+    }
+    const searchData = await searchResponse.json();
+    const results = searchData?.quotes || [];
+    
+    if (results.length === 0) {
+      this.showToast(`No Yahoo symbols found for "${ticker}"`, 'info');
+      return null;
+    }
+
+    // Fetch prices and currencies in parallel for the top search results to help the user choose
+    const symbols = results.map((q: any) => q.symbol).filter(Boolean);
+    const pricePromises = symbols.map(async (sym: string) => {
+      try {
+        const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`;
+        const resp = await this.fetchWithProxy(target, true);
+        if (resp.ok) {
+          const d = await resp.json();
+          const meta = d?.chart?.result?.[0]?.meta;
+          if (meta) {
+            let price = parseFloat(meta.regularMarketPrice);
+            if (price === null || isNaN(price) || price <= 0) {
+              price = parseFloat(meta.chartPreviousClose);
+            }
+            return {
+              symbol: sym,
+              price: !isNaN(price) && price > 0 ? price : null,
+              currency: (meta.currency || 'USD').toUpperCase()
+            };
+          }
+        }
+      } catch (e) {
+        // ignore error
+      }
+      return { symbol: sym, price: null, currency: 'USD' };
+    });
+
+    const priceResults = await Promise.all(pricePromises);
+    const priceMap = new Map<string, { price: number | null; currency: string }>();
+    priceResults.forEach((r: any) => {
+      priceMap.set(r.symbol, { price: r.price, currency: r.currency });
+    });
+
+    return new Promise<string | null>((resolve) => {
+      this.searchSymbolModal.set({
+        ticker,
+        results: results.map((q: any) => {
+          const pInfo = priceMap.get(q.symbol) || { price: null, currency: 'USD' };
+          return {
+            symbol: q.symbol,
+            name: q.longname || q.shortname || ticker,
+            exchange: q.exchange,
+            quoteType: q.quoteType || 'EQUITY',
+            price: pInfo.price,
+            currency: pInfo.currency
+          };
+        }),
+        resolve: (val) => {
+          this.searchSymbolModal.set(null);
+          resolve(val);
         }
       });
     });
@@ -1523,6 +1630,10 @@ export class PortfolioService {
       tickers.forEach(ticker => {
         const cleanTicker = ticker.toUpperCase().trim();
         const config = meta[cleanTicker];
+        if (!force && config && config.notFound) {
+          const isFresh = !config.notFoundTime || (Date.now() - config.notFoundTime < 7 * 24 * 60 * 60 * 1000);
+          if (isFresh) return; // Skip invalid tickers for 7 days
+        }
         let resolvedSymbol = cleanTicker;
         if (config && config.yahooSymbol) {
           const symbolOverride = config.yahooSymbol.toUpperCase().trim();
@@ -1545,6 +1656,10 @@ export class PortfolioService {
         try {
           const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?includePrePost=true&events=split`;
           const chartResponse = await this.fetchWithProxy(chartTarget, true);
+          if (chartResponse.status === 404) {
+            this.markTickerNotFound(originalTicker);
+            return;
+          }
           if (!chartResponse.ok) return;
 
           const data = await chartResponse.json();
@@ -1552,16 +1667,18 @@ export class PortfolioService {
           const chartMeta = result?.meta;
           if (!chartMeta) return;
 
-          const closes = result.indicators?.quote?.[0]?.close || [];
-          let price: number | null = null;
-          for (let i = closes.length - 1; i >= 0; i--) {
-            if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-              price = parseFloat(closes[i]);
-              break;
+          let price: number | null = parseFloat(chartMeta.regularMarketPrice);
+          if (price === null || isNaN(price) || price <= 0) {
+            const closes = result.indicators?.quote?.[0]?.close || [];
+            for (let i = closes.length - 1; i >= 0; i--) {
+              if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+                price = parseFloat(closes[i]);
+                break;
+              }
             }
           }
           if (price === null || isNaN(price) || price <= 0) {
-            price = parseFloat(chartMeta.regularMarketPrice || chartMeta.chartPreviousClose);
+            price = parseFloat(chartMeta.chartPreviousClose);
           }
 
           let currency: string = (chartMeta.currency || 'USD').toUpperCase();
@@ -1603,7 +1720,9 @@ export class PortfolioService {
             updatedCount++;
           }
         } catch (e) {
-          // skip this ticker
+          if (typeof window !== 'undefined' && window.navigator.onLine) {
+            this.markTickerNotFound(originalTicker);
+          }
         }
       };
 
@@ -1613,7 +1732,7 @@ export class PortfolioService {
       );
 
       // Autocomplete discovery helper for remaining tickers
-      const fetchWithSelfDiscovery = async (ticker: string): Promise<{ ticker: string, price: number, priceCurrency: string, sector?: string, name?: string, logoData?: string } | null> => {
+      const fetchWithSelfDiscovery = async (ticker: string): Promise<{ ticker: string, price: number, priceCurrency: string, sector?: string, name?: string, logoData?: string, yahooSymbol?: string } | null> => {
         try {
           const cleanTicker = ticker.toUpperCase().trim();
           let resolvedSymbol = cleanTicker;
@@ -1633,23 +1752,29 @@ export class PortfolioService {
             name = config.name || cleanTicker;
             sector = config.sector || 'Other';
           } else {
-            const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
-            const searchResponse = await this.fetchWithProxy(searchTarget, true);
-            if (searchResponse.ok) {
-              const searchData = await searchResponse.json();
-              const quotes = searchData?.quotes || [];
-              
-              let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
-              if (!quote && quotes.length > 0) {
-                quote = quotes[0];
-              }
-              
-              if (quote) {
-                resolvedSymbol = quote.symbol.toUpperCase();
-                name = quote.longname || quote.shortname || cleanTicker;
-                sector = quote.sector || 'Other';
+            let selectedSymbol: string | null = null;
+            if (force) {
+              selectedSymbol = await this.selectYahooSymbol(cleanTicker);
+            } else {
+              // Silently resolve to first match in background auto-refreshes
+              const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
+              const searchResponse = await this.fetchWithProxy(searchTarget, true);
+              if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                const quotes = searchData?.quotes || [];
+                let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
+                if (!quote && quotes.length > 0) {
+                  quote = quotes[0];
+                }
+                if (quote) {
+                  selectedSymbol = quote.symbol.toUpperCase();
+                  name = quote.longname || quote.shortname || cleanTicker;
+                  sector = quote.sector || 'Other';
+                }
               }
             }
+            if (!selectedSymbol) return null;
+            resolvedSymbol = selectedSymbol;
           }
 
           const cleanResolved = encodeURIComponent(resolvedSymbol);
@@ -1662,16 +1787,18 @@ export class PortfolioService {
           const result = data?.chart?.result?.[0];
           const chartMeta = result?.meta;
           if (chartMeta) {
-            const closes = result.indicators?.quote?.[0]?.close || [];
-            let price = null;
-            for (let i = closes.length - 1; i >= 0; i--) {
-              if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                price = parseFloat(closes[i]);
-                break;
+            let price: number | null = parseFloat(chartMeta.regularMarketPrice);
+            if (price === null || isNaN(price) || price <= 0) {
+              const closes = result.indicators?.quote?.[0]?.close || [];
+              for (let i = closes.length - 1; i >= 0; i--) {
+                if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+                  price = parseFloat(closes[i]);
+                  break;
+                }
               }
             }
             if (price === null || isNaN(price) || price <= 0) {
-              price = parseFloat(chartMeta.regularMarketPrice || chartMeta.chartPreviousClose);
+              price = parseFloat(chartMeta.chartPreviousClose);
             }
 
             let currency: string = (chartMeta.currency || 'USD').toUpperCase();
@@ -1705,23 +1832,28 @@ export class PortfolioService {
               }
 
               const logoData = meta[cleanTicker]?.logoData;
-              return { ticker: cleanTicker, price, priceCurrency: currency, sector, name, logoData };
+              return { ticker: cleanTicker, price, priceCurrency: currency, sector, name, logoData, yahooSymbol: resolvedSymbol };
             }
           }
         } catch (e) {
           console.warn(`Failed to self-discover price/info for ${ticker}:`, e);
+          if (typeof window !== 'undefined' && window.navigator.onLine) {
+            this.markTickerNotFound(ticker);
+          }
         }
         return null;
       };
 
-      const remainingTickers = tickers.filter(t => !bulkUpdatedSet.has(t));
+      const remainingTickers = tickers.filter(t => {
+        const clean = t.toUpperCase().trim();
+        const config = meta[clean];
+        const isNotFound = !force && config && config.notFound && (!config.notFoundTime || (Date.now() - config.notFoundTime < 7 * 24 * 60 * 60 * 1000));
+        return !isNotFound && !bulkUpdatedSet.has(t);
+      });
       if (remainingTickers.length > 0) {
-        const promises = remainingTickers.map(ticker => fetchWithSelfDiscovery(ticker));
-        const results = await Promise.all(promises);
-        
-        results.forEach((res) => {
+        for (const ticker of remainingTickers) {
+          const res = await fetchWithSelfDiscovery(ticker);
           if (res) {
-            const ticker = res.ticker;
             const price = res.price;
             const current = meta[ticker] || {
               ticker,
@@ -1736,10 +1868,20 @@ export class PortfolioService {
             const finalName = res.name || current.name || ticker;
             const finalLogo = res.logoData || current.logoData;
             
-            this.updateTickerConfig(ticker, price, finalSector, finalName, res.priceCurrency, finalLogo);
+            if (res.yahooSymbol && res.yahooSymbol !== ticker && current.yahooSymbol !== res.yahooSymbol) {
+              this.showToast(`Auto-resolved ticker "${ticker}" to Yahoo symbol "${res.yahooSymbol}". Please verify this in Prices/Settings.`, 'info', 10000);
+            }
+            
+            this.updateTickerConfig(ticker, price, finalSector, finalName, res.priceCurrency, finalLogo, res.yahooSymbol);
             updatedCount++;
+          } else {
+            // Self-discovery failed or user cancelled search modal
+            this.markTickerNotFound(ticker);
+            if (force) {
+              this.showToast(`Yahoo symbol selection cancelled for "${ticker}". Storing as unresolved (Error).`, 'error', 6000);
+            }
           }
-        });
+        }
       }
 
 
@@ -2208,6 +2350,11 @@ export class PortfolioService {
     const requestedLevel = rangeLevels[range] || 1;
 
     for (const ticker of activeTickers) {
+      const config = this.tickerConfigs()[ticker];
+      if (config && config.notFound) {
+        const isFresh = !config.notFoundTime || (now - config.notFoundTime < 7 * 24 * 60 * 60 * 1000);
+        if (isFresh) continue; // Skip invalid tickers for 7 days
+      }
       if (this.failedTickers.has(ticker)) {
         continue;
       }
@@ -2261,6 +2408,10 @@ export class PortfolioService {
 
         let targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
         let resp = await this.fetchWithProxy(targetUrl, true);
+        if (resp.status === 404) {
+          this.markTickerNotFound(ticker);
+          continue;
+        }
 
         // If direct fetch fails, and it's not rate-limited, and no custom symbol override was set, try search discovery
         if (!resp.ok && resp.status !== 429 && !(config && config.yahooSymbol)) {
@@ -2274,9 +2425,16 @@ export class PortfolioService {
               resolvedSymbol = quote.symbol.toUpperCase();
               targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
               resp = await this.fetchWithProxy(targetUrl, true);
+              if (resp.status === 404) {
+                this.markTickerNotFound(ticker);
+                continue;
+              }
+            } else {
+              this.markTickerNotFound(ticker);
+              continue;
             }
           } else {
-            this.failedTickers.add(ticker);
+            this.markTickerNotFound(ticker);
             continue;
           }
         }
@@ -2326,6 +2484,9 @@ export class PortfolioService {
       } catch (e) {
         console.warn(`Failed to fetch history for ${ticker}:`, e);
         this.failedTickers.add(ticker);
+        if (typeof window !== 'undefined' && window.navigator.onLine) {
+          this.markTickerNotFound(ticker);
+        }
         if (!pricesObj[ticker]) {
           pricesObj[ticker] = {};
           this.historicalPrices.set({ ...pricesObj });
@@ -2368,37 +2529,41 @@ export class PortfolioService {
       const sep = targetUrl.includes('?') ? '&' : '?';
       targetUrl = `${targetUrl}${sep}_ts=${Date.now()}`;
     }
-    const options = cacheNoStore ? { cache: 'no-store' as RequestCache } : {};
+    
+    // Use AbortSignal.timeout to prevent long hangs on slow proxies
+    const options: RequestInit = {
+      ...(cacheNoStore ? { cache: 'no-store' } : {}),
+      signal: AbortSignal.timeout(4000)
+    };
 
     // 1. Try corsproxy.io (raw URL format)
     try {
       const resp = await fetch(`https://corsproxy.io/?${targetUrl}`, options);
-      if (resp.ok) return resp;
+      // Return immediately on successful response or definitive client error (e.g. 404)
+      if (resp.status !== 401 && resp.status !== 403 && resp.status < 500) return resp;
     } catch (e) {
-      // network error, try next
+      // network error or timeout, try next
     }
 
     // 2. Try api.allorigins.win
     try {
       const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, options);
-      if (resp.ok) return resp;
+      if (resp.status !== 401 && resp.status !== 403 && resp.status < 500) return resp;
     } catch (e) {
-      // network error, try next
+      // network error or timeout, try next
     }
 
-    // 3. Direct fetch as last resort
-    return fetch(targetUrl, options);
+    // 3. Direct fetch as last resort (no timeout/abort to ensure direct compatibility)
+    const directOptions = cacheNoStore ? { cache: 'no-store' as RequestCache } : {};
+    return fetch(targetUrl, directOptions);
   }
 
   public async refreshMarketData(force: boolean = false) {
     if (this.isSyncing()) return;
     this.isSyncing.set(true);
     try {
-      if (force) {
-        this.showToast('Forcing refresh of all market prices and FX rates...', 'info');
-      }
-      await this.loadMarketPricesApi(force);
-      await this.loadExchangeRatesApi(force);
+      await this.loadMarketPricesApi(force, true);
+      await this.loadExchangeRatesApi(force, true);
       const now = Date.now();
       localStorage.setItem('pt_last_refresh_time', now.toString());
       this.lastRefreshTime.set(now);

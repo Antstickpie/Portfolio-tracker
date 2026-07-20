@@ -483,6 +483,13 @@ export class PricesComponent {
     this.service.showToast(`Updated Yahoo Symbol to ${finalSymbol || 'default'} for ${ticker.toUpperCase()}`, 'success');
   }
 
+  public async searchYahooSymbol(ticker: string) {
+    const selectedSymbol = await this.service.selectYahooSymbol(ticker);
+    if (selectedSymbol) {
+      this.updateTickerYahooSymbol(ticker, selectedSymbol);
+    }
+  }
+
 
   public formatSyncTime(timestamp: number): string {
     const diff = Date.now() - timestamp;

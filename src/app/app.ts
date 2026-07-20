@@ -46,4 +46,11 @@ export class App {
   public forceSyncPrices() {
     this.service.refreshMarketData(true);
   }
+
+  public formatModalPrice(price: number | null | undefined, currency?: string): string {
+    if (price === null || price === undefined) return '';
+    const curr = (currency || 'USD').toUpperCase();
+    const symbol = curr === 'USD' ? '$' : (curr === 'EUR' ? '€' : (curr === 'GBP' ? '£' : (curr === 'GBp' ? 'GBp ' : curr + ' ')));
+    return symbol + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 }

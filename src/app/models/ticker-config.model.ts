@@ -10,4 +10,6 @@ export interface TickerConfig {
   splitRatio?: number;
   splitDate?: string;
   splits?: { date: string; ratio: number; }[];
+  notFound?: boolean;
+  notFoundTime?: number;
 }
