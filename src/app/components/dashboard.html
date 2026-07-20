@@ -374,8 +374,12 @@
       </div>
     </div>
   </div>
-  <!-- Allocation Charts Controls (Moved above pies) -->
-  <div style="display: flex; justify-content: center; align-items: center; margin-top: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; width: 100%;">
+  <!-- Big Page Layout Wrapper with dynamic order -->
+  <div style="display: flex; flex-direction: column; gap: 2rem; margin-top: 1.5rem;">
+    <!-- Allocation Section Wrapper with order -->
+    <div [style.order]="service.isPastPeriodActive() ? 2 : 1" style="display: flex; flex-direction: column; width: 100%;">
+      <!-- Allocation Charts Controls (Moved above pies) -->
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; width: 100%;">
     
     <!-- Sector Taxonomy Toggle -->
     <div class="currency-toggle" style="margin: 0;">
@@ -499,12 +503,10 @@
       </div>
     </div>
   </div>
+  </div>
 
-
-  <!-- Tables container with dynamic flex order -->
-  <div style="display: flex; flex-direction: column; gap: 2rem; margin-top: 1.5rem;">
-    <!-- Portfolio Table -->
-    <div class="glass-card table-card" #tableCard style="position: relative;" [style.order]="service.isPastPeriodActive() ? 2 : 1">
+  <!-- Portfolio Table -->
+  <div class="glass-card table-card" #tableCard style="position: relative;" [style.order]="service.isPastPeriodActive() ? 3 : 2">
     <div class="table-header">
       <h2 (click)="toggleTable()" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
         Holdings Analysis
@@ -665,7 +667,7 @@
   </div>
 
   <!-- Realized Gains Table -->
-  <div class="glass-card table-card" #realizedTableCard [style.order]="service.isPastPeriodActive() ? 1 : 2">
+  <div class="glass-card table-card" #realizedTableCard [style.order]="service.isPastPeriodActive() ? 1 : 3">
     <div class="table-header">
       <h2 (click)="isRealizedCollapsed.set(!isRealizedCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
         Realized Gains Ledger

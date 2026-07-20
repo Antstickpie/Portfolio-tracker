@@ -1538,42 +1538,79 @@ export class PortfolioService {
         symbolsToFetch.push(resolvedSymbol);
       });
 
-      // Fetch quote data in a single request
-      const symbolsList = symbolsToFetch.join(',');
-      const targetUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolsList)}`;
-      
-      const bulkResponse = await this.fetchWithProxy(targetUrl, true);
+      // Fetch prices via v8 chart API per symbol (v7 quote requires crumb auth)
       const bulkUpdatedSet = new Set<string>();
 
-      if (bulkResponse.ok) {
-        const json = await bulkResponse.json();
-        const results = json?.quoteResponse?.result || [];
-        
-        results.forEach((q: any) => {
-          const resolvedSymbol = (q.symbol || '').toUpperCase().trim();
-          const ticker = symbolMap.get(resolvedSymbol);
-          if (ticker) {
-            let price = q.regularMarketPrice || q.regularMarketPreviousClose || 0;
-            let currency = (q.currency || 'USD').toUpperCase();
-            
-            if (price > 0) {
-              if (currency === 'GBP' || q.currency === 'GBp') {
-                if (q.currency === 'GBp') price = price / 100;
-                currency = 'GBP';
-              }
-              
-              const current = meta[ticker] || {};
-              const finalSector = current.sector || 'Other';
-              const finalName = q.longName || q.shortName || current.name || ticker;
-              const finalLogo = current.logoData;
-              
-              this.updateTickerConfig(ticker, price, finalSector, finalName, currency, finalLogo);
-              bulkUpdatedSet.add(ticker);
-              updatedCount++;
+      const fetchViaChart = async (resolvedSymbol: string, originalTicker: string) => {
+        try {
+          const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?includePrePost=true&events=split`;
+          const chartResponse = await this.fetchWithProxy(chartTarget, true);
+          if (!chartResponse.ok) return;
+
+          const data = await chartResponse.json();
+          const result = data?.chart?.result?.[0];
+          const chartMeta = result?.meta;
+          if (!chartMeta) return;
+
+          const closes = result.indicators?.quote?.[0]?.close || [];
+          let price: number | null = null;
+          for (let i = closes.length - 1; i >= 0; i--) {
+            if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+              price = parseFloat(closes[i]);
+              break;
             }
           }
-        });
-      }
+          if (price === null || isNaN(price) || price <= 0) {
+            price = parseFloat(chartMeta.regularMarketPrice || chartMeta.chartPreviousClose);
+          }
+
+          let currency: string = (chartMeta.currency || 'USD').toUpperCase();
+          if (!isNaN(price) && price > 0) {
+            if (currency === 'GBP' || chartMeta.currency === 'GBp') {
+              if (chartMeta.currency === 'GBp') price = price / 100;
+              currency = 'GBP';
+            }
+
+            // Extract splits
+            const events = result?.events;
+            if (events?.splits) {
+              const splitsArr: { date: string; ratio: number }[] = [];
+              Object.values(events.splits).forEach((s: any) => {
+                if (s.numerator && s.denominator) {
+                  const d = new Date(s.date * 1000);
+                  const dateStr = d.toISOString().slice(0, 10);
+                  splitsArr.push({ date: dateStr, ratio: s.numerator / s.denominator });
+                }
+              });
+              if (splitsArr.length > 0) {
+                splitsArr.sort((a, b) => a.date.localeCompare(b.date));
+                const existingCfg = this.tickerConfigs()[originalTicker];
+                if (!existingCfg?.splits || JSON.stringify(existingCfg.splits) !== JSON.stringify(splitsArr)) {
+                  this.tickerConfigs.update(p => ({
+                    ...p,
+                    [originalTicker]: { ...(p[originalTicker] || {}), splits: splitsArr }
+                  }));
+                }
+              }
+            }
+
+            const current = meta[originalTicker] || {};
+            const finalSector = current.sector || 'Other';
+            const finalName = chartMeta.longName || chartMeta.shortName || current.name || originalTicker;
+            const finalLogo = current.logoData;
+            this.updateTickerConfig(originalTicker, price, finalSector, finalName, currency, finalLogo);
+            bulkUpdatedSet.add(originalTicker);
+            updatedCount++;
+          }
+        } catch (e) {
+          // skip this ticker
+        }
+      };
+
+      // Fetch all symbols in parallel via v8 chart
+      await Promise.all(
+        Array.from(symbolMap.entries()).map(([resolved, original]) => fetchViaChart(resolved, original))
+      );
 
       // Autocomplete discovery helper for remaining tickers
       const fetchWithSelfDiscovery = async (ticker: string): Promise<{ ticker: string, price: number, priceCurrency: string, sector?: string, name?: string, logoData?: string } | null> => {
@@ -2327,33 +2364,29 @@ export class PortfolioService {
   }
 
   private async fetchWithProxy(targetUrl: string, cacheNoStore = false): Promise<Response> {
+    if (cacheNoStore) {
+      const sep = targetUrl.includes('?') ? '&' : '?';
+      targetUrl = `${targetUrl}${sep}_ts=${Date.now()}`;
+    }
     const options = cacheNoStore ? { cache: 'no-store' as RequestCache } : {};
-    
-    const shouldFallback = (status: number) => {
-      return status >= 500 || status === 0;
-    };
 
-    // 1. Try corsproxy.io
+    // 1. Try corsproxy.io (raw URL format)
     try {
-      const url = `https://corsproxy.io/?${targetUrl}`;
-      const resp = await fetch(url, options);
-      if (resp.ok || !shouldFallback(resp.status)) return resp;
-      console.warn(`corsproxy.io failed (status ${resp.status}) for ${targetUrl}. Trying fallback...`);
+      const resp = await fetch(`https://corsproxy.io/?${targetUrl}`, options);
+      if (resp.ok) return resp;
     } catch (e) {
-      console.warn(`corsproxy.io network error for ${targetUrl}. Trying fallback...`, e);
+      // network error, try next
     }
 
     // 2. Try api.allorigins.win
     try {
-      const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-      const resp = await fetch(url, options);
-      if (resp.ok || !shouldFallback(resp.status)) return resp;
-      console.warn(`allorigins failed (status ${resp.status}) for ${targetUrl}. Trying direct...`);
+      const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, options);
+      if (resp.ok) return resp;
     } catch (e) {
-      console.warn(`allorigins network error for ${targetUrl}. Trying direct...`, e);
+      // network error, try next
     }
 
-    // 3. Try direct fetch as last resort
+    // 3. Direct fetch as last resort
     return fetch(targetUrl, options);
   }
 
