@@ -995,6 +995,60 @@ export class PortfolioService {
     return getCurrencyToUsdRate(f) * (1.0 / getCurrencyToUsdRate(t));
   }
 
+  public getYearlyAverageExchangeRate(from: string, to: string, year: number): number {
+    const f = from.toUpperCase();
+    const t = to.toUpperCase();
+    if (f === t) return 1.0;
+
+    const getHistoricalRatesForYear = (base: string, quote: string, yr: number): number[] => {
+      const symbol = `${base}${quote}=X`;
+      const history = this.historicalPrices()[symbol];
+      if (history) {
+        const rates: number[] = [];
+        const prefix = `${yr}-`;
+        Object.entries(history).forEach(([dateStr, val]) => {
+          if (dateStr.startsWith(prefix) && val > 0) {
+            rates.push(val);
+          }
+        });
+        return rates;
+      }
+      return [];
+    };
+
+    const getAverageRateVal = (base: string, quote: string, yr: number): number | null => {
+      const directRates = getHistoricalRatesForYear(base, quote, yr);
+      if (directRates.length > 0) {
+        const sum = directRates.reduce((acc, v) => acc + v, 0);
+        return sum / directRates.length;
+      }
+      const inverseRates = getHistoricalRatesForYear(quote, base, yr);
+      if (inverseRates.length > 0) {
+        const sum = inverseRates.reduce((acc, v) => acc + v, 0);
+        return 1.0 / (sum / inverseRates.length);
+      }
+      return null;
+    };
+
+    const getCurrencyToUsdYearlyAvg = (curr: string, yr: number): number => {
+      const direct = getAverageRateVal(curr, 'USD', yr);
+      if (direct !== null) return direct;
+      const inverse = getAverageRateVal('USD', curr, yr);
+      if (inverse !== null && inverse > 0) return 1.0 / inverse;
+      
+      // Fallback to live rate if no history is loaded for that year
+      return this.getExchangeRate(curr, 'USD');
+    };
+
+    if (t === 'USD') {
+      return getCurrencyToUsdYearlyAvg(f, year);
+    }
+    if (f === 'USD') {
+      return 1.0 / getCurrencyToUsdYearlyAvg(t, year);
+    }
+    return getCurrencyToUsdYearlyAvg(f, year) * (1.0 / getCurrencyToUsdYearlyAvg(t, year));
+  }
+
   public getAverageCost(ticker: string): number {
     const sA = this.portfolioA();
     const posA = sA.positions.find(p => p.ticker.toUpperCase() === ticker.toUpperCase());

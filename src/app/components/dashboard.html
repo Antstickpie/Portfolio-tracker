@@ -73,7 +73,8 @@
             class="currency-btn" 
             *ngFor="let curr of service.visibleCurrencies()"
             [class.active]="displayCurrency() === curr" 
-            (click)="displayCurrency.set(curr)">
+            (click)="displayCurrency.set(curr)"
+            [title]="getCurrencyTooltip(curr)">
             {{ getCurrencyBtnLabel(curr) }}
           </button>
           <button 
@@ -760,7 +761,7 @@
                   <a href="https://www.google.com/search?q={{ g.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google" (click)="$event.stopPropagation()">{{ g.ticker }}</a>
                 </div>
               </td>
-              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, g.currency, 2, g.currency) }}</td>
+              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
                 {{ (g.currency !== displayCurrency() && g.sales.length === 1) ? (getRowFxRate(g.currency, g.sales[0].date) | number:'1.4-4') : '—' }}
@@ -785,7 +786,7 @@
                 <td class="text-muted" style="vertical-align: middle; padding-left: 1.5rem;">
                   Sale
                 </td>
-                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, s.currency, 2, s.currency) }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.purchasePrice, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
                   {{ s.currency !== displayCurrency() ? (getRowFxRate(s.currency, s.date) | number:'1.4-4') : '—' }}

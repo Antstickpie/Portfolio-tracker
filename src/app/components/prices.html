@@ -239,6 +239,9 @@
               style="flex: 1; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; font-size: 0.78rem; text-transform: uppercase;">
             <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.6rem;" (click)="addVisibleCurrency()" [disabled]="!newCurrencyCode.trim()">+ Add</button>
           </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.6rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.05); text-align: left;">
+            💡 <strong>EUR</strong> uses the <em>calendar year average exchange rate</em> tax rule for realized gains. Other currencies (like <strong>INR</strong>) use the <em>historical daily exchange rate</em> on the transaction date.
+          </div>
         </div>
       </div>
     </div>
