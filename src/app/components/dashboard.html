@@ -501,8 +501,10 @@
   </div>
 
 
-  <!-- Portfolio Table -->
-  <div class="glass-card table-card" #tableCard style="position: relative;">
+  <!-- Tables container with dynamic flex order -->
+  <div style="display: flex; flex-direction: column; gap: 2rem; margin-top: 1.5rem;">
+    <!-- Portfolio Table -->
+    <div class="glass-card table-card" #tableCard style="position: relative;" [style.order]="service.isPastPeriodActive() ? 2 : 1">
     <div class="table-header">
       <h2 (click)="toggleTable()" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
         Holdings Analysis
@@ -663,7 +665,7 @@
   </div>
 
   <!-- Realized Gains Table -->
-  <div class="glass-card table-card" style="margin-top: 2rem;" #realizedTableCard>
+  <div class="glass-card table-card" #realizedTableCard [style.order]="service.isPastPeriodActive() ? 1 : 2">
     <div class="table-header">
       <h2 (click)="isRealizedCollapsed.set(!isRealizedCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0;">
         Realized Gains Ledger
@@ -816,4 +818,5 @@
       </table>
     </div>
   </div>
+</div>
 </div>
