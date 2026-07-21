@@ -521,6 +521,13 @@
   font-family: 'Consolas', monospace;
 }
 
+.switchers-wrapper {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
 /* --- RESPONSIVE MEDIA QUERIES (XS, S, M) --- */
 
 /* Medium (Tablets, max 1024px) */
@@ -561,6 +568,12 @@
   }
   .premium-date-input {
     width: 45%;
+  }
+  .switchers-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.6rem;
   }
   .currency-toggle, .tabs-control {
     width: 100%;

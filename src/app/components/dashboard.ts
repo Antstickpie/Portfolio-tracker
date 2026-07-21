@@ -170,6 +170,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public currentYear = new Date().getFullYear();
   public isCollapsed = signal<boolean>(false);
   public isRealizedCollapsed = signal<boolean>(false);
+  public isChartsCollapsed = signal<boolean>(false);
   public isRefreshing = this.service.isSyncing;
 
   // Computed signal to calculate detailed realized gain events (chronologically correct avg cost, filtered by date)
