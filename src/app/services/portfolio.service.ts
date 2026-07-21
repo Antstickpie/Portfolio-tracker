@@ -1721,15 +1721,16 @@ export class PortfolioService {
           const chartMeta = result?.meta;
           if (!chartMeta) return;
 
-          let price: number | null = parseFloat(chartMeta.regularMarketPrice);
-          if (price === null || isNaN(price) || price <= 0) {
-            const closes = result.indicators?.quote?.[0]?.close || [];
-            for (let i = closes.length - 1; i >= 0; i--) {
-              if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                price = parseFloat(closes[i]);
-                break;
-              }
+          let price: number | null = null;
+          const closes = result.indicators?.quote?.[0]?.close || [];
+          for (let i = closes.length - 1; i >= 0; i--) {
+            if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+              price = parseFloat(closes[i]);
+              break;
             }
+          }
+          if (price === null || isNaN(price) || price <= 0) {
+            price = parseFloat(chartMeta.regularMarketPrice);
           }
           if (price === null || isNaN(price) || price <= 0) {
             price = parseFloat(chartMeta.chartPreviousClose);
@@ -1841,15 +1842,16 @@ export class PortfolioService {
           const result = data?.chart?.result?.[0];
           const chartMeta = result?.meta;
           if (chartMeta) {
-            let price: number | null = parseFloat(chartMeta.regularMarketPrice);
-            if (price === null || isNaN(price) || price <= 0) {
-              const closes = result.indicators?.quote?.[0]?.close || [];
-              for (let i = closes.length - 1; i >= 0; i--) {
-                if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                  price = parseFloat(closes[i]);
-                  break;
-                }
+            let price: number | null = null;
+            const closes = result.indicators?.quote?.[0]?.close || [];
+            for (let i = closes.length - 1; i >= 0; i--) {
+              if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+                price = parseFloat(closes[i]);
+                break;
               }
+            }
+            if (price === null || isNaN(price) || price <= 0) {
+              price = parseFloat(chartMeta.regularMarketPrice);
             }
             if (price === null || isNaN(price) || price <= 0) {
               price = parseFloat(chartMeta.chartPreviousClose);
