@@ -56,7 +56,7 @@
             <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Year Basis</label>
             <select 
               [ngModel]="service.yearBasis()" 
-              (ngModelChange)="service.yearBasis.set($event); service.saveToStorage()"
+              (ngModelChange)="service.setYearBasis($event)"
               style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
               <option value="calendar" style="background: #0d1117;">Calendar Year</option>
               <option value="financial" style="background: #0d1117;">Financial Year</option>
@@ -70,7 +70,7 @@
             <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Start Month</label>
             <select 
               [ngModel]="service.financialYearStartMonth()" 
-              (ngModelChange)="service.financialYearStartMonth.set(+$event); service.saveToStorage()"
+              (ngModelChange)="service.setFinancialYearStartMonth(+$event)"
               style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
               <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m" style="background: #0d1117;">{{ getMonthName(m) }}</option>
             </select>
@@ -79,7 +79,7 @@
             <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Start Day</label>
             <select 
               [ngModel]="service.financialYearStartDay()" 
-              (ngModelChange)="service.financialYearStartDay.set(+$event); service.saveToStorage()"
+              (ngModelChange)="service.setFinancialYearStartDay(+$event)"
               style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
               <option *ngFor="let d of getDaysArray()" [value]="d" style="background: #0d1117;">{{ d }}</option>
             </select>

@@ -522,20 +522,19 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   public shiftYear(direction: number) {
+    const nowRange = this.service.getYearRange(0);
     const fromVal = this.service.dateFrom();
-    let currentYear = new Date().getFullYear();
+    let yearOffset = 0;
     if (fromVal) {
-      const parts = fromVal.split('-');
-      if (parts.length > 0) {
-        const y = parseInt(parts[0], 10);
-        if (!isNaN(y)) {
-          currentYear = y;
-        }
+      const fromYear = parseInt(fromVal.slice(0, 4), 10);
+      const nowYear = parseInt(nowRange.from.slice(0, 4), 10);
+      if (!isNaN(fromYear) && !isNaN(nowYear)) {
+        yearOffset = fromYear - nowYear;
       }
     }
-    const targetYear = currentYear + direction;
-    this.service.dateFrom.set(`${targetYear}-01-01`);
-    this.service.dateTo.set(`${targetYear}-12-31`);
+    const targetRange = this.service.getYearRange(yearOffset + direction);
+    this.service.dateFrom.set(targetRange.from);
+    this.service.dateTo.set(targetRange.to);
   }
 
   public toggleTable() {

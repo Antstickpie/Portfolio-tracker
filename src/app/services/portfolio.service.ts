@@ -353,14 +353,11 @@ export class PortfolioService {
     this.theme.set(savedTheme);
     this.applyTheme(savedTheme);
 
-    // Default to current calendar year if no dates set
-    if (!this.dateFrom()) {
-      const yr = new Date().getFullYear();
-      this.dateFrom.set(`${yr}-01-01`);
-    }
-    if (!this.dateTo()) {
-      const yr = new Date().getFullYear();
-      this.dateTo.set(`${yr}-12-31`);
+    // Default to active year basis range (Calendar Year or Financial Year) if no dates set
+    if (!this.dateFrom() || !this.dateTo()) {
+      const defaultRange = this.getYearRange(0);
+      if (!this.dateFrom()) this.dateFrom.set(defaultRange.from);
+      if (!this.dateTo()) this.dateTo.set(defaultRange.to);
     }
 
     // Auto-refresh prices when tab returns to focus after long idle time (> 2 minutes)
@@ -2158,6 +2155,36 @@ export class PortfolioService {
         from: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
         to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`
       };
+    }
+  }
+
+  public applyDefaultYearRange() {
+    const range = this.getYearRange(0);
+    this.dateFrom.set(range.from);
+    this.dateTo.set(range.to);
+    this.saveToStorage();
+  }
+
+  public setYearBasis(basis: 'calendar' | 'financial') {
+    this.yearBasis.set(basis);
+    this.applyDefaultYearRange();
+  }
+
+  public setFinancialYearStartMonth(month: number) {
+    this.financialYearStartMonth.set(month);
+    if (this.yearBasis() === 'financial') {
+      this.applyDefaultYearRange();
+    } else {
+      this.saveToStorage();
+    }
+  }
+
+  public setFinancialYearStartDay(day: number) {
+    this.financialYearStartDay.set(day);
+    if (this.yearBasis() === 'financial') {
+      this.applyDefaultYearRange();
+    } else {
+      this.saveToStorage();
     }
   }
 
