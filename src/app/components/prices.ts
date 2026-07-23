@@ -51,9 +51,21 @@ export class PricesComponent {
   public sortBy = signal<string>('ticker');
   public sortDirection = signal<'asc' | 'desc'>('asc');
 
-  // Owners names input state
-  public personANameInput = this.service.personAName();
-  public personBNameInput = this.service.personBName();
+  public trackByIndex(index: number): number {
+    return index;
+  }
+
+  public addPerson() {
+    this.service.addPerson();
+  }
+
+  public updatePersonName(index: number, name: string) {
+    this.service.updatePersonName(index, name);
+  }
+
+  public removePerson(index: number) {
+    this.service.removePerson(index);
+  }
 
 
 
@@ -136,12 +148,6 @@ export class PricesComponent {
 
 
   public saveOwnerNames() {
-    if (!this.personANameInput.trim()) {
-      this.service.showToast('Error: Person A name cannot be empty.', 'error');
-      return;
-    }
-    this.service.personAName.set(this.personANameInput.trim());
-    this.service.personBName.set(this.personBNameInput.trim());
     this.service.saveToStorage();
     this.service.showToast('Settings saved successfully!', 'success');
   }
@@ -215,13 +221,11 @@ export class PricesComponent {
         if (data.customSectors) {
           this.service.customSectors.set(data.customSectors);
         }
-        if (data.personAName !== undefined) {
-          this.service.personAName.set(data.personAName);
-          this.personANameInput = data.personAName;
-        }
-        if (data.personBName !== undefined) {
-          this.service.personBName.set(data.personBName);
-          this.personBNameInput = data.personBName;
+        if (data.persons && Array.isArray(data.persons)) {
+          this.service.persons.set(data.persons);
+        } else {
+          if (data.personAName !== undefined) this.service.updatePersonName(0, data.personAName);
+          if (data.personBName !== undefined) this.service.updatePersonName(1, data.personBName);
         }
         if (data.dateFormat) {
           this.service.dateFormat.set(data.dateFormat);

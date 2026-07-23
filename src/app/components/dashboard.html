@@ -70,7 +70,7 @@
 
 
         <!-- View Tabs -->
-        <div class="tabs-control" *ngIf="service.personBName() && service.personBName().trim()">
+        <div class="tabs-control" *ngIf="service.persons().length > 1">
           <button 
             class="tab-btn" 
             [class.active]="activeView() === 'combined'"
@@ -90,9 +90,9 @@
             {{ service.personBName() }}
           </button>
         </div>
-        <div *ngIf="!service.personBName() || !service.personBName().trim()" 
+        <div *ngIf="service.persons().length === 1" 
              style="background: var(--button-group-bg); border: 1px solid var(--card-border); border-radius: 10px; height: 38px; box-sizing: border-box; display: flex; align-items: center; padding: 0 1.2rem; font-family: var(--font-sans); font-weight: 600; font-size: 0.85rem; color: var(--text-main);">
-          {{ service.personAName() }}
+          {{ service.persons()[0] }}
         </div>
       </div>
     </div>

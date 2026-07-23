@@ -110,7 +110,7 @@
             (ngModelChange)="account.set($event)"
             class="form-input" style="height: 35px; box-sizing: border-box; width: 100%;">
             <option value="A">{{ service.personAName() }}</option>
-            <option value="B" *ngIf="service.personBName() && service.personBName().trim()">{{ service.personBName() }}</option>
+            <option value="B" *ngIf="service.persons().length > 1">{{ service.personBName() }}</option>
           </select>
         </div>
 

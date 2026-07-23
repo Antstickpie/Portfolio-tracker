@@ -312,9 +312,36 @@ export class PortfolioService {
   private lastDailyFetchMap = new Map<string, string>();
   private maxFetchedRangeLevelMap = new Map<string, number>();
 
-  // Names of the two portfolio owners
-  public personAName = signal<string>('Person A');
-  public personBName = signal<string>('Person B');
+  // Dynamic list of portfolio owners/persons. Default is single owner.
+  public persons = signal<string[]>(['Person 1']);
+  public personAName = computed(() => this.persons()[0] || 'Person 1');
+  public personBName = computed(() => this.persons()[1] || '');
+
+  public addPerson(name?: string) {
+    const list = this.persons();
+    const newName = name || `Person ${list.length + 1}`;
+    this.persons.set([...list, newName]);
+    this.saveToStorage();
+  }
+
+  public updatePersonName(index: number, name: string) {
+    const list = [...this.persons()];
+    if (index >= 0 && index < list.length) {
+      list[index] = name;
+      this.persons.set(list);
+      this.saveToStorage();
+    }
+  }
+
+  public removePerson(index: number) {
+    const list = [...this.persons()];
+    if (list.length > 1 && index >= 0 && index < list.length) {
+      list.splice(index, 1);
+      this.persons.set(list);
+      this.saveToStorage();
+    }
+  }
+
   public showNameColumn = signal<boolean>(false);
   public showNameHoldings = signal<boolean>(false);
   public showNameRealized = signal<boolean>(false);
@@ -534,11 +561,25 @@ export class PortfolioService {
         }
       }
 
-      const pA = localStorage.getItem('pt_person_a_name');
-      if (pA !== null) this.personAName.set(pA);
-
-      const pB = localStorage.getItem('pt_person_b_name');
-      if (pB !== null) this.personBName.set(pB);
+      const storedPersons = localStorage.getItem('pt_persons');
+      if (storedPersons) {
+        try {
+          const parsed = JSON.parse(storedPersons);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.persons.set(parsed);
+          }
+        } catch (e) {}
+      } else {
+        const pA = localStorage.getItem('pt_person_a_name');
+        const pB = localStorage.getItem('pt_person_b_name');
+        if (pB && pB.trim()) {
+          this.persons.set([pA || 'Person 1', pB]);
+        } else if (pA && pA.trim()) {
+          this.persons.set([pA]);
+        } else {
+          this.persons.set(['Person 1']);
+        }
+      }
 
       const df = localStorage.getItem('pt_date_format');
       if (df) this.dateFormat.set(df);
@@ -673,6 +714,7 @@ export class PortfolioService {
     localStorage.setItem('pt_visible_currencies', JSON.stringify(this.visibleCurrencies()));
     localStorage.setItem('pt_use_proper_sectors', this.useProperSectors().toString());
 
+    localStorage.setItem('pt_persons', JSON.stringify(this.persons()));
     localStorage.setItem('pt_person_a_name', this.personAName());
     localStorage.setItem('pt_person_b_name', this.personBName());
     localStorage.setItem('pt_date_format', this.dateFormat());
@@ -1424,8 +1466,7 @@ export class PortfolioService {
   }
 
   private loadMockData() {
-    this.personAName.set('Alex');
-    this.personBName.set('Taylor');
+    this.persons.set(['Person 1']);
 
 
 
@@ -2336,8 +2377,12 @@ export class PortfolioService {
     if (remoteData.templates) this.templates.set(remoteData.templates);
     if (remoteData.tickerConfigs) this.tickerConfigs.set(remoteData.tickerConfigs);
     if (remoteData.customSectors) this.customSectors.set(remoteData.customSectors);
-    if (remoteData.personAName !== undefined) this.personAName.set(remoteData.personAName);
-    if (remoteData.personBName !== undefined) this.personBName.set(remoteData.personBName);
+    if (remoteData.persons && Array.isArray(remoteData.persons)) {
+      this.persons.set(remoteData.persons);
+    } else {
+      if (remoteData.personAName !== undefined) this.updatePersonName(0, remoteData.personAName);
+      if (remoteData.personBName !== undefined) this.updatePersonName(1, remoteData.personBName);
+    }
     if (remoteData.dateFormat) this.dateFormat.set(remoteData.dateFormat);
     if (remoteData.showNameColumn !== undefined) this.showNameColumn.set(remoteData.showNameColumn);
     if (remoteData.showNameHoldings !== undefined) this.showNameHoldings.set(remoteData.showNameHoldings);
