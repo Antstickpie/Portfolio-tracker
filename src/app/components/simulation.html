@@ -323,76 +323,85 @@
           
           <!-- Asset Allocation Donut Chart -->
           <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
-            <h3>Asset Allocation</h3>
-            
+            <div class="chart-card-header">
+              <h3>Asset Allocation</h3>
+              <span style="font-size: 0.72rem; font-weight: 600; color: var(--primary); background: rgba(99,102,241,0.12); padding: 0.2rem 0.55rem; border-radius: 20px; border: 1px solid rgba(99,102,241,0.25);">
+                {{ assetChartData().length }} {{ assetChartData().length === 1 ? 'Asset' : 'Assets' }}
+              </span>
+            </div>
+                 <!-- Hover details overlay -->
+            <div class="asset-hover-overlay animate-fade-in" *ngIf="hoveredAssetIndex() !== -1 && hoveredAssetDetail()">
+              <div class="overlay-header">
+                <span class="overlay-dot" [style.background-color]="getColor(hoveredAssetIndex())"></span>
+                <span class="overlay-title">{{ hoveredAssetDetail()?.ticker }}</span>
+              </div>
+              <div class="overlay-content">
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Sector:</span>
+                  <span class="detail-val-badge" [title]="hoveredAssetDetail()?.sector">{{ hoveredAssetDetail()?.sector }}</span>
+                </div>
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Weight:</span>
+                  <span class="detail-val-highlight">{{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%</span>
+                </div>
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Price:</span>
+                  <span class="detail-val-highlight">{{ hoveredAssetDetail()?.priceFormatted }}</span>
+                </div>
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Value:</span>
+                  <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
+                </div>
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Shares:</span>
+                  <span class="detail-val-highlight">{{ hoveredAssetDetail()?.shares | number:'1.0-6' }}</span>
+                </div>
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Avg Cost:</span>
+                  <span class="detail-val-highlight">{{ hoveredAssetDetail()?.avgCostFormatted }}</span>
+                </div>
+                <div class="overlay-detail-row">
+                  <span class="detail-label">Purchase:</span>
+                  <span class="detail-val-highlight">{{ hoveredAssetDetail()?.purchaseValueFormatted }}</span>
+                </div>
+              </div>
+            </div>
+
             <div class="chart-content">
               <div class="canvas-wrapper">
                 <canvas #assetCanvas width="460" height="320"></canvas>
-                
-                <!-- Hover details overlay -->
-                <div class="asset-hover-overlay animate-fade-in" *ngIf="hoveredAssetIndex() !== -1 && hoveredAssetDetail()">
-                  <div class="overlay-header">
-                    <span class="overlay-dot" [style.background-color]="getColor(hoveredAssetIndex())"></span>
-                    <span class="overlay-title">{{ hoveredAssetDetail()?.ticker }}</span>
-                  </div>
-                  <div class="overlay-content">
-                    <div class="overlay-detail-row">
-                      <span class="detail-label">Sector:</span>
-                      <span class="detail-val-badge" [title]="hoveredAssetDetail()?.sector">{{ hoveredAssetDetail()?.sector }}</span>
-                    </div>
-                    <div class="overlay-detail-row">
-                      <span class="detail-label">Weight:</span>
-                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%</span>
-                    </div>
-                    <div class="overlay-detail-row">
-                      <span class="detail-label">Value:</span>
-                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
-                    </div>
-                    <div class="overlay-detail-row">
-                      <span class="detail-label">Shares:</span>
-                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.shares | number:'1.0-6' }}</span>
-                    </div>
-                    <div class="overlay-detail-row">
-                      <span class="detail-label">Avg Cost:</span>
-                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.avgCostFormatted }}</span>
-                    </div>
-                    <div class="overlay-detail-row">
-                      <span class="detail-label">Purchase:</span>
-                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.purchaseValueFormatted }}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
 
           <!-- Sector Allocation Donut Chart -->
           <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
-            <h3>Sector Allocation</h3>
+            <div class="chart-card-header">
+              <h3>Sector Allocation</h3>
+            </div>
             
+            <!-- Hover stocks list overlay -->
+            <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
+              <div class="overlay-header">
+                <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+                <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
+              </div>
+              <div class="overlay-list">
+                <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
+                  <span class="stock-symbol">{{ stock.ticker }}</span>
+                  <div class="progress-track">
+                    <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+                  </div>
+                  <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
+                  <span class="stock-val">{{ stock.valueFormatted }}</span>
+                </div>
+              </div>
+            </div>
+
             <div class="chart-content">
               <div class="canvas-wrapper">
                 <canvas #sectorCanvas width="460" height="320"></canvas>
-                
-                <!-- Hover stocks list overlay -->
-                <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
-                  <div class="overlay-header">
-                    <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
-                    <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
-                  </div>
-                  <div class="overlay-list">
-                    <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
-                      <span class="stock-symbol">{{ stock.ticker }}</span>
-                      <div class="progress-track">
-                        <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
-                      </div>
-                      <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
-                      <span class="stock-val">{{ stock.valueFormatted }}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
-
             </div>
           </div>
 

@@ -965,6 +965,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       name: pos.name,
       sector: pos.sector || 'Other',
       pct: data[idx].pct,
+      priceFormatted: symbol + (pos.currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
       valueFormatted: symbol + Math.round(rawVal * rate).toLocaleString(),
       shares: pos.totalShares,
       avgCostFormatted: symbol + (pos.averageCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
@@ -1503,41 +1504,19 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const rate = this.service.getExchangeRate('USD', targetCurr);
     const isLightMode = this.service.theme() === 'light';
 
-    if (hoveredIdx !== -1 && data[hoveredIdx]) {
-      const hoveredItem = data[hoveredIdx];
-      // Draw hovered slice label
-      ctx.fillStyle = isLightMode ? '#0f172a' : '#f3f4f6';
-      ctx.font = '700 17px Outfit';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      let lbl = hoveredItem.label;
-      if (lbl.length > 10) {
-        lbl = lbl.substring(0, 9) + '..';
-      }
-      ctx.fillText(lbl, cx, cy - 10);
+    // Draw center label (always clean and static)
+    ctx.fillStyle = isLightMode ? '#0f172a' : '#f3f4f6';
+    ctx.font = '600 17px Outfit';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(centerText, cx, cy - 10);
 
-      // Draw hovered slice value and percentage in slice color
-      ctx.fillStyle = this.getColor(centerText === 'Assets' ? hoveredIdx : hoveredIdx + 5);
-      ctx.font = '600 12px Outfit';
-      const valStr = symbol + Math.round(hoveredItem.value * rate).toLocaleString();
-      const pctStr = hoveredItem.pct.toFixed(1) + '%';
-      ctx.fillText(`${valStr} (${pctStr})`, cx, cy + 12);
-    } else {
-      // Draw center label
-      ctx.fillStyle = isLightMode ? '#0f172a' : '#f3f4f6';
-      ctx.font = '600 17px Outfit';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(centerText, cx, cy - 10);
-
-      ctx.fillStyle = isLightMode ? '#475569' : '#9ca3af';
-      ctx.font = '400 12px Outfit';
-      
-      let totalVal = data.reduce((sum, item) => sum + item.value, 0);
-      const convertedTotal = totalVal * rate;
-      ctx.fillText(symbol + Math.round(convertedTotal).toLocaleString(), cx, cy + 12);
-    }
+    ctx.fillStyle = isLightMode ? '#475569' : '#9ca3af';
+    ctx.font = '400 12px Outfit';
+    
+    let totalVal = data.reduce((sum, item) => sum + item.value, 0);
+    const convertedTotal = totalVal * rate;
+    ctx.fillText(symbol + Math.round(convertedTotal).toLocaleString(), cx, cy + 12);
   }
 
   public trackByPosition(index: number, item: any): string {

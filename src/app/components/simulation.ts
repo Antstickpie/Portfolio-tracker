@@ -402,6 +402,7 @@ export class SimulationComponent implements AfterViewInit {
       name: pos.name,
       sector: pos.sector || 'Other',
       pct: data[idx].pct,
+      priceFormatted: symbol + (pos.currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
       valueFormatted: symbol + Math.round(rawVal * rate).toLocaleString(),
       shares: pos.totalShares,
       avgCostFormatted: symbol + (pos.averageCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),

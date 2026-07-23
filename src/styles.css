@@ -146,8 +146,8 @@ body.light-theme {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--card-border);
-  border-radius: 12px;
-  padding: 1rem;
+  border-radius: 10px;
+  padding: 0.75rem 1rem !important;
   box-shadow: var(--shadow-md);
   transition: var(--transition-smooth);
   position: relative;
@@ -832,4 +832,104 @@ th.center, td.center {
   .metric-card .sub-value {
     font-size: 0.6rem;
   }
+}
+
+/* --- Global Navbar Layout & Responsive System --- */
+.app-navbar {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 10px !important;
+  gap: 0.45rem !important;
+}
+
+.nav-row-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  gap: 0.5rem !important;
+}
+
+.nav-row-controls {
+  display: flex !important;
+  width: 100% !important;
+  gap: 0.4rem !important;
+}
+
+/* Desktop (> 1000px): Tabs + Currency side by side */
+@media (min-width: 1001px) {
+  .nav-row-controls {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+}
+
+/* Tablet & Mobile (<= 1000px): Dedicated full-width stacked rows (Row 2 = Tabs, Row 3 = Currency) */
+@media (max-width: 1000px) {
+  .nav-row-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .nav-tabs {
+    width: 100% !important;
+    display: flex !important;
+    gap: 0.15rem !important;
+  }
+
+  .nav-tab-btn {
+    flex: 1 1 0px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    padding: 0.35rem 0.15rem !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+  }
+
+  .nav-curr-toggle {
+    width: 100% !important;
+    height: 30px !important;
+    display: flex !important;
+  }
+
+  .nav-curr-toggle .currency-btn {
+    flex: 1 1 0px !important;
+    text-align: center !important;
+    justify-content: center !important;
+    font-size: 0.72rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-tab-btn .tab-icon {
+    display: none !important;
+  }
+  .logo-sub {
+    display: none !important;
+  }
+}
+
+/* --- Global Master Spacing System (Uniform 1rem Bottom Margin Everywhere) --- */
+.app-navbar,
+.dashboard-header,
+.ledger-header,
+.settings-header,
+.import-header,
+.filters-card,
+.chart-card,
+.table-card,
+.metrics-grid,
+.rates-card,
+.prices-card,
+.preview-card,
+.mapper-card,
+.input-card {
+  margin-top: 0 !important;
+  margin-bottom: 1rem !important;
+}
+
+.metrics-grid {
+  gap: 1rem !important;
 }
