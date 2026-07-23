@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  margin-bottom: 2rem;
-  gap: 1rem;
+  margin-bottom: 1rem;
+  gap: 0.6rem;
 }
 
 .subtitle {
@@ -14,7 +14,7 @@
 
 .header-right {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.75rem;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -205,9 +205,9 @@
 /* Charts Layout */
 .charts-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .chart-card-header {
@@ -540,50 +540,122 @@
   }
 }
 
-/* Small (Mobile landscape, max 768px) */
+.chart-header-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Small (Mobile, max 768px) */
 @media (max-width: 768px) {
+
+  .chart-header-toggles {
+    width: 100%;
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+  }
+
+  .chart-header-toggles .currency-toggle {
+    flex: 1 1 0px;
+    width: 0;
+    min-width: 0;
+    height: 32px;
+    display: flex;
+    box-sizing: border-box;
+  }
+
+  .chart-header-toggles .currency-btn {
+    flex: 1 1 0px;
+    width: 0;
+    min-width: 0;
+    padding: 0 0.2rem;
+    font-size: 0.72rem;
+    text-align: center;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
   .dashboard-header {
-    padding: 1rem !important;
-    margin-bottom: 1.5rem;
+    padding: 0.45rem 0.6rem !important;
+    margin-bottom: 0.4rem;
+    gap: 0.3rem;
   }
   .header-left h1 {
-    font-size: 1.6rem;
+    font-size: 1.1rem;
+    line-height: 1.1;
+    margin: 0;
+  }
+  .subtitle {
+    font-size: 0.72rem;
+    margin-top: 0.05rem;
+    margin-bottom: 0.15rem;
   }
   .header-right {
     flex-direction: column;
     align-items: stretch;
-    gap: 1rem;
+    gap: 0.4rem;
   }
+  /* Date range row: PERIOD label + date picker inline, full width */
   .date-range-container {
     flex-direction: column;
     align-items: stretch;
     width: 100%;
-    gap: 0.4rem;
+    gap: 0.35rem;
+  }
+  /* Top part: period label + date picker on same line */
+  .date-range-container .date-picker-title {
+    display: none; /* hide PERIOD label on mobile - saves space */
   }
   .date-picker-wrapper {
     width: 100%;
-    justify-content: space-between;
-    padding-right: 1.5rem;
+    height: 34px;
+    padding: 0 0.6rem;
+    padding-right: 1.6rem;
     box-sizing: border-box;
   }
   .premium-date-input {
-    width: 45%;
+    flex: 1;
+    width: auto;
+    font-size: 0.8rem;
   }
+  /* Preset buttons: separate full width row */
+  .date-range-container > .currency-toggle {
+    height: 32px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+  }
+  .date-range-container > .currency-toggle .currency-btn {
+    flex: 1 1 0px;
+    width: 0;
+    min-width: 0;
+    padding: 0 0.2rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  /* Switchers: stacked clean rows fitting 100% width without overflow */
   .switchers-wrapper {
     flex-direction: column;
     align-items: stretch;
     width: 100%;
-    gap: 0.6rem;
+    gap: 0.35rem;
   }
   .currency-toggle, .tabs-control {
     width: 100%;
-    justify-content: space-around;
+    height: 32px;
+    display: flex;
+    box-sizing: border-box;
   }
   .currency-btn, .tab-btn {
-    flex: 1;
+    flex: 1 1 0px;
+    width: 0;
+    min-width: 0;
     text-align: center;
-    padding: 0 0.5rem;
-    font-size: 0.8rem;
+    justify-content: center;
+    padding: 0 0.2rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
   }
   .chart-content {
     flex-direction: column;
@@ -595,7 +667,7 @@
   .table-header {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.8rem;
+    gap: 0.4rem;
   }
   .table-header div {
     width: 100%;
@@ -612,26 +684,17 @@
 /* Extra Small (Mobile portrait, max 480px) */
 @media (max-width: 480px) {
   .dashboard-header {
-    padding: 0.8rem !important;
+    padding: 0.6rem !important;
   }
   .header-left h1 {
-    font-size: 1.4rem;
-  }
-  .date-picker-wrapper {
-    padding: 0 0.5rem;
-    padding-right: 1.5rem;
+    font-size: 1.2rem;
   }
   .premium-date-input {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
   }
   .currency-btn, .tab-btn {
-    font-size: 0.72rem;
-    padding: 0 0.25rem;
-  }
-  .tab-btn {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.7rem;
+    padding: 0 0.3rem;
   }
   .sector-hover-overlay, .asset-hover-overlay {
     left: 50% !important;

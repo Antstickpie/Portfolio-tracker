@@ -6,6 +6,9 @@
       <p class="subtitle">Click on any row to expand it and configure direct ownership splits.</p>
     </div>
     <div class="header-right button-group">
+      <button class="btn btn-secondary" (click)="showImport.set(!showImport())">
+        {{ showImport() ? 'Hide Import' : 'Import CSV/JSON' }}
+      </button>
       <button class="btn btn-secondary" (click)="showAddForm.set(!showAddForm())">
         {{ showAddForm() ? 'Hide Add Form' : 'Add Manual Transaction' }}
       </button>
@@ -13,6 +16,19 @@
         Clear All Ledger
       </button>
     </div>
+  </div>
+
+  <!-- Import Wizard Toggle Block -->
+  <div *ngIf="showImport()" class="glass-card animate-fade-in" style="margin-bottom: 1.5rem; position: relative; padding: 0.5rem 0 0 0;">
+    <button 
+      (click)="showImport.set(false)" 
+      style="position: absolute; top: 1.25rem; right: 1.25rem; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; z-index: 10; line-height: 1;"
+      onmouseover="this.style.color='var(--text-main)'"
+      onmouseout="this.style.color='var(--text-muted)'"
+      title="Close Import Wizard">
+      &times;
+    </button>
+    <app-import></app-import>
   </div>
 
   <!-- Add Transaction Form -->
@@ -90,18 +106,6 @@
         <label>Source / Broker</label>
         <input type="text" placeholder="Filter by source..." [(ngModel)]="filterSource">
       </div>
-      <div class="form-group">
-        <label>Audit Currency</label>
-        <div class="currency-toggle" style="margin-top: 0.25rem;">
-          <button 
-            *ngFor="let curr of service.visibleCurrencies()"
-            class="currency-btn" 
-            [class.active]="displayCurrency() === curr" 
-            (click)="displayCurrency.set(curr)">
-            {{ service.getCurrencyBtnLabel(curr) }}
-          </button>
-        </div>
-      </div>
       <div class="form-group check-field" style="align-self: center; margin-top: 1.2rem; display: flex; gap: 1.5rem; align-items: center;">
         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none;">
           <input 
@@ -126,20 +130,22 @@
   <!-- Grouped Transactions Tables -->
   <div class="glass-card table-card account-card animate-fade-in" *ngFor="let group of transactionsByAccount(); trackBy: trackByAccount" [style.opacity]="isSourceDisabled(group.name) ? '0.45' : '1'" style="transition: opacity 0.2s;">
     <div class="account-table-header">
-      <h3 (click)="toggleAccountCollapse(group.name)" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+      <h3 (click)="toggleAccountCollapse(group.name)" class="account-header-title">
         {{ group.name }}
-        <span *ngIf="isSourceDisabled(group.name)" style="font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 400;">DISABLED</span>
+        <span *ngIf="isSourceDisabled(group.name)" class="account-disabled-badge">DISABLED</span>
         <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isAccountCollapsed(group.name) ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
       </h3>
-      <div style="display: flex; align-items: center; gap: 0.8rem;">
-        <span class="badge badge-success" style="font-family: monospace; font-weight: bold; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.25); color: var(--success); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem;">
-          Current Account Value: {{ getAccountCurrentValue(group.name) }}
+      <div class="account-header-actions">
+        <span class="badge badge-success account-val-badge">
+          Value: {{ getAccountCurrentValue(group.name) }}
         </span>
-        <span class="badge badge-info">{{ group.list.length }} Transactions</span>
-        <button class="btn btn-secondary btn-sm" (click)="toggleSourceDisabled(group.name)" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-radius: 6px; display: flex; align-items: center; gap: 0.3rem;" [title]="isSourceDisabled(group.name) ? 'Enable this account in calculations' : 'Temporarily disable this account from calculations'">
+        <span class="badge badge-info account-tx-badge">
+          {{ group.list.length }} Transactions
+        </span>
+        <button class="btn btn-secondary btn-sm account-action-btn" (click)="toggleSourceDisabled(group.name)" [title]="isSourceDisabled(group.name) ? 'Enable this account in calculations' : 'Temporarily disable this account from calculations'">
           {{ isSourceDisabled(group.name) ? '🔓 Enable' : '🔒 Disable' }}
         </button>
-        <button class="btn btn-sm" (click)="deleteAccount(group.name)" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger); cursor: pointer;" title="Delete all transactions from this account">
+        <button class="btn btn-sm account-action-btn account-delete-btn" (click)="deleteAccount(group.name)" title="Delete all transactions from this account">
           🗑 Delete
         </button>
       </div>

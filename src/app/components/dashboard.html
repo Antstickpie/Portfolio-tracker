@@ -33,7 +33,7 @@
         </div>
 
         <!-- Quick Presets -->
-        <div class="currency-toggle" style="height: 38px; box-sizing: border-box; display: inline-flex; align-items: center;">
+        <div class="currency-toggle">
           <button 
             class="currency-btn" 
             style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
@@ -46,7 +46,7 @@
             style="height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"
             [class.active]="isThisYearActive()"
             (click)="setThisYear()">
-            This Year
+            {{ service.yearBasis() === 'financial' ? 'This Fin. Year' : 'This Year' }}
           </button>
           <button 
             class="currency-btn" 
@@ -67,24 +67,7 @@
       <div class="switchers-wrapper">
 
 
-        <!-- Currency Toggle -->
-        <div class="currency-toggle">
-          <button 
-            class="currency-btn" 
-            *ngFor="let curr of service.visibleCurrencies()"
-            [class.active]="displayCurrency() === curr" 
-            (click)="displayCurrency.set(curr)"
-            [title]="getCurrencyTooltip(curr)">
-            {{ getCurrencyBtnLabel(curr) }}
-          </button>
-          <button 
-            class="currency-btn" 
-            [class.active]="displayCurrency() === 'native'" 
-            (click)="displayCurrency.set('native')"
-            title="Show each asset in its native currency (e.g. USD for NOW, EUR for SECO)">
-            ⇄ Native
-          </button>
-        </div>
+
 
         <!-- View Tabs -->
         <div class="tabs-control" *ngIf="service.personBName() && service.personBName().trim()">
@@ -209,7 +192,7 @@
       </div>
       
       <!-- Period Selector Toggle -->
-      <div class="currency-toggle" style="margin: 0;">
+      <div class="currency-toggle history-period-toggle" style="margin-top: 0.5rem; width: 100%;">
         <button 
           class="currency-btn" 
           *ngFor="let p of [{key:'all', label:'All'}, {key:'1y', label:'1Y'}, {key:'6m', label:'6M'}, {key:'3m', label:'3M'}, {key:'1m', label:'1M'}, {key:'1w', label:'1W'}]"
@@ -340,7 +323,7 @@
           
           <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
             <span style="color: #9ca3af;">{{ filterTicker() ? 'Purchase Value:' : 'Invested:' }}</span>
-            <span style="font-weight: bold; color: #6366f1;">{{ getCurrencySymbol(displayCurrency() === 'native' ? 'EUR' : displayCurrency()) }}{{ hoveredPt.invested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+            <span style="font-weight: bold; color: #6366f1;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ hoveredPt.invested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
           </div>
           
           <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
@@ -350,12 +333,12 @@
           
           <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
             <span style="color: #9ca3af;">Avg Cost:</span>
-            <span style="font-weight: bold; color: #fff;">{{ getCurrencySymbol(displayCurrency() === 'native' ? 'EUR' : displayCurrency()) }}{{ (hoveredPt.avgCost || 0) | number:'1.2-4' }}</span>
+            <span style="font-weight: bold; color: #fff;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ (hoveredPt.avgCost || 0) | number:'1.2-4' }}</span>
           </div>
           
           <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.08);">
             <span style="color: #9ca3af;">Value:</span>
-            <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">{{ getCurrencySymbol(displayCurrency() === 'native' ? 'EUR' : displayCurrency()) }}{{ hoveredPt.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+            <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ hoveredPt.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1f2937; padding-top: 4px; margin-top: 4px;">
@@ -376,58 +359,38 @@
     </div>
   </div>
   <!-- Big Page Layout Wrapper with dynamic order -->
-  <div style="display: flex; flex-direction: column; gap: 2rem; margin-top: 1.5rem;">
-    <!-- Allocation Section Wrapper with order -->
-    <div [style.order]="service.isPastPeriodActive() ? 2 : 1" style="display: flex; flex-direction: column; width: 100%;">
-      <!-- Allocation Charts Controls (Moved above pies) -->
-      <div style="display: flex; justify-content: center; align-items: center; margin-top: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; width: 100%;">
-    
-    <!-- Sector Taxonomy Toggle -->
-    <div class="currency-toggle" style="margin: 0;">
-      <button 
-        class="currency-btn" 
-        [class.active]="!service.useProperSectors()" 
-        (click)="service.useProperSectors.set(false); service.saveToStorage()"
-        title="Use custom sector mappings">
-        Custom Sectors
-      </button>
-      <button 
-        class="currency-btn" 
-        [class.active]="service.useProperSectors()" 
-        (click)="service.useProperSectors.set(true); service.saveToStorage()"
-        title="Use live Yahoo Finance sectors">
-        Market Sectors
-      </button>
-    </div>
-
-
-
-    <!-- Valuation Basis Toggle -->
-    <div class="currency-toggle" style="margin: 0;">
-      <button 
-        class="currency-btn" 
-        [class.active]="allocationBasis() === 'cost'" 
-        (click)="allocationBasis.set('cost')">
-        Invested Money
-      </button>
-      <button 
-        class="currency-btn" 
-        [class.active]="allocationBasis() === 'value'" 
-        (click)="allocationBasis.set('value')">
-        Current Value
-      </button>
-    </div>
-
-  </div>
-
+  <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem;">
   <!-- Charts Section -->
-  <div class="glass-card table-card" style="margin-bottom: 1.5rem; position: relative;" [style.order]="service.isPastPeriodActive() ? 2 : 1">
-    <h2 (click)="isChartsCollapsed.set(!isChartsCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0; padding: 0.2rem 0;">
-      Allocation Charts
-      <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isChartsCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
-    </h2>
+  <div class="glass-card table-card" style="margin-bottom: 0; position: relative;" [style.order]="service.isPastPeriodActive() ? 2 : 1">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.25rem;">
+      <h2 (click)="isChartsCollapsed.set(!isChartsCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.6rem; margin: 0;">
+        Allocation Charts
+        <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isChartsCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+      </h2>
+      <!-- Toggles in header row -->
+      <div *ngIf="!isChartsCollapsed()" class="chart-header-toggles">
+        <!-- Sector Taxonomy Toggle -->
+        <div class="currency-toggle" style="margin: 0;">
+          <button class="currency-btn" [class.active]="!service.useProperSectors()" (click)="service.useProperSectors.set(false); service.saveToStorage()" title="Use custom sector mappings">
+            Custom Sectors
+          </button>
+          <button class="currency-btn" [class.active]="service.useProperSectors()" (click)="service.useProperSectors.set(true); service.saveToStorage()" title="Use live Yahoo Finance sectors">
+            Market Sectors
+          </button>
+        </div>
+        <!-- Valuation Basis Toggle -->
+        <div class="currency-toggle" style="margin: 0;">
+          <button class="currency-btn" [class.active]="allocationBasis() === 'cost'" (click)="allocationBasis.set('cost')">
+            Invested Money
+          </button>
+          <button class="currency-btn" [class.active]="allocationBasis() === 'value'" (click)="allocationBasis.set('value')">
+            Current Value
+          </button>
+        </div>
+      </div>
+    </div>
 
-    <div class="charts-row" *ngIf="!isChartsCollapsed()" style="margin-top: 1.5rem; margin-bottom: 0;">
+    <div class="charts-row" [style.display]="isChartsCollapsed() ? 'none' : 'grid'" style="margin-top: 0.75rem; margin-bottom: 0;">
       <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
         <h3>Asset Allocation</h3>
         <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
@@ -556,10 +519,11 @@
             <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
               Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none;">
-              Current Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            <th class="num" (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Current Price {{ sortBy() === 'currentPrice' ? (currentPriceSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('averageCost')" style="cursor: pointer; user-select: none;">
+            <th class="num" (click)="setSort('averageCost')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
               Avg Cost {{ sortBy() === 'averageCost' ? (averageCostSortMode() === 'pct' ? '(%)' : '($)') : '' }}
               <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'averageCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
@@ -572,11 +536,13 @@
             <th (click)="setSort('sector')" style="cursor: pointer; user-select: none;">
               Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('totalCost')" style="cursor: pointer; user-select: none;">
-              Investment <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            <th class="num" (click)="setSort('totalCost')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Investment {{ sortBy() === 'totalCost' ? (totalCostSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'totalCost'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSort('currentValue')" style="cursor: pointer; user-select: none;">
-              Current Value <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentValue'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+            <th class="num" (click)="setSort('currentValue')" style="cursor: pointer; user-select: none;" title="Click to cycle: Value (Desc) -> Value (Asc) -> % (Desc) -> % (Asc)">
+              Current Value {{ sortBy() === 'currentValue' ? (currentValueSortMode() === 'pct' ? '(%)' : '($)') : '' }}
+              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentValue'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
             </th>
             <th class="num" (click)="setSort('dividends')" style="cursor: pointer; user-select: none;">
               Dividends <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'dividends'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
@@ -614,10 +580,12 @@
                 <a href="https://www.google.com/search?q={{ pos.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ pos.ticker }}</a>
               </div>
             </td>
-            <td class="num font-mono">{{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}</td>
+            <td class="num font-mono">
+              {{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}
+              <div [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-top: 2px; font-weight: 500;">{{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%</div>
+            </td>
             <td class="num font-mono">
               {{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}
-              <div [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-top: 2px; font-weight: 500;">{{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%</div>
             </td>
             <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
               {{ pos.currency !== displayCurrency() ? (getRowFxRate(pos.currency) | number:'1.4-4') : '—' }}

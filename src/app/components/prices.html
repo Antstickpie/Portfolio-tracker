@@ -5,9 +5,9 @@
   </div>
 
   <!-- SECTION 1: SETTINGS DASHBOARD GRID -->
-  <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));">
+  <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
     <!-- Card 1: Preferences & Calculations -->
-    <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem;">
       <div>
         <h3>Preferences & Calculations</h3>
         <p class="subtitle">Set owner names, date formats, and tax/split engine methods.</p>
@@ -109,7 +109,7 @@
     </div>
 
     <!-- Card 2: Data & Backup -->
-    <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem;">
       <div>
         <h3>Data & Cloud Sync</h3>
         <p class="subtitle">Access your data securely across devices or download backups locally.</p>
@@ -184,7 +184,7 @@
     </div>
 
     <!-- Card 3: Sector & Currencies -->
-    <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem;">
       <div>
         <h3>Sectors & Currencies</h3>
         <p class="subtitle">Customize labels for stock sectors and toggle active dashboard exchange currencies.</p>
@@ -241,6 +241,20 @@
           </div>
           <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.6rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.05); text-align: left;">
             💡 <strong>EUR</strong> uses the <em>calendar year average exchange rate</em> tax rule for realized gains. Other currencies (like <strong>INR</strong>) use the <em>historical daily exchange rate</em> on the transaction date.
+          </div>
+        </div>
+
+        <!-- Default Currency Selection -->
+        <div style="margin-top: 1.25rem;">
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Default Currency</label>
+          <select 
+            [ngModel]="service.defaultCurrency()" 
+            (ngModelChange)="service.defaultCurrency.set($event); service.saveToStorage()"
+            style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
+            <option *ngFor="let curr of service.visibleCurrencies()" [value]="curr" style="background: #0d1117;">{{ curr }}</option>
+          </select>
+          <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.4rem;">
+            This currency will be used for aggregate charts and calculations when "Native" is selected or when starting the app.
           </div>
         </div>
       </div>

@@ -335,7 +335,80 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   padding: 0.2rem 0;
+}
+
+.account-header-title {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.account-disabled-badge {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 400;
+}
+
+.account-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.account-val-badge {
+  font-family: monospace;
+  font-weight: bold;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--success);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.account-tx-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.account-action-btn {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.account-delete-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.account-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .account-card .table-container {
@@ -346,13 +419,6 @@
   border-left: none;
   border-right: none;
   border-bottom: none;
-}
-
-.account-table-header h3 {
-  font-size: 1.05rem;
-  color: var(--primary);
-  margin: 0;
-  font-weight: 600;
 }
 
 .table-card.account-card {

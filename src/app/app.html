@@ -1,11 +1,70 @@
 <div class="app-frame">
   <!-- Navigation Header -->
+  <!-- Navigation Header -->
   <header class="app-navbar glass-card">
-    <div class="nav-logo">
-      <span class="logo-icon">&#9650;</span>
-      <span class="logo-text">PORTFOLIO <span class="logo-sub">TRACKER</span></span>
+    <!-- Row 1: Logo (Left) & Right-Aligned Live Status + Utility Controls (Right) -->
+    <div class="nav-top-bar">
+      <div class="nav-logo">
+        <span class="logo-icon">&#9650;</span>
+        <span class="logo-text">PORTFOLIO <span class="logo-sub">TRACKER</span></span>
+      </div>
+
+      <div class="nav-top-right">
+        <!-- Live Prices Sync Status (Right-Aligned) -->
+        <div class="nav-sync" style="display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; flex-wrap: nowrap;">
+          <span [style.color]="service.lastRefreshTime() ? 'var(--success)' : 'var(--text-muted)'" style="font-size: 0.65rem; line-height: 1;">●</span>
+          <span style="color: var(--text-main); font-weight: 500; font-size: 0.74rem; white-space: nowrap;">
+            Live: <span style="color: var(--text-muted); font-weight: 400; margin-left: 0.1rem; font-family: monospace; font-variant-numeric: tabular-nums; font-size: 0.72rem;">{{ service.getSyncedTimeAgoText() }}</span>
+          </span>
+          <button 
+            (click)="forceSyncPrices()" 
+            title="Force sync of stock prices and FX rates"
+            style="background: transparent; border: none; outline: none; padding: 0; margin-left: 0.15rem; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; opacity: 0.5; transition: opacity 0.2s; flex-shrink: 0;"
+            onmouseover="this.style.opacity='1'"
+            onmouseout="this.style.opacity='0.5'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [style.animation]="service.isSyncing() ? 'spin 1.2s linear infinite' : 'none'">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Theme Toggle Button -->
+        <button 
+          (click)="service.toggleTheme()" 
+          [title]="service.theme() === 'light' ? 'Switch to Dark Theme' : 'Switch to Light Theme'"
+          class="nav-icon-btn">
+          <svg *ngIf="service.theme() === 'light'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg *ngIf="service.theme() === 'dark'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+
+        <!-- Help link -->
+        <a
+          href="https://github.com/Antstickpie/Portfolio-tracker#readme"
+          target="_blank"
+          title="User Guide & Documentation"
+          class="nav-icon-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </a>
+      </div>
     </div>
-    
+
+    <!-- Row 2: Nav Tabs -->
     <nav class="nav-tabs">
       <button 
         class="nav-tab-btn" 
@@ -15,81 +74,43 @@
       </button>
       <button 
         class="nav-tab-btn" 
-        [class.active]="activeTab() === 'import'" 
-        (click)="switchTab('import')">
-        <span class="tab-icon">&#8677;</span> Import Data
-      </button>
-      <button 
-        class="nav-tab-btn" 
         [class.active]="activeTab() === 'ledger'" 
         (click)="switchTab('ledger')">
         <span class="tab-icon">&#9783;</span> Transaction Ledger
       </button>
       <button 
         class="nav-tab-btn" 
+        [class.active]="activeTab() === 'simulation'" 
+        (click)="switchTab('simulation')">
+        <span class="tab-icon">&#9874;</span> Simulation Sandbox
+      </button>
+      <button 
+        class="nav-tab-btn" 
         [class.active]="activeTab() === 'prices'" 
         (click)="switchTab('prices')">
-        <span class="tab-icon">&#9881;</span> Settings & Market Rates
+        <span class="tab-icon">&#9881;</span> Settings
       </button>
     </nav>
 
-    <!-- Controls Row -->
-    <div class="nav-controls" style="margin-left: auto; display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-      <!-- Live Prices Sync Status in Top Bar -->
-      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem 0.7rem; border-radius: 20px; color: var(--text-muted); flex-shrink: 0;">
-        <span [style.color]="service.lastRefreshTime() ? 'var(--success)' : 'var(--text-muted)'" style="font-size: 0.65rem; line-height: 1;">●</span>
-        <span style="color: var(--text-main); font-weight: 500; font-size: 0.74rem;">
-          Live: <span style="color: var(--text-muted); font-weight: 400; margin-left: 0.1rem; font-family: monospace; font-variant-numeric: tabular-nums; font-size: 0.72rem;">{{ service.getSyncedTimeAgoText() }} | Next: {{ service.nextSyncCountdown() }}</span>
-        </span>
+    <!-- Row 3: Currency Switcher (Dedicated Full Width Row) -->
+    <div class="nav-currency-bar">
+      <div class="currency-toggle nav-curr-toggle">
         <button 
-          (click)="forceSyncPrices()" 
-          title="Force sync of stock prices and FX rates"
-          style="background: transparent; border: none; outline: none; padding: 0; margin-left: 0.25rem; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; opacity: 0.4; transition: opacity 0.2s;"
-          onmouseover="this.style.opacity='1'"
-          onmouseout="this.style.opacity='0.4'">
-          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [style.animation]="service.isSyncing() ? 'spin 1.2s linear infinite' : 'none'">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-          </svg>
+          class="currency-btn" 
+          *ngFor="let curr of service.visibleCurrencies()"
+          [class.active]="service.displayCurrency() === curr" 
+          (click)="service.displayCurrency.set(curr); service.saveToStorage()"
+          [title]="service.getCurrencyTooltip(curr)">
+          {{ service.getCurrencyBtnLabel(curr) }}
+        </button>
+        <button 
+          class="currency-btn" 
+          [class.active]="service.displayCurrency() === 'native'" 
+          (click)="service.displayCurrency.set('native'); service.saveToStorage()"
+          title="Show each asset in its native currency (e.g. USD for NOW, EUR for SECO)">
+          ⇄ Native
         </button>
       </div>
-
-      <!-- Theme Toggle Button -->
-      <button 
-        (click)="service.toggleTheme()" 
-        [title]="service.theme() === 'light' ? 'Switch to Dark Theme' : 'Switch to Light Theme'"
-        style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--text-muted); background: transparent; border-radius: 50%; border: 1px solid var(--card-border); cursor: pointer; transition: all 0.2s; flex-shrink: 0;"
-        onmouseover="this.style.color='var(--primary)';this.style.borderColor='var(--primary)';this.style.background='rgba(99,102,241,0.08)'"
-        onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--card-border)';this.style.background='transparent'">
-        <svg *ngIf="service.theme() === 'light'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
-        <svg *ngIf="service.theme() === 'dark'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-      </button>
-
-      <!-- Help link -->
-      <a
-        href="https://github.com/Antstickpie/Portfolio-tracker#readme"
-        target="_blank"
-        title="User Guide & Documentation"
-        style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--text-muted); text-decoration: none; border-radius: 50%; border: 1px solid var(--card-border); transition: all 0.2s; flex-shrink: 0;"
-        onmouseover="this.style.color='var(--primary)';this.style.borderColor='var(--primary)';this.style.background='rgba(99,102,241,0.08)'"
-        onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--card-border)';this.style.background='transparent'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </a>
     </div>
   </header>
 
@@ -114,9 +135,9 @@
   <!-- Main Content Body -->
   <main class="app-main-content">
     <app-dashboard *ngIf="activeTab() === 'dashboard'"></app-dashboard>
-    <app-import *ngIf="activeTab() === 'import'"></app-import>
     <app-transactions *ngIf="activeTab() === 'ledger'"></app-transactions>
     <app-prices *ngIf="activeTab() === 'prices'"></app-prices>
+    <app-simulation *ngIf="activeTab() === 'simulation'"></app-simulation>
   </main>
 
   <!-- Global Footer -->

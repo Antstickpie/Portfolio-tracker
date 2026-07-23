@@ -1,0 +1,404 @@
+<div class="animate-fade-in" style="padding-bottom: 2rem;">
+  
+  <!-- Simulation Header & Toggle Banner -->
+  <div class="glass-card header-banner" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1.25rem 1.5rem;">
+    <div style="text-align: left;">
+      <h1 style="margin: 0; font-size: 1.6rem; font-weight: 700; background: linear-gradient(135deg, #00ffff, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Simulation Sandbox</h1>
+      <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Model BUY or SELL trades on top of your existing holdings without changing real data.</p>
+    </div>
+    
+    <!-- Big Premium Mode Switcher -->
+    <div style="display: flex; align-items: center; gap: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.6rem 1rem; border-radius: 12px;">
+      <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">Apply to Dashboard:</span>
+      <label class="switch" style="position: relative; display: inline-block; width: 46px; height: 24px; margin: 0;">
+        <input 
+          type="checkbox" 
+          [ngModel]="service.isSimulationModeActive()"
+          (ngModelChange)="service.isSimulationModeActive.set($event); service.saveToStorage()"
+          style="opacity: 0; width: 0; height: 0;">
+        <span class="slider round"></span>
+      </label>
+      <span 
+        [style.color]="service.isSimulationModeActive() ? 'var(--success)' : 'var(--text-muted)'" 
+        style="font-size: 0.82rem; font-weight: 700; min-width: 32px;">
+        {{ service.isSimulationModeActive() ? 'ON' : 'OFF' }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Comparative Metrics Grid -->
+  <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    
+    <!-- Real Net Worth -->
+    <div class="glass-card metric-card" style="border-left: 3px solid var(--text-muted); text-align: left;">
+      <div class="label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted);">Real Net Worth (Value)</div>
+      <div class="value" style="font-size: 1.15rem; font-weight: 700; color: var(--text-muted); font-family: monospace; margin: 0.2rem 0; word-break: break-all;">{{ formatVal(realSummary().totalValue) }}</div>
+      <div style="font-size: 0.7rem; color: var(--text-muted);">Real cost basis: {{ formatVal(realSummary().totalCostBasis) }}</div>
+    </div>
+
+    <!-- Simulated Net Worth -->
+    <div class="glass-card metric-card" [class.glow-primary]="service.simulatedTransactions().length > 0" style="border-left: 3px solid var(--primary); text-align: left;">
+      <div class="label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--primary);">Simulated Net Worth</div>
+      <div class="value" style="font-size: 1.15rem; font-weight: 700; font-family: monospace; margin: 0.2rem 0; word-break: break-all;">{{ formatVal(simulatedSummary().totalValue) }}</div>
+      
+      <!-- Difference indicator -->
+      <div style="font-size: 0.72rem; display: flex; align-items: center; gap: 0.25rem;">
+        <span [ngClass]="(simulatedSummary().totalValue - realSummary().totalValue) >= 0 ? 'text-success' : 'text-danger'" style="font-weight: bold;">
+          {{ (simulatedSummary().totalValue - realSummary().totalValue) >= 0 ? '▲ +' : '▼ ' }}{{ formatVal(simulatedSummary().totalValue - realSummary().totalValue) }}
+        </span>
+        <span style="color: var(--text-muted);">vs Real</span>
+      </div>
+      <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;">Simulated cost basis: {{ formatVal(simulatedSummary().totalCostBasis) }}</div>
+    </div>
+
+    <!-- Simulated Cash Impact -->
+    <div class="glass-card metric-card" style="border-left: 3px solid #10b981; text-align: left;">
+      <div class="label" style="font-size: 0.72rem; text-transform: uppercase; color: #10b981;">Simulated Cash Balance</div>
+      <div *ngIf="cashImpact().length === 0" style="font-size: 0.95rem; font-weight: 600; color: var(--text-muted); margin-top: 0.4rem;">
+        No Cash Generated
+      </div>
+      <div *ngIf="cashImpact().length > 0" style="margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.25rem;">
+        <div 
+          *ngFor="let cash of cashImpact()" 
+          style="font-family: monospace; font-size: 1.05rem; font-weight: 700;"
+          [ngClass]="cash.amount >= 0 ? 'text-success' : 'text-danger'">
+          {{ cash.amount >= 0 ? '+' : '' }}{{ service.getCurrencySymbol(cash.currency) }}{{ cash.amount | number:'1.2-2' }} <span style="font-size: 0.72rem; font-weight: normal; color: var(--text-muted);">{{ cash.currency }}</span>
+        </div>
+      </div>
+      <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.3rem;">Positive: Net proceeds from sales. Negative: Net cost of buys.</div>
+    </div>
+  </div>
+
+  <!-- Trade Simulator Form & Active Simulations List (Stretched full width on top, followed by charts) -->
+  <div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+    
+    <!-- 1. Simulated Trade Input Form -->
+    <div class="glass-card" style="padding: 1.25rem 1.5rem;">
+      <h2 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 600; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+        <span>{{ editingId() ? 'Edit Trade Simulation' : 'Simulate a Trade' }}</span>
+        <button *ngIf="editingId()" class="btn btn-secondary btn-xs" (click)="resetForm()">Cancel Edit</button>
+      </h2>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; margin-bottom: 1rem;">
+        
+        <!-- Buy / Sell Action -->
+        <div>
+          <label class="form-label">Trade Action</label>
+          <div class="toggle-group" style="display: flex; width: 100%;">
+            <button 
+              type="button" 
+              class="toggle-btn" 
+              style="flex: 1; border: none; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.2s;"
+              [style.background]="type() === 'BUY' ? 'var(--primary)' : 'transparent'"
+              [style.color]="type() === 'BUY' ? '#ffffff' : 'var(--text-muted)'"
+              (click)="type.set('BUY')">BUY</button>
+            <button 
+              type="button" 
+              class="toggle-btn" 
+              style="flex: 1; border: none; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.2s;"
+              [style.background]="type() === 'SELL' ? '#ef4444' : 'transparent'"
+              [style.color]="type() === 'SELL' ? '#ffffff' : 'var(--text-muted)'"
+              (click)="type.set('SELL')">SELL</button>
+          </div>
+        </div>
+
+        <!-- Account -->
+        <div>
+          <label class="form-label">Account</label>
+          <select 
+            [ngModel]="account()"
+            (ngModelChange)="account.set($event)"
+            class="form-input" style="height: 35px; box-sizing: border-box; width: 100%;">
+            <option value="A">{{ service.personAName() }}</option>
+            <option value="B" *ngIf="service.personBName() && service.personBName().trim()">{{ service.personBName() }}</option>
+          </select>
+        </div>
+
+        <!-- Ticker -->
+        <div>
+          <label class="form-label">Ticker Symbol</label>
+          <input 
+            type="text" 
+            [(ngModel)]="ticker" 
+            list="existing-tickers-list"
+            placeholder="e.g. AAPL" 
+            class="form-input" 
+            style="text-transform: uppercase; height: 35px; box-sizing: border-box; width: 100%;">
+          <datalist id="existing-tickers-list">
+            <ng-container *ngIf="type() === 'BUY'">
+              <option *ngFor="let t of service.allTickers()" [value]="t">{{ t }}</option>
+            </ng-container>
+            <ng-container *ngIf="type() === 'SELL'">
+              <option *ngFor="let t of availableTickersForSell()" [value]="t">{{ t }}</option>
+            </ng-container>
+          </datalist>
+        </div>
+
+        <!-- Shares -->
+        <div>
+          <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Shares</span>
+            <span *ngIf="type() === 'SELL' && maxSharesForSell() !== null" style="font-size: 0.68rem; color: var(--text-muted);">
+              Max: {{ maxSharesForSell() | number:'1.0-6' }}
+            </span>
+          </label>
+          <input 
+            type="number" 
+            [(ngModel)]="shares" 
+            [max]="maxSharesForSell()"
+            placeholder="0.00" 
+            step="any" 
+            class="form-input" 
+            style="height: 35px; box-sizing: border-box; width: 100%;">
+        </div>
+
+        <!-- Price -->
+        <div>
+          <label class="form-label" style="display: flex; justify-content: space-between;">
+            <span>Price ({{ getActiveCurrencyCode() }})</span>
+            <button 
+              type="button" 
+              (click)="useLivePrice()"
+              style="background: none; border: none; padding: 0; color: var(--primary); font-size: 0.68rem; cursor: pointer; text-decoration: underline;"
+              *ngIf="service.getTickerCurrentPrice(ticker()) > 0">Live</button>
+          </label>
+          <input 
+            type="number" 
+            [(ngModel)]="price" 
+            placeholder="0.00" 
+            step="any" 
+            class="form-input" 
+            style="height: 35px; box-sizing: border-box; width: 100%;">
+        </div>
+
+        <!-- Fees -->
+        <div>
+          <label class="form-label">Fees</label>
+          <select 
+            [ngModel]="feesType()"
+            (ngModelChange)="feesType.set($event)"
+            class="form-input" style="height: 35px; box-sizing: border-box; width: 100%;">
+            <option value="none">No Fee (0)</option>
+            <option value="bps">Broker (0.25%)</option>
+            <option value="custom">Custom amount</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Custom Fee Input field if custom selected -->
+      <div *ngIf="feesType() === 'custom'" style="margin-bottom: 1rem; width: 100%; text-align: left;">
+        <label class="form-label">Custom Fee ({{ getActiveCurrencyCode() }})</label>
+        <input 
+          type="number" 
+          [(ngModel)]="feesVal" 
+          placeholder="e.g. 5.00" 
+          class="form-input" 
+          style="width: 100%; max-width: 200px; height: 35px; box-sizing: border-box;">
+      </div>
+
+      <!-- Submit Buttons -->
+      <div style="display: flex; gap: 0.5rem; justify-content: flex-start; margin-top: 0.4rem;">
+        <button 
+          class="btn btn-primary" 
+          (click)="saveSimulation()"
+          [disabled]="!ticker().trim() || !shares() || shares()! <= 0 || !price() || price()! <= 0">
+          {{ editingId() ? 'Save Trade Changes' : '+ Add Trade Simulation' }}
+        </button>
+        <button class="btn btn-secondary" (click)="resetForm()">Clear Form</button>
+      </div>
+    </div>
+
+    <!-- 2. Active Simulated Transactions List -->
+    <div class="glass-card" style="padding: 1.25rem 1.5rem; overflow-x: auto;">
+      <h2 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 600; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <span>Active Simulations ({{ service.simulatedTransactions().length }})</span>
+        <button 
+          *ngIf="service.simulatedTransactions().length > 0" 
+          class="btn btn-secondary btn-xs" 
+          onmouseover="this.style.background='#ef4444'; this.style.borderColor='#ef4444'; this.style.color='#ffffff';" 
+          onmouseout="this.style.background='var(--button-bg)'; this.style.borderColor='var(--button-border)'; this.style.color='var(--text-muted)';"
+          (click)="clearAllSimulations()">✕ Clear All</button>
+      </h2>
+
+      <div *ngIf="service.simulatedTransactions().length === 0" style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+        No trade simulations added yet. Use form above to model transactions.
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;" *ngIf="service.simulatedTransactions().length > 0">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase;">
+            <th style="padding: 0.5rem 0.6rem;">Action</th>
+            <th style="padding: 0.5rem 0.6rem;">Account</th>
+            <th style="padding: 0.5rem 0.6rem;">Ticker</th>
+            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Shares</th>
+            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Price</th>
+            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Fees</th>
+            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Net Subtotal</th>
+            <th style="padding: 0.5rem 0.6rem; text-align: center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let sim of service.simulatedTransactions()" style="border-bottom: 1px solid rgba(255,255,255,0.02); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.01)'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 0.65rem 0.6rem; font-weight: bold;">
+              <span [style.color]="sim.type === 'BUY' ? 'var(--primary)' : '#ef4444'">{{ sim.type }}</span>
+            </td>
+            <td style="padding: 0.65rem 0.6rem; font-weight: 500;">
+              {{ sim.account === 'A' ? service.personAName() : service.personBName() }}
+            </td>
+            <td style="padding: 0.65rem 0.6rem; font-weight: bold; color: var(--text-main);">
+              {{ sim.ticker }}
+            </td>
+            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
+              {{ sim.shares | number:'1.0-6' }}
+            </td>
+            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
+              {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ sim.price | number:'1.2-4' }}
+            </td>
+            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; color: var(--text-muted);">
+              {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ service.calculateSimulatedFees(sim) | number:'1.2-2' }}
+            </td>
+            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; font-weight: 600;" [ngClass]="sim.type === 'BUY' ? 'text-danger' : 'text-success'">
+              {{ sim.type === 'BUY' ? '-' : '+' }}{{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ (sim.shares * sim.price + (sim.type === 'BUY' ? 1 : -1) * service.calculateSimulatedFees(sim)) | number:'1.2-2' }}
+            </td>
+            <td style="padding: 0.65rem 0.6rem; text-align: center;">
+              <div style="display: inline-flex; gap: 0.35rem; justify-content: center;">
+                <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" (click)="editSimulation(sim)">Edit</button>
+                <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" (click)="deleteSimulation(sim.id)">Delete</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3. Simulated Allocation Section Card (Exactly like Dashboard Allocation Section) -->
+    <div style="display: flex; flex-direction: column; width: 100%;">
+      
+      <!-- Toggles row -->
+      <div class="chart-header-toggles" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+        
+        <!-- Sector Taxonomy Toggle -->
+        <div class="currency-toggle" style="margin: 0;">
+          <button 
+            class="currency-btn" 
+            [class.active]="!service.useProperSectors()" 
+            (click)="service.useProperSectors.set(false); service.saveToStorage()"
+            title="Use custom sector mappings">
+            Custom Sectors
+          </button>
+          <button 
+            class="currency-btn" 
+            [class.active]="service.useProperSectors()" 
+            (click)="service.useProperSectors.set(true); service.saveToStorage()"
+            title="Use live Yahoo Finance sectors">
+            Market Sectors
+          </button>
+        </div>
+
+        <!-- Valuation Basis Toggle -->
+        <div class="currency-toggle" style="margin: 0;">
+          <button 
+            class="currency-btn" 
+            [class.active]="allocationBasis() === 'cost'" 
+            (click)="allocationBasis.set('cost')">
+            Invested Money
+          </button>
+          <button 
+            class="currency-btn" 
+            [class.active]="allocationBasis() === 'value'" 
+            (click)="allocationBasis.set('value')">
+            Current Value
+          </button>
+        </div>
+      </div>
+
+      <!-- Donut charts wrapper -->
+      <div class="glass-card table-card" style="margin-bottom: 1.5rem; position: relative; margin-top: 0;">
+        <h2 (click)="isChartsCollapsed.set(!isChartsCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.8rem; margin: 0; padding: 0.2rem 0;">
+          Simulated Allocation Charts
+          <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isChartsCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+        </h2>
+
+        <div class="charts-row" [style.display]="isChartsCollapsed() ? 'none' : 'grid'" style="margin-top: 1.5rem; margin-bottom: 0;">
+          
+          <!-- Asset Allocation Donut Chart -->
+          <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
+            <h3>Asset Allocation</h3>
+            
+            <div class="chart-content">
+              <div class="canvas-wrapper">
+                <canvas #assetCanvas width="460" height="320"></canvas>
+                
+                <!-- Hover details overlay -->
+                <div class="asset-hover-overlay animate-fade-in" *ngIf="hoveredAssetIndex() !== -1 && hoveredAssetDetail()">
+                  <div class="overlay-header">
+                    <span class="overlay-dot" [style.background-color]="getColor(hoveredAssetIndex())"></span>
+                    <span class="overlay-title">{{ hoveredAssetDetail()?.ticker }}</span>
+                  </div>
+                  <div class="overlay-content">
+                    <div class="overlay-detail-row">
+                      <span class="detail-label">Sector:</span>
+                      <span class="detail-val-badge" [title]="hoveredAssetDetail()?.sector">{{ hoveredAssetDetail()?.sector }}</span>
+                    </div>
+                    <div class="overlay-detail-row">
+                      <span class="detail-label">Weight:</span>
+                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%</span>
+                    </div>
+                    <div class="overlay-detail-row">
+                      <span class="detail-label">Value:</span>
+                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.valueFormatted }}</span>
+                    </div>
+                    <div class="overlay-detail-row">
+                      <span class="detail-label">Shares:</span>
+                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.shares | number:'1.0-6' }}</span>
+                    </div>
+                    <div class="overlay-detail-row">
+                      <span class="detail-label">Avg Cost:</span>
+                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.avgCostFormatted }}</span>
+                    </div>
+                    <div class="overlay-detail-row">
+                      <span class="detail-label">Purchase:</span>
+                      <span class="detail-val-highlight">{{ hoveredAssetDetail()?.purchaseValueFormatted }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sector Allocation Donut Chart -->
+          <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
+            <h3>Sector Allocation</h3>
+            
+            <div class="chart-content">
+              <div class="canvas-wrapper">
+                <canvas #sectorCanvas width="460" height="320"></canvas>
+                
+                <!-- Hover stocks list overlay -->
+                <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
+                  <div class="overlay-header">
+                    <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+                    <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
+                  </div>
+                  <div class="overlay-list">
+                    <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
+                      <span class="stock-symbol">{{ stock.ticker }}</span>
+                      <div class="progress-track">
+                        <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+                      </div>
+                      <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
+                      <span class="stock-val">{{ stock.valueFormatted }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

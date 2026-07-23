@@ -161,6 +161,10 @@ export class PricesComponent {
       personBName: this.service.personBName(),
       dateFormat: this.service.dateFormat(),
       historicalPrices: this.service.historicalPrices(),
+      simulatedTransactions: this.service.simulatedTransactions(),
+      isSimulationModeActive: this.service.isSimulationModeActive(),
+      defaultCurrency: this.service.defaultCurrency(),
+      displayCurrency: this.service.displayCurrency(),
       splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null
     };
     
@@ -227,6 +231,18 @@ export class PricesComponent {
         }
         if (data.historicalPrices) {
           this.service.historicalPrices.set(data.historicalPrices);
+        }
+        if (data.simulatedTransactions) {
+          this.service.simulatedTransactions.set(data.simulatedTransactions);
+        }
+        if (data.isSimulationModeActive !== undefined) {
+          this.service.isSimulationModeActive.set(data.isSimulationModeActive);
+        }
+        if (data.defaultCurrency) {
+          this.service.defaultCurrency.set(data.defaultCurrency);
+        }
+        if (data.displayCurrency) {
+          this.service.displayCurrency.set(data.displayCurrency);
         }
         
         this.service.saveToStorage();

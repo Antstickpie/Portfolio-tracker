@@ -1,9 +1,9 @@
 import { Component, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DashboardComponent } from './components/dashboard';
-import { ImportComponent } from './components/import';
 import { TransactionsComponent } from './components/transactions';
 import { PricesComponent } from './components/prices';
+import { SimulationComponent } from './components/simulation';
 import { PortfolioService } from './services/portfolio.service';
 
 @Component({
@@ -12,16 +12,16 @@ import { PortfolioService } from './services/portfolio.service';
   imports: [
     CommonModule, 
     DashboardComponent, 
-    ImportComponent, 
     TransactionsComponent, 
-    PricesComponent
+    PricesComponent,
+    SimulationComponent
   ],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App {
   public service = inject(PortfolioService);
-  public activeTab = signal<'dashboard' | 'import' | 'ledger' | 'prices'>('dashboard');
+  public activeTab = signal<'dashboard' | 'ledger' | 'prices' | 'simulation'>('dashboard');
 
   // True when only demo data is loaded (no real user data yet)
   public isDemoMode = computed(() => {
@@ -29,7 +29,7 @@ export class App {
     return txs.length > 0 && txs.every(t => (t as any)._isDemo === true);
   });
 
-  public switchTab(tab: 'dashboard' | 'import' | 'ledger' | 'prices') {
+  public switchTab(tab: 'dashboard' | 'ledger' | 'prices' | 'simulation') {
     this.activeTab.set(tab);
   }
 

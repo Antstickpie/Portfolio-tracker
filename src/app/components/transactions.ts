@@ -4,10 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
 import { Transaction } from '../models/transaction.model';
 
+import { ImportComponent } from './import';
+
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ImportComponent],
   templateUrl: './transactions.html',
   styleUrl: './transactions.css'
 })
@@ -15,6 +17,7 @@ export class TransactionsComponent {
   public service = inject(PortfolioService);
 
   public showAddForm = signal(false);
+  public showImport = signal(false);
   public showCashTopUp = signal(false);
   public collapsedAccounts = signal<Record<string, boolean>>({});
 
@@ -26,7 +29,12 @@ export class TransactionsComponent {
   }
 
   public isAccountCollapsed(accountName: string): boolean {
-    return !!this.collapsedAccounts()[accountName];
+    const groups = this.transactionsByAccount();
+    // If only one account: always expanded
+    if (groups.length <= 1) return false;
+    // Multiple accounts: collapsed by default unless explicitly toggled open
+    const explicitState = this.collapsedAccounts()[accountName];
+    return explicitState === undefined ? true : explicitState;
   }
   public sortBy = signal<'date' | 'price' | 'ticker' | 'type' | 'quantity' | 'totalAmount' | 'name'>('date');
   public sortDirection = signal<'asc' | 'desc'>('desc');
@@ -34,7 +42,10 @@ export class TransactionsComponent {
   // Track expanded transaction row
   public expandedTxId = signal<string | null>(null);
 
-  public displayCurrency = signal<string>(this.service.visibleCurrencies()[0] || 'EUR');
+  public displayCurrency = computed(() => {
+    const globalCurr = this.service.displayCurrency();
+    return globalCurr === 'native' ? this.service.defaultCurrency() : globalCurr;
+  });
 
   public getAccountCurrentValue(accountName: string): string {
     const txs = this.service.transactions().filter(t => (t.source || 'Manual Entries') === accountName);

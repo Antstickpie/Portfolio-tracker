@@ -4,6 +4,7 @@ import { MappingTemplate } from '../models/mapping-template.model';
 import { TickerConfig } from '../models/ticker-config.model';
 import { PortfolioPosition } from '../models/portfolio-position.model';
 import { PersonPortfolioSummary } from '../models/portfolio-summary.model';
+import { SimulatedTransaction } from '../models/simulated-transaction.model';
 
 declare var google: any;
 
@@ -13,6 +14,65 @@ declare var google: any;
 export class PortfolioService {
   // Signals for state
   public transactions = signal<Transaction[]>([]);
+  public simulatedTransactions = signal<SimulatedTransaction[]>([]);
+  public isSimulationModeActive = signal<boolean>(false);
+
+  public calculateSimulatedFees(sim: SimulatedTransaction): number {
+    if (sim.feesType === 'none') return 0;
+    if (sim.feesType === 'bps') return sim.shares * sim.price * 0.0025; // 0.25%
+    return sim.feesVal || 0;
+  }
+
+  public effectiveTransactions = computed<Transaction[]>(() => {
+    const real = this.transactions();
+    const sims = this.simulatedTransactions();
+    const convertedSims = sims.map(s => {
+      const fees = this.calculateSimulatedFees(s);
+      const totalAmount = s.type === 'BUY'
+        ? (s.shares * s.price + fees)
+        : (s.shares * s.price - fees);
+      
+      const quantity = s.shares;
+      let personAShares = 0;
+      let personBShares = 0;
+      let personACostBasis = 0;
+      let personBCostBasis = 0;
+
+      if (s.account === 'A') {
+        personAShares = s.shares;
+        personACostBasis = totalAmount;
+      } else {
+        personBShares = s.shares;
+        personBCostBasis = totalAmount;
+      }
+
+      const tickerUpper = s.ticker.toUpperCase().trim();
+      const tickerCurrency = this.tickerConfigs()[tickerUpper]?.priceCurrency || 'USD';
+
+      return {
+        id: 'sim-' + s.id,
+        date: new Date().toISOString().slice(0, 10), // today
+        ticker: tickerUpper,
+        type: s.type,
+        price: s.price,
+        quantity: quantity,
+        totalAmount: totalAmount,
+        currency: tickerCurrency,
+        personAShares,
+        personBShares,
+        personACostBasis,
+        personBCostBasis,
+        source: 'Simulation',
+        _isSimulated: true
+      } as any;
+    });
+
+    return [...real, ...convertedSims];
+  });
+
+  public activeTransactions = computed<Transaction[]>(() => {
+    return this.isSimulationModeActive() ? this.effectiveTransactions() : this.transactions();
+  });
   public templates = signal<MappingTemplate[]>([]);
   public tickerConfigs = signal<Record<string, TickerConfig>>({});
   public exchangeRates = signal<Record<string, number>>({});
@@ -25,7 +85,7 @@ export class PortfolioService {
     const from = this.dateFrom();
     const to = this.dateTo();
     if (!from && !to) return true;
-    const txs = this.transactions();
+    const txs = this.activeTransactions();
     if (txs.length === 0) return true;
     const dates = txs.map(t => t.date ? t.date.slice(0, 10) : '').filter(Boolean).sort();
     if (dates.length === 0) return true;
@@ -48,6 +108,8 @@ export class PortfolioService {
   public splitAdjustedSources = signal<string[]>([]);
   public costBasisMethod = signal<'fifo' | 'avg'>('fifo');
   public disabledSources = signal<string[]>([]);
+  public defaultCurrency = signal<string>('EUR');
+  public displayCurrency = signal<string>('native');
   public lastRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
@@ -198,6 +260,13 @@ export class PortfolioService {
     const config = this.tickerConfigs()[full] || this.tickerConfigs()[clean];
     return storedName || config?.name || ticker;
   }
+
+  public getTickerCurrentPrice(ticker: string): number {
+    const t = ticker.toUpperCase().trim();
+    return this.tickerConfigs()[t]?.currentPrice || 0;
+  }
+
+
 
   public getLogoData(ticker: string): string {
     const clean = ticker.toUpperCase().trim();
@@ -571,11 +640,23 @@ export class PortfolioService {
       const ds = localStorage.getItem('pt_disabled_sources');
       if (ds) this.disabledSources.set(JSON.parse(ds));
 
+      const defCurr = localStorage.getItem('pt_default_currency');
+      if (defCurr) this.defaultCurrency.set(defCurr);
+
+      const dispCurr = localStorage.getItem('pt_display_currency');
+      if (dispCurr) this.displayCurrency.set(dispCurr);
+
       const lrt = localStorage.getItem('pt_last_refresh_time');
       if (lrt) this.lastRefreshTime.set(parseInt(lrt, 10));
 
       const lu = localStorage.getItem('pt_last_updated');
       if (lu) this.lastUpdated.set(parseInt(lu, 10));
+
+      const sims = localStorage.getItem('pt_simulated_transactions');
+      if (sims) this.simulatedTransactions.set(JSON.parse(sims));
+
+      const sma = localStorage.getItem('pt_simulation_mode_active');
+      if (sma) this.isSimulationModeActive.set(sma === 'true');
     } catch (e) {
       console.error('Failed to load portfolio tracker data from localStorage', e);
     }
@@ -628,9 +709,14 @@ export class PortfolioService {
       localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
     }
 
+    localStorage.setItem('pt_default_currency', this.defaultCurrency());
+    localStorage.setItem('pt_display_currency', this.displayCurrency());
+
     localStorage.setItem('pt_split_adjusted_sources', JSON.stringify(this.splitAdjustedSources()));
     localStorage.setItem('pt_cost_basis_method', this.costBasisMethod());
     localStorage.setItem('pt_disabled_sources', JSON.stringify(this.disabledSources()));
+    localStorage.setItem('pt_simulated_transactions', JSON.stringify(this.simulatedTransactions()));
+    localStorage.setItem('pt_simulation_mode_active', this.isSimulationModeActive().toString());
   }
 
   // Update a single transaction allocation and recalculate shares
@@ -916,7 +1002,7 @@ export class PortfolioService {
   }
 
   public allTickers = computed(() => {
-    const txs = this.transactions();
+    const txs = this.activeTransactions();
     const tickers = new Set<string>();
     txs.forEach((t) => {
       if (t.ticker) tickers.add(t.ticker.toUpperCase().trim());
@@ -1069,8 +1155,8 @@ export class PortfolioService {
   public portfolioB = computed(() => this.calculatePortfolioForOwner('B'));
 
   // Calculate portfolio details
-  private calculatePortfolioForOwner(owner: 'A' | 'B'): PersonPortfolioSummary {
-    const rawTxs = this.transactions();
+  public calculatePortfolioForOwner(owner: 'A' | 'B', customTxs?: Transaction[]): PersonPortfolioSummary {
+    const rawTxs = customTxs || this.activeTransactions();
     const from = this.dateFrom();
     const to = this.dateTo();
     // Read exchangeRates to register it as a reactive dependency —
@@ -1650,7 +1736,10 @@ export class PortfolioService {
   public getTickerCurrency(ticker: string): string {
     if (!ticker) return 'USD';
     const clean = ticker.replace(/\..*$/, '').toUpperCase().trim();
-    const tx = this.transactions().find(t => t.ticker === clean);
+    if (this.tickerConfigs()[clean]?.priceCurrency) {
+      return this.tickerConfigs()[clean].priceCurrency.toUpperCase();
+    }
+    const tx = this.activeTransactions().find(t => t.ticker === clean);
     return tx ? tx.currency : 'USD';
   }
 
@@ -2254,6 +2343,10 @@ export class PortfolioService {
       localStorage.setItem('pt_historical_prices', JSON.stringify(remoteData.historicalPrices));
     }
     if (remoteData.lastUpdated) this.lastUpdated.set(remoteData.lastUpdated);
+    if (remoteData.simulatedTransactions !== undefined) this.simulatedTransactions.set(remoteData.simulatedTransactions);
+    if (remoteData.isSimulationModeActive !== undefined) this.isSimulationModeActive.set(remoteData.isSimulationModeActive);
+    if (remoteData.defaultCurrency) this.defaultCurrency.set(remoteData.defaultCurrency);
+    if (remoteData.displayCurrency) this.displayCurrency.set(remoteData.displayCurrency);
   }
 
   private buildLocalData() {
@@ -2272,6 +2365,10 @@ export class PortfolioService {
       exchangeRates: this.exchangeRates(),
       useProperSectors: this.useProperSectors(),
       historicalPrices: this.historicalPrices(),
+      simulatedTransactions: this.simulatedTransactions(),
+      isSimulationModeActive: this.isSimulationModeActive(),
+      defaultCurrency: this.defaultCurrency(),
+      displayCurrency: this.displayCurrency(),
       lastUpdated: Date.now()
     };
   }
@@ -2578,6 +2675,14 @@ export class PortfolioService {
       'INR': '₹ INR'
     };
     return symbols[curr] || curr;
+  }
+
+  public getCurrencyTooltip(curr: string): string {
+    const c = curr.toUpperCase();
+    if (c === 'EUR') {
+      return 'EUR - Uses calendar year average exchange rate tax rule.';
+    }
+    return `${c} - Uses daily exchange rate on transaction date.`;
   }
 
   private async fetchWithProxy(targetUrl: string, cacheNoStore = false): Promise<Response> {

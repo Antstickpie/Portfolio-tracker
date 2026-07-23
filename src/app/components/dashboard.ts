@@ -39,7 +39,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   // Combined, ownerA, or ownerB
   public activeView = signal<'combined' | 'ownerA' | 'ownerB'>('combined');
-  public displayCurrency = signal<string>('native');
+  public displayCurrency = this.service.displayCurrency;
   public historyPeriod = signal<'all' | '1y' | '6m' | '3m' | '1m' | '1w'>('1m');
 
   // Hovered slice states (using Signals so calculated values updates are reactive)
@@ -163,9 +163,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public sortDirectionRealized = signal<'asc' | 'desc'>('desc');
   public unrealizedSortMode = signal<'value' | 'pct'>('value');
   public averageCostSortMode = signal<'value' | 'pct'>('value');
+  public currentPriceSortMode = signal<'value' | 'pct'>('value');
   public realizedSortMode = signal<'value' | 'pct'>('value');
   public totalReturnSortMode = signal<'value' | 'pct'>('value');
   public realizedLedgerSortMode = signal<'value' | 'pct'>('value');
+  public totalCostSortMode = signal<'value' | 'pct'>('value');
+  public currentValueSortMode = signal<'value' | 'pct'>('value');
   public allocationBasis = signal<'value' | 'cost'>('value');
   public currentYear = new Date().getFullYear();
   public isCollapsed = signal<boolean>(false);
@@ -175,7 +178,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   // Computed signal to calculate detailed realized gain events (chronologically correct avg cost, filtered by date)
   public realizedGains = computed(() => {
-    const rawTxs = this.service.transactions();
+    const rawTxs = this.service.activeTransactions();
     const from = this.service.dateFrom();
     const to = this.service.dateTo();
     const view = this.activeView();
@@ -218,7 +221,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const ticker = tx.ticker.toUpperCase().trim();
       if (!ticker) return;
 
-      const displayCurr = this.displayCurrency();
+      const displayCurr = this.service.displayCurrency();
       const targetCurrency = displayCurr === 'native'
         ? tx.currency.toUpperCase()
         : displayCurr.toUpperCase();
@@ -564,7 +567,29 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   public setSort(field: string) {
-    if (field === 'averageCost') {
+    if (field === 'currentPrice') {
+      if (this.sortBy() !== 'currentPrice') {
+        this.sortBy.set('currentPrice');
+        this.currentPriceSortMode.set('value');
+        this.sortDirection.set('desc');
+      } else {
+        if (this.currentPriceSortMode() === 'value') {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.currentPriceSortMode.set('pct');
+            this.sortDirection.set('desc');
+          }
+        } else {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.currentPriceSortMode.set('value');
+            this.sortDirection.set('desc');
+          }
+        }
+      }
+    } else if (field === 'averageCost') {
       if (this.sortBy() !== 'averageCost') {
         this.sortBy.set('averageCost');
         this.averageCostSortMode.set('value');
@@ -586,8 +611,51 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
           }
         }
       }
+    } else if (field === 'totalCost') {
+      if (this.sortBy() !== 'totalCost') {
+        this.sortBy.set('totalCost');
+        this.totalCostSortMode.set('value');
+        this.sortDirection.set('desc');
+      } else {
+        if (this.totalCostSortMode() === 'value') {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.totalCostSortMode.set('pct');
+            this.sortDirection.set('desc');
+          }
+        } else {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.totalCostSortMode.set('value');
+            this.sortDirection.set('desc');
+          }
+        }
+      }
+    } else if (field === 'currentValue') {
+      if (this.sortBy() !== 'currentValue') {
+        this.sortBy.set('currentValue');
+        this.currentValueSortMode.set('value');
+        this.sortDirection.set('desc');
+      } else {
+        if (this.currentValueSortMode() === 'value') {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.currentValueSortMode.set('pct');
+            this.sortDirection.set('desc');
+          }
+        } else {
+          if (this.sortDirection() === 'desc') {
+            this.sortDirection.set('asc');
+          } else {
+            this.currentValueSortMode.set('value');
+            this.sortDirection.set('desc');
+          }
+        }
+      }
     } else if (field === 'unrealizedProfit') {
-
       if (this.sortBy() !== 'unrealizedProfit') {
         this.sortBy.set('unrealizedProfit');
         this.unrealizedSortMode.set('value');
@@ -706,13 +774,25 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const field = this.sortBy();
     const dir = this.sortDirection();
     
+    const totalCostSum = list.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+    const totalValueSum = list.reduce((sum, p) => sum + (p.currentValue || 0), 0);
+    
     return [...list].sort((a: any, b: any) => {
       let valA = a[field];
       let valB = b[field];
 
-      if (field === 'averageCost' && this.averageCostSortMode() === 'pct') {
+      if (field === 'currentPrice' && this.currentPriceSortMode() === 'pct') {
         valA = a.unrealizedReturnPct || 0;
         valB = b.unrealizedReturnPct || 0;
+      } else if (field === 'averageCost' && this.averageCostSortMode() === 'pct') {
+        valA = a.unrealizedReturnPct || 0;
+        valB = b.unrealizedReturnPct || 0;
+      } else if (field === 'totalCost' && this.totalCostSortMode() === 'pct') {
+        valA = totalCostSum > 0 ? (a.totalCost / totalCostSum) * 100 : 0;
+        valB = totalCostSum > 0 ? (b.totalCost / totalCostSum) * 100 : 0;
+      } else if (field === 'currentValue' && this.currentValueSortMode() === 'pct') {
+        valA = totalValueSum > 0 ? (a.currentValue / totalValueSum) * 100 : 0;
+        valB = totalValueSum > 0 ? (b.currentValue / totalValueSum) * 100 : 0;
       } else if (field === 'unrealizedProfit' && this.unrealizedSortMode() === 'pct') {
         valA = a.unrealizedReturnPct || 0;
         valB = b.unrealizedReturnPct || 0;
@@ -863,10 +943,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const pos = s.positions.find(p => p.ticker === ticker);
     if (!pos) return null;
     
-    const displayCurr = this.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? (pos.currency || 'EUR') : displayCurr;
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? (pos.currency || this.service.defaultCurrency()) : displayCurr;
     const rate = this.service.getExchangeRate('USD', targetCurr);
-    const symbol = this.getCurrencySymbol(targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
     
     const isCost = this.allocationBasis() === 'cost';
     const rawVal = isCost ? pos.totalCost : pos.currentValue;
@@ -899,8 +979,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     
     const sectorName = data[idx].label;
     const s = this.summary();
-    const rate = this.displayCurrency() === 'USD' ? 1.0 : this.service.getExchangeRate('USD', 'EUR');
-    const symbol = this.displayCurrency() === 'USD' ? '$' : '€';
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
     
     const isCost = this.allocationBasis() === 'cost';
     return s.positions
@@ -925,10 +1007,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (savedView) {
       this.activeView.set(savedView as any);
     }
-    const savedCurrency = localStorage.getItem('pt_dash_display_currency');
-    if (savedCurrency) {
-      this.displayCurrency.set(savedCurrency);
-    }
     const savedPeriod = localStorage.getItem('pt_dash_history_period');
     if (savedPeriod) {
       this.historyPeriod.set(savedPeriod as any);
@@ -936,9 +1014,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       localStorage.setItem('pt_dash_active_view', this.activeView());
-    });
-    effect(() => {
-      localStorage.setItem('pt_dash_display_currency', this.displayCurrency());
     });
     effect(() => {
       localStorage.setItem('pt_dash_history_period', this.historyPeriod());
@@ -958,7 +1033,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     // Fetch historical prices only when period, transactions, date filters, or view changes
     effect(() => {
       this.historyPeriod();
-      this.service.transactions();
+      this.service.activeTransactions();
       this.activeView();
       this.service.dateFrom();
       this.service.dateTo();
@@ -979,6 +1054,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       this.service.historicalPrices(); // Redraw chart when cache updates
       this.service.disabledSources();
       this.service.theme(); // Redraw on theme change
+      this.isChartsCollapsed(); // Redraw when expanded
       
       // Wait a tick for DOM updates
       setTimeout(() => {
@@ -1152,9 +1228,9 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   public formatVal(val: number, fromCurrency: string = 'USD', decimals: number = 2, nativeCurrency?: string, forceSign: boolean = false): string {
-    const displayCurr = this.displayCurrency();
+    const displayCurr = this.service.displayCurrency();
     const targetCurr = displayCurr === 'native'
-      ? (nativeCurrency || 'EUR')
+      ? (nativeCurrency || this.service.defaultCurrency())
       : displayCurr;
     const rate = this.service.getExchangeRate(fromCurrency, targetCurr);
     const converted = val * rate;
@@ -1182,14 +1258,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   public getRowFxRate(fromCurrency: string, date?: string): number {
-    const displayCurr = this.displayCurrency();
+    const displayCurr = this.service.displayCurrency();
     const targetCurr = displayCurr === 'native' ? fromCurrency : displayCurr;
     return this.service.getExchangeRate(fromCurrency, targetCurr, date);
   }
 
   public formatValShort(val: number, fromCurrency: string = 'USD'): string {
-    const displayCurr = this.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
     const rate = this.service.getExchangeRate(fromCurrency, targetCurr);
     const converted = val * rate;
     const symbol = this.getCurrencySymbol(targetCurr);
@@ -1412,8 +1488,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       startAngle = endAngle;
     });
 
-    const displayCurr = this.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
     const symbol = this.getCurrencySymbol(targetCurr);
     const rate = this.service.getExchangeRate('USD', targetCurr);
     const isLightMode = this.service.theme() === 'light';
@@ -1523,7 +1599,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       else if (daysDiff <= 1825) range = '5y';
       else range = 'max';
 
-      const txs = this.service.transactions()
+      const txs = this.service.activeTransactions()
         .filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL')
         .filter(t => !this.service.disabledSources().includes(t.source || ''));
       const tickers = Array.from(new Set(txs.map(t => t.ticker.toUpperCase().trim()).filter(Boolean)));
@@ -1543,7 +1619,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const cache = this.service.historicalPrices();
     const activeView = this.activeView();
     const filterTkr = this.filterTicker().toUpperCase().trim();
-    let txs = [...this.service.transactions()];
+    let txs = [...this.service.activeTransactions()];
     txs = txs.filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL');
     txs = txs.filter(t => !this.service.disabledSources().includes(t.source || ''));
     if (filterTkr) {
@@ -1765,8 +1841,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       });
     }
 
-    const displayCurr = this.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
     const rateToTarget = this.service.getExchangeRate('USD', targetCurr);
 
     const finalPoints = allPoints.map(p => ({
@@ -1912,8 +1988,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const yTicksCount = 5;
     this.yTicks = [];
-    const displayCurr = this.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? 'EUR' : displayCurr;
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
     const symbol = this.getCurrencySymbol(targetCurr);
 
     for (let i = 0; i <= yTicksCount; i++) {
