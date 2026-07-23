@@ -363,6 +363,21 @@ export class PortfolioService {
       this.dateTo.set(`${yr}-12-31`);
     }
 
+    // Auto-refresh prices when tab returns to focus after long idle time (> 2 minutes)
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          const last = this.lastRefreshTime();
+          const now = Date.now();
+          if (!last || (now - last > 2 * 60 * 1000)) {
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+              this.loadMarketPricesApi(false, true);
+            }
+          }
+        }
+      });
+    }
+
     effect(() => {
       this.transactions();
       untracked(() => {
@@ -985,12 +1000,16 @@ export class PortfolioService {
   public markTickerNotFound(ticker: string) {
     const t = ticker.toUpperCase().trim();
     this.tickerConfigs.update((p) => {
-      const prev = p[t] || { ticker: t, currentPrice: 0, priceCurrency: 'USD', sector: 'Other', name: t };
+      const prev = p[t];
+      // If we already have a valid price for this ticker, NEVER overwrite it to 0 or mark it notFound!
+      if (prev && prev.currentPrice > 0) {
+        return p;
+      }
       return {
         ...p,
         [t]: {
-          ...prev,
-          currentPrice: 0,
+          ...(prev || { ticker: t, priceCurrency: 'USD', sector: 'Other', name: t }),
+          currentPrice: prev?.currentPrice || 0,
           notFound: true,
           notFoundTime: Date.now()
         }
@@ -1912,9 +1931,7 @@ export class PortfolioService {
             updatedCount++;
           }
         } catch (e) {
-          if (typeof window !== 'undefined' && window.navigator.onLine) {
-            this.markTickerNotFound(originalTicker);
-          }
+          // Network errors or tab wake-up glitches are not 404s — preserve existing prices
         }
       };
 
