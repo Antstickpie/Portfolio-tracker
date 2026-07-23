@@ -30,6 +30,18 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.chart-header-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: auto;
+}
+
+.chart-header-toggles .currency-toggle {
+  width: auto;
+  flex: 0 0 auto;
+}
+
 .currency-toggle {
   background: var(--button-group-bg);
   padding: 3px;

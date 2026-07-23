@@ -265,7 +265,16 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       } else {
         rateToTarget = this.service.getExchangeRate(tx.currency, targetCurrency, tx.date);
       }
-      const targetCost = costAllocated * rateToTarget;
+
+      let pureCostAllocated = costAllocated;
+      const ownerFraction = tx.quantity > 0 ? (sharesAllocated / tx.quantity) : 0;
+      const txFees = (tx.fees || 0) * ownerFraction;
+      if (tx.price && tx.price > 0 && sharesAllocated > 0) {
+        pureCostAllocated = sharesAllocated * tx.price;
+      } else if (txFees > 0 && costAllocated > txFees) {
+        pureCostAllocated = costAllocated - txFees;
+      }
+      const targetCost = pureCostAllocated * rateToTarget;
 
       if (tx.type.toUpperCase() === 'BUY') {
         if (sharesAllocated > 0) {

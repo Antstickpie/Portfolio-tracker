@@ -28,9 +28,7 @@ export class PortfolioService {
     const sims = this.simulatedTransactions();
     const convertedSims = sims.map(s => {
       const fees = this.calculateSimulatedFees(s);
-      const totalAmount = s.type === 'BUY'
-        ? (s.shares * s.price + fees)
-        : (s.shares * s.price - fees);
+      const totalAmount = s.shares * s.price; // Cost basis without fees
       
       const quantity = s.shares;
       let personAShares = 0;
@@ -1224,9 +1222,18 @@ export class PortfolioService {
         ? 1.0
         : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.getExchangeRate(tx.currency, 'USD', tx.date));
 
-      const baseCost = costAllocated * rateToUsd;
-
       const ownerFraction = totalShares > 0 ? (sharesAllocated / totalShares) : 0;
+      const txFees = (tx.fees || 0) * ownerFraction;
+
+      // Cost basis without considering transaction fees
+      let pureCostAllocated = costAllocated;
+      if (tx.price && tx.price > 0 && sharesAllocated > 0) {
+        pureCostAllocated = sharesAllocated * tx.price;
+      } else if (txFees > 0 && costAllocated > txFees) {
+        pureCostAllocated = costAllocated - txFees;
+      }
+
+      const baseCost = pureCostAllocated * rateToUsd;
       
       const txDateStr = tx.date ? tx.date.slice(0, 10) : '';
       const inDateRange = !from || txDateStr >= from;
