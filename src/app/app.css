@@ -14,15 +14,19 @@
   padding: 0.75rem 1rem !important;
   border-radius: 10px !important;
   gap: 0.45rem;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-/* Row 1: Logo (Left) and Live Status + Theme + Help (Right) — ALWAYS CONSISTENT */
+/* Row 1: Logo (Left) and Currency + Live Status + Theme + Help (Right) */
 .nav-row-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 0.5rem;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  gap: 0.5rem !important;
+  flex-wrap: nowrap !important;
 }
 
 .nav-logo {
@@ -58,10 +62,13 @@
 }
 
 .nav-top-right {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
 }
 
 .nav-sync {
@@ -185,13 +192,25 @@
   font-size: 0.82rem;
 }
 
+.nav-curr-toggle {
+  background: var(--button-group-bg);
+  border: 1px solid var(--card-border);
+  padding: 2px !important;
+  border-radius: 20px !important;
+  height: 30px !important;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center;
+}
+
 .currency-toggle {
   background: var(--button-group-bg);
-  padding: 3px;
-  border-radius: 10px;
+  padding: 2px;
+  border-radius: 20px;
   display: flex;
   border: 1px solid var(--card-border);
-  height: 32px; /* standard height for navbar controls */
+  height: 30px;
   box-sizing: border-box;
   flex-shrink: 0;
 }
@@ -201,11 +220,11 @@
   border: none;
   outline: none;
   color: var(--text-muted);
-  padding: 0 0.8rem;
-  border-radius: 8px;
+  padding: 0 0.65rem;
+  border-radius: 16px !important;
   font-family: var(--font-sans);
   font-weight: 500;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: var(--transition-smooth);
   height: 100%;
@@ -221,65 +240,110 @@
   color: var(--button-active-text);
 }
 
-/* --- RESPONSIVE MEDIA QUERIES --- */
+/* --- STREAMLINED 2-VIEW SYSTEM (Breakpoint at 870px) --- */
 
-/* On Desktop (> 950px): Horizontal row for Tabs + Currency */
-@media (min-width: 951px) {
+/* VIEW 1: Large Desktop (> 870px) */
+@media (min-width: 871px) {
+  .desktop-curr-toggle {
+    display: inline-flex !important;
+  }
+  .mobile-curr-toggle {
+    display: none !important;
+  }
   .nav-row-controls {
+    display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
   }
   .nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
     width: auto !important;
   }
-  .nav-curr-toggle {
+  .nav-tab-btn {
+    flex: 0 0 auto !important;
     width: auto !important;
+    padding: 0.35rem 0.75rem !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
   }
 }
 
-/* On Mobile/Tablet (<= 950px): Dedicated full-width stacked rows (Row 2 = Tabs, Row 3 = Currency) */
-@media (max-width: 950px) {
+/* VIEW 2: Mobile & Tablet (0px to 870px) */
+@media (max-width: 870px) {
+  .desktop-curr-toggle {
+    display: none !important;
+  }
   .nav-row-controls {
+    display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 0.35rem !important;
+    gap: 0.4rem !important;
     width: 100% !important;
   }
-
-  .nav-tabs {
-    width: 100% !important;
-    gap: 0.15rem !important;
+  .mobile-curr-toggle {
     display: flex !important;
-  }
-
-  .nav-tab-btn {
-    flex: 1 1 0px !important;
-    text-align: center !important;
-    justify-content: center !important;
-    padding: 0.35rem 0.15rem !important;
-    font-size: 0.72rem !important;
-  }
-
-  .nav-curr-toggle {
+    order: 1 !important;
     width: 100% !important;
     height: 30px !important;
-    display: flex !important;
+    margin: 0 !important;
   }
-
-  .nav-curr-toggle .currency-btn {
+  .mobile-curr-toggle .currency-btn {
     flex: 1 1 0px !important;
     text-align: center !important;
     justify-content: center !important;
-    font-size: 0.72rem !important;
+    font-size: 0.76rem !important;
+  }
+  .nav-tabs {
+    order: 2 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 0.2rem !important;
+    width: 100% !important;
+  }
+  .nav-tab-btn {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
   }
 }
 
-@media (max-width: 480px) {
-  .tab-icon {
-    display: none !important;
+/* Mobile Screens (< 520px): Keep top row on 1 line with crisp '▲ PORTFOLIO' logo & compact live badge */
+@media (max-width: 520px) {
+  .logo-text {
+    display: inline-block !important;
+    font-size: 0.88rem !important;
   }
   .logo-sub {
-    display: none !important;
+    display: none !important; /* Hide 'TRACKER' subword on mobile to save space */
+  }
+  .sync-label {
+    display: none !important; /* Hide 'Live: ' prefix, keep '● Just now ↺' badge compact */
+  }
+  .nav-tabs {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.25rem !important;
+    width: 100% !important;
+  }
+  .nav-tab-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 0.35rem 0.3rem !important;
+    font-size: 0.75rem !important;
   }
 }
+
+

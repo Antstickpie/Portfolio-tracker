@@ -143,7 +143,7 @@ input:checked + .slider:before {
   width: 100% !important;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 800px) {
   .charts-row {
     grid-template-columns: 1fr !important;
   }
@@ -373,7 +373,7 @@ input:checked + .slider:before {
 }
 
 /* Mobile-Friendly Overrides for Overlays */
-@media (max-width: 768px) {
+@media (max-width: 870px) {
   .sector-hover-overlay, .asset-hover-overlay {
     left: 50% !important;
     transform: translateX(-50%) !important;

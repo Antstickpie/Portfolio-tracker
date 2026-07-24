@@ -1095,6 +1095,19 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  openDatePicker(input: HTMLInputElement) {
+    try {
+      if (input && typeof (input as any).showPicker === 'function') {
+        (input as any).showPicker();
+      } else if (input) {
+        input.focus();
+        input.click();
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+
   ngOnDestroy() {
     this.stopAutoRefreshInterval();
     if (this.timeAgoIntervalId) {

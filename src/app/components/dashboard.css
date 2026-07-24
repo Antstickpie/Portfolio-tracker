@@ -56,6 +56,7 @@
 }
   
 .premium-date-input {
+  position: relative;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -75,7 +76,13 @@
 }
   
 .premium-date-input::-webkit-calendar-picker-indicator {
-  display: none !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .date-arrow {
@@ -144,10 +151,12 @@
   background: var(--button-group-bg);
   padding: 3px;
   border-radius: 10px;
-  display: flex;
+  display: flex !important;
+  align-items: center;
   border: 1px solid var(--card-border);
   height: 38px;
   box-sizing: border-box;
+  width: 100% !important;
 }
 
 .tab-btn {
@@ -155,23 +164,35 @@
   border: none;
   outline: none;
   color: var(--text-muted);
-  padding: 0 1.2rem;
+  padding: 0 0.5rem;
   border-radius: 8px;
   font-family: var(--font-sans);
   font-weight: 500;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   cursor: pointer;
   transition: var(--transition-smooth);
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  flex: 1 1 0px !important;
+  text-align: center;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .tab-btn.active {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: var(--button-active-text);
+  font-weight: 600;
+  box-shadow: none;
 }
+
+
 
 /* Glow Effects on cards */
 .glow-primary {
@@ -191,13 +212,20 @@
 .text-danger { color: var(--danger); }
 .text-accent { color: var(--primary); }
 
-/* Charts Layout */
+/* Charts Layout (Side-by-side on desktop > 800px, 1 pie per row on <= 800px) */
 .charts-row {
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   gap: 0.75rem !important;
   width: 100% !important;
   margin-bottom: 0;
+}
+
+@media (max-width: 870px) {
+  .charts-row {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
 }
 
 .chart-card-header {
@@ -505,32 +533,9 @@
   flex-wrap: nowrap;
 }
 
-/* --- RESPONSIVE MEDIA QUERIES (XS, S, M) --- */
+/* --- UNIFIED SINGLE BREAKPOINT SYSTEM (Breakpoint at 870px) --- */
 
-/* Medium (Tablets, max 1024px) */
-@media (max-width: 1024px) {
-  .dashboard-header {
-    gap: 1.2rem;
-  }
-  .header-right {
-    gap: 1rem;
-  }
-}
-
-.chart-header-toggles {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: auto;
-}
-
-.chart-header-toggles .currency-toggle {
-  width: auto;
-  flex: 0 0 auto;
-}
-
-/* Small (Mobile, max 768px) */
-@media (max-width: 768px) {
+@media (max-width: 870px) {
 
   .chart-header-toggles {
     width: 100%;
@@ -624,13 +629,13 @@
     width: 100%;
     gap: 0.35rem;
   }
-  .currency-toggle, .tabs-control {
+  .currency-toggle {
     width: 100%;
     height: 32px;
     display: flex;
     box-sizing: border-box;
   }
-  .currency-btn, .tab-btn {
+  .currency-btn {
     flex: 1 1 0px;
     width: 0;
     min-width: 0;
@@ -638,6 +643,22 @@
     justify-content: center;
     padding: 0 0.2rem;
     font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .tabs-control {
+    width: 100% !important;
+    height: 34px;
+    display: flex !important;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 3px;
+  }
+  .tab-btn {
+    flex: 1 1 0px !important;
+    text-align: center;
+    justify-content: center;
+    padding: 0 0.4rem;
+    font-size: 0.8rem;
     white-space: nowrap;
   }
   .chart-content {
@@ -661,33 +682,6 @@
   }
   .control-divider {
     display: none !important;
-  }
-}
-
-/* Extra Small (Mobile portrait, max 480px) */
-@media (max-width: 480px) {
-  .dashboard-header {
-    padding: 0.6rem !important;
-  }
-  .header-left h1 {
-    font-size: 1.2rem;
-  }
-  .premium-date-input {
-    font-size: 0.72rem;
-  }
-  .currency-btn, .tab-btn {
-    font-size: 0.7rem;
-    padding: 0 0.3rem;
-  }
-  .sector-hover-overlay, .asset-hover-overlay {
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    top: auto !important;
-    bottom: 12px !important;
-    width: 92% !important;
-    max-width: 320px !important;
-    box-shadow: var(--shadow-lg), 0 4px 20px rgba(0, 0, 0, 0.6) !important;
-    background: var(--card-bg) !important;
   }
 }
 

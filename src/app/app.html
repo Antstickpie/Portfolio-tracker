@@ -9,12 +9,29 @@
       </div>
 
       <div class="nav-top-right">
+        <!-- Currency Selector (Desktop > 870px: Shown next to Live status) -->
+        <div class="currency-toggle nav-curr-toggle desktop-curr-toggle">
+          <button 
+            class="currency-btn" 
+            *ngFor="let curr of service.visibleCurrencies()" 
+            [class.active]="service.displayCurrency() === curr" 
+            (click)="service.displayCurrency.set(curr); service.saveToStorage()"
+            [title]="'Convert portfolio to ' + curr">
+            {{ curr === 'EUR' ? '€ EUR' : (curr === 'USD' ? '$ USD' : curr) }}
+          </button>
+          <button 
+            class="currency-btn" 
+            [class.active]="service.displayCurrency() === 'native'" 
+            (click)="service.displayCurrency.set('native'); service.saveToStorage()"
+            title="Display original asset currencies">
+            ⇄ Native
+          </button>
+        </div>
+
         <!-- Live Prices Sync Status -->
         <div class="nav-sync">
           <span [style.color]="service.lastRefreshTime() ? 'var(--success)' : 'var(--text-muted)'" class="sync-dot">●</span>
-          <span class="sync-text">
-            Live: <span class="sync-time">{{ service.getSyncedTimeAgoText() }}</span>
-          </span>
+          <span class="sync-text"><span class="sync-label">Live: </span><span class="sync-time">{{ service.getSyncedTimeAgoText() }}</span></span>
           <button 
             (click)="forceSyncPrices()" 
             title="Force sync stock prices and FX rates"
@@ -60,8 +77,9 @@
       </div>
     </div>
 
-    <!-- Row 2: Nav Tabs + Currency Switcher Bar -->
+    <!-- Row 2: Nav Controls (Tabs on Left, Currency Selector on Right for <= 870px) -->
     <div class="nav-row-controls">
+      <!-- Nav Tabs (Left) -->
       <nav class="nav-tabs">
         <button 
           class="nav-tab-btn" 
@@ -89,20 +107,21 @@
         </button>
       </nav>
 
-      <div class="currency-toggle nav-curr-toggle">
+      <!-- Currency Selector (Mobile & Tablet <= 870px: Right side of Row 2) -->
+      <div class="currency-toggle nav-curr-toggle mobile-curr-toggle">
         <button 
           class="currency-btn" 
           *ngFor="let curr of service.visibleCurrencies()" 
           [class.active]="service.displayCurrency() === curr" 
           (click)="service.displayCurrency.set(curr); service.saveToStorage()"
-          [title]="'Show values in ' + curr">
+          [title]="'Convert portfolio to ' + curr">
           {{ curr === 'EUR' ? '€ EUR' : (curr === 'USD' ? '$ USD' : curr) }}
         </button>
         <button 
           class="currency-btn" 
           [class.active]="service.displayCurrency() === 'native'" 
           (click)="service.displayCurrency.set('native'); service.saveToStorage()"
-          title="Show each asset in its native currency">
+          title="Display original asset currencies">
           ⇄ Native
         </button>
       </div>
@@ -136,8 +155,8 @@
   </main>
 
   <!-- Global Footer -->
-  <footer class="app-footer">
-    <p>Portfolio Tracker &copy; 2026. Data stored locally in browser.</p>
+  <footer class="app-footer" style="text-align: center; width: 100%; padding: 1.5rem 0 2rem 0; color: var(--text-muted); font-size: 0.8rem;">
+    <p style="margin: 0; text-align: center;">Portfolio Tracker &copy; 2026. Data stored locally in browser.</p>
   </footer>
 </div>
 

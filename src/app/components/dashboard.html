@@ -15,6 +15,7 @@
             #dateFromInput
             [ngModel]="service.dateFrom()"
             (ngModelChange)="service.dateFrom.set($event || '')"
+            (click)="openDatePicker(dateFromInput)"
             class="premium-date-input"
             title="Start date">
           <span class="date-arrow">→</span>
@@ -23,6 +24,7 @@
             #dateToInput
             [ngModel]="service.dateTo()"
             (ngModelChange)="service.dateTo.set($event || '')"
+            (click)="openDatePicker(dateToInput)"
             class="premium-date-input"
             title="End date">
           <button
@@ -75,7 +77,7 @@
             class="tab-btn" 
             [class.active]="activeView() === 'combined'"
             (click)="activeView.set('combined')">
-            Consolidated Portfolio
+            Consolidated
           </button>
           <button 
             class="tab-btn" 

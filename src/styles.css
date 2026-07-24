@@ -462,20 +462,24 @@ th.center, td.center {
   border: 1px solid rgba(14, 165, 233, 0.2);
 }
 
-/* Key Metrics Grid */
+/* Key Metrics Grid - Flexbox layout that automatically fills 100% width on all screen sizes with zero empty space */
 .metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
   margin-bottom: 0.75rem;
+  width: 100%;
 }
 
 .metric-card {
-  padding: 0.65rem 0.85rem;
+  flex: 1 1 170px;
+  min-width: 160px;
+  padding: 0.65rem 0.75rem;
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* Shimmer sweep on hover */
@@ -540,11 +544,14 @@ th.center, td.center {
 }
 
 .metric-card .value {
-  font-size: 1.6rem;
+  font-size: clamp(1.05rem, 1.4vw, 1.5rem);
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: -0.04em;
   line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-card .sub-value {
@@ -770,144 +777,24 @@ th.center, td.center {
 
 .animate-spin {
   animation: spin 1s linear infinite;
-}
+}/* --- UNIFIED SINGLE BREAKPOINT (max-width: 870px) --- */
 
-/* --- RESPONSIVE MEDIA QUERIES (XS, S, M) --- */
-
-/* Medium (Tablets, max 1024px) */
-@media (max-width: 1024px) {
-  .container {
-    padding: 1.5rem;
-  }
-  .metrics-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-  }
-}
-
-/* Small (Mobile landscape, max 768px) */
-@media (max-width: 768px) {
-  .container {
-    padding: 1rem;
-  }
-  .metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.8rem;
-  }
-  .metrics-grid > :last-child {
-    grid-column: span 2;
-  }
-  .metric-card {
-    padding: 0.65rem 0.75rem;
-  }
-  .metric-card .value {
-    font-size: 1.4rem;
-  }
-  .table-container {
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* Extra Small (Mobile portrait, max 480px) */
-@media (max-width: 480px) {
+@media (max-width: 870px) {
   .container {
     padding: 0.75rem;
   }
   .metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
   }
-  .metrics-grid > :last-child {
-    grid-column: span 2;
-  }
   .metric-card {
-    padding: 0.75rem 0.6rem;
+    flex: 1 1 150px;
+    padding: 0.65rem 0.65rem;
   }
   .metric-card .value {
-    font-size: 1.15rem;
+    font-size: 1.2rem;
   }
-  .metric-card .label {
-    font-size: 0.65rem;
-  }
-  .metric-card .sub-value {
-    font-size: 0.6rem;
-  }
-}
-
-/* --- Global Navbar Layout & Responsive System --- */
-.app-navbar {
-  display: flex !important;
-  flex-direction: column !important;
-  padding: 0.75rem 1rem !important;
-  border-radius: 10px !important;
-  gap: 0.45rem !important;
-}
-
-.nav-row-top {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  width: 100% !important;
-  gap: 0.5rem !important;
-}
-
-.nav-row-controls {
-  display: flex !important;
-  width: 100% !important;
-  gap: 0.4rem !important;
-}
-
-/* Desktop (> 1000px): Tabs + Currency side by side */
-@media (min-width: 1001px) {
-  .nav-row-controls {
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-  }
-}
-
-/* Tablet & Mobile (<= 1000px): Dedicated full-width stacked rows (Row 2 = Tabs, Row 3 = Currency) */
-@media (max-width: 1000px) {
-  .nav-row-controls {
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  .nav-tabs {
-    width: 100% !important;
-    display: flex !important;
-    gap: 0.15rem !important;
-  }
-
-  .nav-tab-btn {
-    flex: 1 1 0px !important;
-    text-align: center !important;
-    justify-content: center !important;
-    padding: 0.35rem 0.15rem !important;
-    font-size: 0.72rem !important;
-    white-space: nowrap !important;
-  }
-
-  .nav-curr-toggle {
-    width: 100% !important;
-    height: 30px !important;
-    display: flex !important;
-  }
-
-  .nav-curr-toggle .currency-btn {
-    flex: 1 1 0px !important;
-    text-align: center !important;
-    justify-content: center !important;
-    font-size: 0.72rem !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .nav-tab-btn .tab-icon {
-    display: none !important;
-  }
-  .logo-sub {
-    display: none !important;
+  .table-container {
+    -webkit-overflow-scrolling: touch;
   }
 }
 
