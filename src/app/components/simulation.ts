@@ -334,6 +334,56 @@ export class SimulationComponent implements AfterViewInit {
     };
   }
 
+  // Pre-calculate baseline assets chart data (Before Simulation)
+  public baselineAssetChartData = computed(() => {
+    const s = this.realSummary();
+    const isCost = this.allocationBasis() === 'cost';
+    const total = isCost ? s.totalCostBasis : s.totalValue;
+    if (total === 0) return [];
+    
+    return s.positions
+      .filter(pos => (isCost ? pos.totalCost : pos.currentValue) > 0)
+      .map(pos => {
+        const val = isCost ? pos.totalCost : pos.currentValue;
+        return {
+          label: pos.ticker,
+          value: val,
+          pct: (val / total) * 100,
+        };
+      });
+  });
+
+  // Pre-calculate baseline sectors chart data (Before Simulation)
+  public baselineSectorChartData = computed(() => {
+    const s = this.realSummary();
+    const isCost = this.allocationBasis() === 'cost';
+    const total = isCost ? s.totalCostBasis : s.totalValue;
+    if (total === 0) return [];
+    
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
+    const sectorMap = {} as Record<string, number>;
+    s.positions.forEach(pos => {
+      const val = isCost ? pos.totalCost : pos.currentValue;
+      if (val > 0) {
+        const sec = pos.sector || 'Other';
+        sectorMap[sec] = (sectorMap[sec] || 0) + val;
+      }
+    });
+
+    return Object.entries(sectorMap)
+      .map(([label, value]) => ({
+        label,
+        value,
+        pct: (value / total) * 100,
+        totalFormatted: symbol + Math.round(value * rate).toLocaleString()
+      }))
+      .sort((a, b) => b.value - a.value);
+  });
+
   // Pre-calculate assets chart data
   public assetChartData = computed(() => {
     const s = this.simulatedSummary();
@@ -353,13 +403,18 @@ export class SimulationComponent implements AfterViewInit {
       });
   });
 
-  // Pre-calculate sectors chart data
+  // Pre-calculate sectors chart data with formatted totals
   public sectorChartData = computed(() => {
     const s = this.simulatedSummary();
     const isCost = this.allocationBasis() === 'cost';
     const total = isCost ? s.totalCostBasis : s.totalValue;
     if (total === 0) return [];
     
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
     const sectorMap = {} as Record<string, number>;
     s.positions.forEach(pos => {
       const val = isCost ? pos.totalCost : pos.currentValue;
@@ -373,44 +428,166 @@ export class SimulationComponent implements AfterViewInit {
       .map(([label, value]) => ({
         label,
         value,
-        pct: (value / total) * 100
+        pct: (value / total) * 100,
+        totalFormatted: symbol + Math.round(value * rate).toLocaleString()
       }))
       .sort((a, b) => b.value - a.value);
   });
 
-  // Compute details of the hovered asset stock
+  // Compute sector deltas (Before Simulation vs After Simulation)
+  public sectorDeltas = computed(() => {
+    const initialSummary = this.realSummary(); // Baseline (Before)
+    const simSummary = this.simulatedSummary(); // Simulated (After)
+    const isCost = this.allocationBasis() === 'cost';
+
+    const initialTotal = isCost ? initialSummary.totalCostBasis : initialSummary.totalValue;
+    const simTotal = isCost ? simSummary.totalCostBasis : simSummary.totalValue;
+
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
+    const initialMap = new Map<string, number>();
+    initialSummary.positions.forEach((p: PortfolioPosition) => {
+      const val = isCost ? p.totalCost : p.currentValue;
+      if (val > 0) {
+        const sec = p.sector || 'Other';
+        initialMap.set(sec, (initialMap.get(sec) || 0) + val);
+      }
+    });
+
+    const simMap = new Map<string, number>();
+    simSummary.positions.forEach((p: PortfolioPosition) => {
+      const val = isCost ? p.totalCost : p.currentValue;
+      if (val > 0) {
+        const sec = p.sector || 'Other';
+        simMap.set(sec, (simMap.get(sec) || 0) + val);
+      }
+    });
+
+    const allSectors = Array.from(new Set([...Array.from(initialMap.keys()), ...Array.from(simMap.keys())]));
+    
+    return allSectors.map(sec => {
+      const beforeVal = initialMap.get(sec) || 0;
+      const afterVal = simMap.get(sec) || 0;
+      
+      const beforePct = initialTotal > 0 ? (beforeVal / initialTotal) * 100 : 0;
+      const afterPct = simTotal > 0 ? (afterVal / simTotal) * 100 : 0;
+      
+      const deltaValUSD = afterVal - beforeVal;
+      const deltaPct = afterPct - beforePct;
+      
+      const sign = deltaValUSD > 0 ? '+' : (deltaValUSD < 0 ? '-' : '');
+      const absDeltaValUSD = Math.abs(deltaValUSD);
+      const deltaValueFormatted = (deltaValUSD === 0 ? '' : sign) + symbol + Math.round(absDeltaValUSD * rate).toLocaleString();
+
+      const pctSign = deltaPct > 0 ? '+' : (deltaPct < 0 ? '-' : '');
+      const deltaPctFormatted = (deltaPct === 0 ? '0.0%' : pctSign + Math.abs(deltaPct).toFixed(1) + '%');
+
+      return {
+        label: sec,
+        beforeValue: beforeVal,
+        beforePct,
+        beforeFormatted: symbol + Math.round(beforeVal * rate).toLocaleString(),
+        afterValue: afterVal,
+        afterPct,
+        afterFormatted: symbol + Math.round(afterVal * rate).toLocaleString(),
+        deltaValUSD,
+        deltaPct,
+        deltaValueFormatted,
+        deltaPctFormatted
+      };
+    }).sort((a, b) => b.afterValue - a.afterValue);
+  });
+
+  // Compute delta info for hovered sector
+  public hoveredSectorDelta = computed(() => {
+    const idx = this.hoveredSectorIndex();
+    const data = this.sectorChartData();
+    if (idx === -1 || !data[idx]) return null;
+    const sectorName = data[idx].label;
+    return this.sectorDeltas().find(d => d.label === sectorName) || null;
+  });
+
+  // Compute details of the hovered asset stock with Before vs After simulation delta
   public hoveredAssetDetail = computed(() => {
     const idx = this.hoveredAssetIndex();
     const data = this.assetChartData();
     if (idx === -1 || !data[idx]) return null;
     
     const ticker = data[idx].label;
-    const s = this.simulatedSummary();
-    const pos = s.positions.find(p => p.ticker === ticker);
-    if (!pos) return null;
     
+    const realSum = this.realSummary();
+    const simSum = this.simulatedSummary();
+
+    const realPos = realSum.positions.find(p => p.ticker === ticker);
+    const simPos = simSum.positions.find(p => p.ticker === ticker);
+
+    const isCost = this.allocationBasis() === 'cost';
     const displayCurr = this.service.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? (pos.currency || this.service.defaultCurrency()) : displayCurr;
+    const posForCurr = simPos || realPos;
+    if (!posForCurr) return null;
+
+    const targetCurr = displayCurr === 'native' ? (posForCurr.currency || this.service.defaultCurrency()) : displayCurr;
     const rate = this.service.getExchangeRate('USD', targetCurr);
     const symbol = this.service.getCurrencySymbol(targetCurr);
-    
-    const isCost = this.allocationBasis() === 'cost';
-    const rawVal = isCost ? pos.totalCost : pos.currentValue;
+
+    const realTotal = isCost ? realSum.totalCostBasis : realSum.totalValue;
+    const simTotal = isCost ? simSum.totalCostBasis : simSum.totalValue;
+
+    const beforeValUSD = realPos ? (isCost ? realPos.totalCost : realPos.currentValue) : 0;
+    const afterValUSD = simPos ? (isCost ? simPos.totalCost : simPos.currentValue) : 0;
+
+    const beforePct = realTotal > 0 ? (beforeValUSD / realTotal) * 100 : 0;
+    const afterPct = simTotal > 0 ? (afterValUSD / simTotal) * 100 : 0;
+
+    const beforeShares = realPos ? realPos.totalShares : 0;
+    const afterShares = simPos ? simPos.totalShares : 0;
+
+    const deltaValUSD = afterValUSD - beforeValUSD;
+    const deltaPct = afterPct - beforePct;
+    const deltaShares = afterShares - beforeShares;
+
+    const sign = deltaValUSD > 0 ? '+' : (deltaValUSD < 0 ? '-' : '');
+    const absDeltaValUSD = Math.abs(deltaValUSD);
+    const deltaValueFormatted = (deltaValUSD === 0 ? '' : sign) + symbol + Math.round(absDeltaValUSD * rate).toLocaleString();
+
+    const pctSign = deltaPct > 0 ? '+' : (deltaPct < 0 ? '-' : '');
+    const deltaPctFormatted = (deltaPct === 0 ? '0.0%' : pctSign + Math.abs(deltaPct).toFixed(1) + '%');
+
+    const sharesSign = deltaShares > 0 ? '+' : (deltaShares < 0 ? '-' : '');
+    const deltaSharesFormatted = (deltaShares === 0 ? '0' : sharesSign + Math.abs(deltaShares).toLocaleString(undefined, { maximumFractionDigits: 4 }));
+
+    const currentPrice = posForCurr.currentPrice;
 
     return {
-      ticker: pos.ticker,
-      name: pos.name,
-      sector: pos.sector || 'Other',
-      pct: data[idx].pct,
-      priceFormatted: symbol + (pos.currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
-      valueFormatted: symbol + Math.round(rawVal * rate).toLocaleString(),
-      shares: pos.totalShares,
-      avgCostFormatted: symbol + (pos.averageCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
-      purchaseValueFormatted: symbol + Math.round(pos.totalShares * pos.averageCost * rate).toLocaleString()
+      ticker: posForCurr.ticker,
+      name: posForCurr.name,
+      sector: posForCurr.sector || 'Other',
+      priceFormatted: symbol + (currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      
+      // Before / Baseline values
+      beforeValFormatted: symbol + Math.round(beforeValUSD * rate).toLocaleString(),
+      beforePct,
+      beforeShares,
+      
+      // After / Simulated values
+      afterValFormatted: symbol + Math.round(afterValUSD * rate).toLocaleString(),
+      afterPct,
+      afterShares,
+
+      // Delta
+      deltaValUSD,
+      deltaPct,
+      deltaShares,
+      deltaValueFormatted,
+      deltaPctFormatted,
+      deltaSharesFormatted
     };
   });
 
-  // Compute stocks belonging to the hovered sector
+  // Compute stocks belonging to the hovered sector with native currency support
   public hoveredSectorStocks = computed(() => {
     const idx = this.hoveredSectorIndex();
     const data = this.sectorChartData();
@@ -419,19 +596,20 @@ export class SimulationComponent implements AfterViewInit {
     const sectorName = data[idx].label;
     const s = this.simulatedSummary();
     const displayCurr = this.service.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
-    const rate = this.service.getExchangeRate('USD', targetCurr);
-    const symbol = this.service.getCurrencySymbol(targetCurr);
-    
     const isCost = this.allocationBasis() === 'cost';
+    
     return s.positions
       .filter(p => (p.sector || 'Other') === sectorName && (isCost ? p.totalCost : p.currentValue) > 0)
       .map(p => {
-        const val = isCost ? p.totalCost : p.currentValue;
+        const valUSD = isCost ? p.totalCost : p.currentValue;
+        const targetCurr = displayCurr === 'native' ? (p.currency || this.service.defaultCurrency()) : displayCurr;
+        const rate = this.service.getExchangeRate('USD', targetCurr);
+        const symbol = this.service.getCurrencySymbol(targetCurr);
+
         return {
           ticker: p.ticker,
-          pct: (val / data[idx].value) * 100,
-          valueFormatted: symbol + Math.round(val * rate).toLocaleString()
+          pct: (valUSD / data[idx].value) * 100,
+          valueFormatted: symbol + Math.round(valUSD * rate).toLocaleString()
         };
       })
       .sort((a, b) => b.pct - a.pct);
@@ -500,15 +678,16 @@ export class SimulationComponent implements AfterViewInit {
     }, 100);
   }
 
-  // HTML5 Canvas Donut Chart rendering
+  // HTML5 Canvas Donut Chart rendering (Dual-Ring Ghost Pie: Inner = Baseline, Outer = Simulated)
   private drawCharts() {
-    this.drawDonutChart(this.assetCanvas, this.assetChartData(), 'Assets');
-    this.drawDonutChart(this.sectorCanvas, this.sectorChartData(), 'Sectors');
+    this.drawDonutChart(this.assetCanvas, this.assetChartData(), this.baselineAssetChartData(), 'Assets');
+    this.drawDonutChart(this.sectorCanvas, this.sectorChartData(), this.baselineSectorChartData(), 'Sectors');
   }
 
   private drawDonutChart(
     canvasRef: ElementRef<HTMLCanvasElement> | undefined,
     data: { label: string; value: number; pct: number }[],
+    baselineData: { label: string; value: number; pct: number }[],
     centerText: string
   ) {
     if (!canvasRef) return;
@@ -534,7 +713,7 @@ export class SimulationComponent implements AfterViewInit {
     const radius = Math.min(cx, cy) - 52;
     const innerRadius = radius * 0.48;
 
-    if (data.length === 0) {
+    if (data.length === 0 && baselineData.length === 0) {
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
@@ -549,23 +728,58 @@ export class SimulationComponent implements AfterViewInit {
       return;
     }
 
-    let startAngle = -0.5 * Math.PI;
     const hoveredIdx = centerText === 'Assets' ? this.hoveredAssetIndex() : this.hoveredSectorIndex();
     const usedYRight: number[] = [];
     const usedYLeft: number[] = [];
     const isLight = this.service.theme() === 'light';
 
+    // 1. Draw Inner Ring: Ghost Baseline (Before Simulation Trades)
+    if (baselineData.length > 0) {
+      let startAngleBase = -0.5 * Math.PI;
+      const innerOuterR = radius - 14;
+      const innerInnerR = innerRadius - 2;
+      const strokeWidthBase = innerOuterR - innerInnerR;
+
+      baselineData.forEach((item, index) => {
+        const sliceAngle = (item.pct / 100) * 2 * Math.PI;
+        const endAngle = startAngleBase + sliceAngle;
+        const isHovered = (index === hoveredIdx);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, (innerOuterR + innerInnerR) / 2, startAngleBase, endAngle);
+        ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
+        ctx.globalAlpha = isHovered ? 0.75 : 0.35; // Ghost opacity
+        ctx.lineWidth = strokeWidthBase;
+        ctx.stroke();
+        ctx.restore();
+
+        startAngleBase = endAngle;
+      });
+    }
+
+    // 2. Draw Outer Ring: Active Simulated (After Simulation Trades)
+    let startAngle = -0.5 * Math.PI;
+    const outerR = radius;
+    const outerInnerR = radius - 11;
+    const strokeWidthOuter = outerR - outerInnerR;
+
     data.forEach((item, index) => {
       const sliceAngle = (item.pct / 100) * 2 * Math.PI;
       const endAngle = startAngle + sliceAngle;
       const isHovered = (index === hoveredIdx);
-      const strokeWidth = radius - innerRadius;
 
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, (radius + innerRadius) / 2, startAngle, endAngle);
+      ctx.arc(cx, cy, (outerR + outerInnerR) / 2, startAngle, endAngle);
       ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
-      ctx.lineWidth = isHovered ? strokeWidth + 4 : strokeWidth;
+      ctx.lineWidth = isHovered ? strokeWidthOuter + 4 : strokeWidthOuter;
+      if (isHovered) {
+        ctx.shadowColor = this.getColor(centerText === 'Assets' ? index : index + 5);
+        ctx.shadowBlur = 10;
+      }
       ctx.stroke();
+      ctx.restore();
 
       // Draw label
       const labelText = `${item.label} ${item.pct.toFixed(1)}%`;

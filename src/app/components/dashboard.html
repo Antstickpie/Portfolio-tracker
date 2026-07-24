@@ -461,9 +461,15 @@
 
         <!-- Beautiful glassmorphic overlay for sector stocks breakdown on hover -->
         <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredSectorIndex() !== -1 && hoveredSectorStocks().length > 0">
-          <div class="overlay-header">
-            <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
-            <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
+          <div class="overlay-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span class="overlay-dot" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
+              <span class="overlay-title">{{ sectorChartData()[hoveredSectorIndex()].label }}</span>
+            </div>
+            <div style="font-weight: 600; font-size: 0.82rem; color: var(--text-main); white-space: nowrap; margin-left: 0.5rem;">
+              {{ sectorChartData()[hoveredSectorIndex()].totalFormatted }}
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 0.2rem;">({{ sectorChartData()[hoveredSectorIndex()].pct | number:'1.0-1' }}%)</span>
+            </div>
           </div>
           <div class="overlay-list">
             <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">

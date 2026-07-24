@@ -913,12 +913,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       });
   });
 
-  // Pre-calculate sectors chart data
+  // Pre-calculate sectors chart data with formatted totals
   public sectorChartData = computed(() => {
     const s = this.summary();
     const isCost = this.allocationBasis() === 'cost';
     const total = isCost ? s.totalCostBasis : s.totalValue;
     if (total === 0) return [];
+
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
 
     const sectorsMap = new Map<string, number>();
     s.positions.forEach((pos: PortfolioPosition) => {
@@ -928,12 +933,13 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       sectorsMap.set(sec, (sectorsMap.get(sec) || 0) + val);
     });
 
-    const sectors: { label: string; value: number; pct: number }[] = [];
+    const sectors: { label: string; value: number; pct: number; totalFormatted: string }[] = [];
     sectorsMap.forEach((val, key) => {
       sectors.push({
         label: key,
         value: val,
         pct: (val / total) * 100,
+        totalFormatted: symbol + Math.round(val * rate).toLocaleString()
       });
     });
 
@@ -980,7 +986,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // Compute stocks belonging to the hovered sector
+  // Compute stocks belonging to the hovered sector with native currency support
   public hoveredSectorStocks = computed(() => {
     const idx = this.hoveredSectorIndex();
     const data = this.sectorChartData();
@@ -989,19 +995,20 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const sectorName = data[idx].label;
     const s = this.summary();
     const displayCurr = this.service.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
-    const rate = this.service.getExchangeRate('USD', targetCurr);
-    const symbol = this.service.getCurrencySymbol(targetCurr);
-    
     const isCost = this.allocationBasis() === 'cost';
+    
     return s.positions
       .filter(p => (p.sector || 'Other') === sectorName && (isCost ? p.totalCost : p.currentValue) > 0)
       .map(p => {
-        const val = isCost ? p.totalCost : p.currentValue;
+        const valUSD = isCost ? p.totalCost : p.currentValue;
+        const targetCurr = displayCurr === 'native' ? (p.currency || this.service.defaultCurrency()) : displayCurr;
+        const rate = this.service.getExchangeRate('USD', targetCurr);
+        const symbol = this.service.getCurrencySymbol(targetCurr);
+
         return {
           ticker: p.ticker,
-          pct: (val / data[idx].value) * 100,
-          valueFormatted: symbol + Math.round(val * rate).toLocaleString()
+          pct: (valUSD / data[idx].value) * 100,
+          valueFormatted: symbol + Math.round(valUSD * rate).toLocaleString()
         };
       })
       .sort((a, b) => b.pct - a.pct);
