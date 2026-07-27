@@ -152,6 +152,17 @@ export class PricesComponent {
     this.service.showToast('Settings saved successfully!', 'success');
   }
 
+  public async clearAllLedger() {
+    const ok = await this.service.showConfirm(
+      'Clear All Ledger Data',
+      'WARNING: Are you sure you want to delete ALL transactions in the ledger? This action is irreversible.'
+    );
+    if (ok) {
+      this.service.clearAllData();
+      this.service.showToast('All transactions cleared successfully.', 'info');
+    }
+  }
+
   // Backup to JSON file
   public exportPortfolioBackup() {
     const cachedSplits = localStorage.getItem('pt_splits_cache');
