@@ -33,7 +33,7 @@ export class ImportComponent {
 
   // Default owner for transactions batch
   public defaultOwner = 'ownerA';
-  public accountName = 'Account 1';
+  public accountName = '';
 
   // Custom Combobox Dropdown State
   public isAccountDropdownOpen = signal(false);
@@ -41,9 +41,19 @@ export class ImportComponent {
   // Existing accounts list strictly from current portfolio transactions
   public existingAccounts = computed(() => {
     const fromTxs = this.service.transactions()
-      .map(t => (t.source || '').trim())
+      .map(t => (t.source || 'Manual Entries').trim())
       .filter(Boolean);
-    return Array.from(new Set<string>(fromTxs)).sort();
+    const list = Array.from(new Set<string>(fromTxs)).sort();
+    
+    // Auto-initialize accountName to first existing account if currently empty or default
+    if (list.length > 0 && (!this.accountName || this.accountName === 'Account 1')) {
+      setTimeout(() => {
+        if (!this.accountName || this.accountName === 'Account 1') {
+          this.accountName = list[0];
+        }
+      });
+    }
+    return list;
   });
 
   public filteredAccounts = computed(() => {
@@ -51,9 +61,10 @@ export class ImportComponent {
     const query = (this.accountName || '').toLowerCase().trim();
     if (!query) return all;
     
-    // If current value is an exact match of an existing account, show all accounts for easy switching
+    // If current value matches an existing account, or doesn't match any filter partial, show all existing accounts
     const exactMatch = all.find(acc => acc.toLowerCase() === query);
-    if (exactMatch) return all;
+    const hasMatches = all.some(acc => acc.toLowerCase().includes(query));
+    if (exactMatch || !hasMatches) return all;
 
     return all.filter(acc => acc.toLowerCase().includes(query));
   });
