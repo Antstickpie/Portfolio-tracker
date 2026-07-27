@@ -38,23 +38,25 @@ export class ImportComponent {
   // Custom Combobox Dropdown State
   public isAccountDropdownOpen = signal(false);
 
-  // Existing accounts list from current transactions
+  // Existing accounts list from current transactions + default suggestions
   public existingAccounts = computed(() => {
     const fromTxs = this.service.transactions()
       .map(t => (t.source || '').trim())
       .filter(Boolean);
-    const set = new Set<string>(fromTxs);
-    if (set.size === 0) {
-      set.add('Account 1');
-      set.add('Account 2');
-    }
+    const defaults = ['Account 1', 'Account 2', 'Revolut', 'Trading212', 'Interactive Brokers', 'Robinhood'];
+    const set = new Set<string>([...fromTxs, ...defaults]);
     return Array.from(set).sort();
   });
 
   public filteredAccounts = computed(() => {
-    const query = (this.accountName || '').toLowerCase().trim();
     const all = this.existingAccounts();
+    const query = (this.accountName || '').toLowerCase().trim();
     if (!query) return all;
+    
+    // If current value is an exact match of an existing account, show all accounts for easy switching
+    const exactMatch = all.find(acc => acc.toLowerCase() === query);
+    if (exactMatch) return all;
+
     return all.filter(acc => acc.toLowerCase().includes(query));
   });
 
