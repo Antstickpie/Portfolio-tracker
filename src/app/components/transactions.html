@@ -339,7 +339,7 @@
                     <div class="drawer-title" style="margin-bottom: 0.8rem;">
                       <h4>Configure Ownership Splits</h4>
                       <span class="tx-subtitle">
-                        {{ tx.type }} {{ tx.quantity > 0 ? (tx.quantity + ' shares of ' + tx.ticker) : '' }} on {{ tx.date | date:service.dateFormat() }}. Total: {{ tx.totalAmount | currency:tx.currency }}
+                        {{ tx.type }} <ng-container *ngIf="tx.quantity > 0">{{ tx.quantity }} shares of {{ tx.ticker }} </ng-container>on {{ tx.date | date:service.dateFormat() }}. Total: {{ tx.totalAmount | currency:tx.currency }}
                       </span>
                     </div>
 
