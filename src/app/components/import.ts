@@ -38,14 +38,12 @@ export class ImportComponent {
   // Custom Combobox Dropdown State
   public isAccountDropdownOpen = signal(false);
 
-  // Existing accounts list from current transactions + default suggestions
+  // Existing accounts list strictly from current portfolio transactions
   public existingAccounts = computed(() => {
     const fromTxs = this.service.transactions()
       .map(t => (t.source || '').trim())
       .filter(Boolean);
-    const defaults = ['Account 1', 'Account 2', 'Revolut', 'Trading212', 'Interactive Brokers', 'Robinhood'];
-    const set = new Set<string>([...fromTxs, ...defaults]);
-    return Array.from(set).sort();
+    return Array.from(new Set<string>(fromTxs)).sort();
   });
 
   public filteredAccounts = computed(() => {
