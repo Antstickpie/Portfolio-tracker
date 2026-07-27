@@ -23,6 +23,10 @@
   color: var(--primary);
 }
 
+.account-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .input-card h3:not(:first-child) {
   margin-top: 1.5rem;
 }

@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 })
 export class ImportComponent {
   public service = inject(PortfolioService);
+  private elementRef = inject(ElementRef);
 
   // Form State
   public rawText = '';
@@ -34,6 +35,9 @@ export class ImportComponent {
   public defaultOwner = 'ownerA';
   public accountName = 'Account 1';
 
+  // Custom Combobox Dropdown State
+  public isAccountDropdownOpen = signal(false);
+
   // Existing accounts list from current transactions
   public existingAccounts = computed(() => {
     const fromTxs = this.service.transactions()
@@ -47,11 +51,28 @@ export class ImportComponent {
     return Array.from(set).sort();
   });
 
-  public onSelectExistingAccount(event: Event) {
-    const val = (event.target as HTMLSelectElement).value;
-    if (val) {
-      this.accountName = val;
-      (event.target as HTMLSelectElement).value = '';
+  public filteredAccounts = computed(() => {
+    const query = (this.accountName || '').toLowerCase().trim();
+    const all = this.existingAccounts();
+    if (!query) return all;
+    return all.filter(acc => acc.toLowerCase().includes(query));
+  });
+
+  public selectAccount(name: string, event?: Event) {
+    if (event) event.stopPropagation();
+    this.accountName = name;
+    this.isAccountDropdownOpen.set(false);
+  }
+
+  public toggleAccountDropdown(event: Event) {
+    event.stopPropagation();
+    this.isAccountDropdownOpen.update(v => !v);
+  }
+
+  @HostListener('document:click', ['$event'])
+  public onDocumentClick(event: MouseEvent) {
+    if (this.elementRef && !this.elementRef.nativeElement.contains(event.target)) {
+      this.isAccountDropdownOpen.set(false);
     }
   }
 
