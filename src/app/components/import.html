@@ -55,11 +55,33 @@
       </div>
 
       <div class="import-form-group">
-        <label>Account / Ledger Batch Name</label>
-        <input 
-          type="text" 
-          [(ngModel)]="accountName" 
-          placeholder="e.g. Account 1, Revolut, Trading212">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+          <label style="margin-bottom: 0;">Account / Ledger Batch Name</label>
+          <span style="font-size: 0.72rem; color: var(--text-muted);" *ngIf="existingAccounts().length > 0">
+            Select existing or type new
+          </span>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input 
+            type="text" 
+            [(ngModel)]="accountName" 
+            list="existingAccountsList"
+            placeholder="e.g. Account 1, Revolut, Trading212"
+            style="flex: 1;">
+          
+          <select 
+            *ngIf="existingAccounts().length > 0"
+            (change)="onSelectExistingAccount($event)" 
+            style="width: 160px; padding: 0.55rem 0.6rem; font-size: 0.8rem; background: var(--button-group-bg); border: 1px solid var(--card-border); color: var(--text-main); border-radius: 6px; cursor: pointer;">
+            <option value="" disabled selected>Existing accounts...</option>
+            <option *ngFor="let acc of existingAccounts()" [value]="acc">{{ acc }}</option>
+          </select>
+        </div>
+        
+        <datalist id="existingAccountsList">
+          <option *ngFor="let acc of existingAccounts()" [value]="acc"></option>
+        </datalist>
+        <p class="field-hint">Pick an existing account from the dropdown or type a custom name for this import batch.</p>
       </div>
 
       <h3>2. Paste or Upload Broker File</h3>

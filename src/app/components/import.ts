@@ -34,6 +34,27 @@ export class ImportComponent {
   public defaultOwner = 'ownerA';
   public accountName = 'Account 1';
 
+  // Existing accounts list from current transactions
+  public existingAccounts = computed(() => {
+    const fromTxs = this.service.transactions()
+      .map(t => (t.source || '').trim())
+      .filter(Boolean);
+    const set = new Set<string>(fromTxs);
+    if (set.size === 0) {
+      set.add('Account 1');
+      set.add('Account 2');
+    }
+    return Array.from(set).sort();
+  });
+
+  public onSelectExistingAccount(event: Event) {
+    const val = (event.target as HTMLSelectElement).value;
+    if (val) {
+      this.accountName = val;
+      (event.target as HTMLSelectElement).value = '';
+    }
+  }
+
   // Parser output
   public parsedLines = signal<string[][]>([]);
   public isPreviewCollapsed = signal(false);
