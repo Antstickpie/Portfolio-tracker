@@ -246,17 +246,17 @@
                     <div style="display: flex; gap: 0.5rem;">
                       <button 
                         class="btn btn-sm" 
-                        [class.btn-primary]="activeDrawerTab()[tx.id] !== 'ownership'" 
-                        [class.btn-secondary]="activeDrawerTab()[tx.id] === 'ownership'"
-                        (click)="setDrawerTab(tx.id, 'edit')">
-                        ✏️ Edit Entry Details
+                        [class.btn-primary]="activeDrawerTab()[tx.id] !== 'edit'" 
+                        [class.btn-secondary]="activeDrawerTab()[tx.id] === 'edit'"
+                        (click)="setDrawerTab(tx.id, 'ownership')">
+                        👥 Ownership Split
                       </button>
                       <button 
                         class="btn btn-sm" 
-                        [class.btn-primary]="activeDrawerTab()[tx.id] === 'ownership'" 
-                        [class.btn-secondary]="activeDrawerTab()[tx.id] !== 'ownership'"
-                        (click)="setDrawerTab(tx.id, 'ownership')">
-                        👥 Ownership Split
+                        [class.btn-primary]="activeDrawerTab()[tx.id] === 'edit'" 
+                        [class.btn-secondary]="activeDrawerTab()[tx.id] !== 'edit'"
+                        (click)="setDrawerTab(tx.id, 'edit')">
+                        ✏️ Edit Entry Details
                       </button>
                     </div>
 
@@ -270,7 +270,7 @@
                   </div>
 
                   <!-- Tab 1: Edit Entry Details Form -->
-                  <div *ngIf="activeDrawerTab()[tx.id] !== 'ownership'" class="animate-fade-in">
+                  <div *ngIf="activeDrawerTab()[tx.id] === 'edit'" class="animate-fade-in">
                     <div *ngIf="getEditingTx(tx) as edit" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem; background: rgba(255,255,255,0.015); border: 1px solid var(--card-border); padding: 1rem; border-radius: 10px;">
                       
                       <div style="display: flex; flex-direction: column; gap: 0.3rem;">
@@ -327,15 +327,15 @@
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; margin-top: 0.8rem; gap: 0.5rem;">
-                      <button class="btn btn-secondary btn-sm" (click)="toggleExpand(tx.id)">Cancel</button>
+                      <button class="btn btn-secondary btn-sm" (click)="setDrawerTab(tx.id, 'ownership')">Cancel</button>
                       <button class="btn btn-primary btn-sm" (click)="saveEditedTransaction(tx)" style="padding: 0.45rem 1.2rem; font-weight: 600;">
                         💾 Save Changes
                       </button>
                     </div>
                   </div>
 
-                  <!-- Tab 2: Ownership Allocation Split -->
-                  <div *ngIf="activeDrawerTab()[tx.id] === 'ownership'" class="animate-fade-in">
+                  <!-- Tab 2: Ownership Allocation Split (Default view) -->
+                  <div *ngIf="activeDrawerTab()[tx.id] !== 'edit'" class="animate-fade-in">
                     <div class="drawer-title" style="margin-bottom: 0.8rem;">
                       <h4>Configure Ownership Splits</h4>
                       <span class="tx-subtitle">

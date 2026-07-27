@@ -233,22 +233,23 @@ export class TransactionsComponent {
     }
   }
 
-  // Drawer Tab & Editing State
+  // Drawer Tab & Editing State ('ownership' is default)
   public editingTxMap = signal<Record<string, Transaction>>({});
-  public activeDrawerTab = signal<Record<string, 'edit' | 'ownership'>>({});
+  public activeDrawerTab = signal<Record<string, 'ownership' | 'edit'>>({});
 
-  public setDrawerTab(txId: string, tab: 'edit' | 'ownership') {
+  public setDrawerTab(txId: string, tab: 'ownership' | 'edit') {
+    if (tab === 'edit' && !this.editingTxMap()[txId]) {
+      const tx = this.service.transactions().find(t => t.id === txId);
+      if (tx) {
+        const copy = JSON.parse(JSON.stringify(tx));
+        this.editingTxMap.update(prev => ({ ...prev, [txId]: copy }));
+      }
+    }
     this.activeDrawerTab.update(prev => ({ ...prev, [txId]: tab }));
   }
 
   public getEditingTx(tx: Transaction): Transaction {
-    const current = this.editingTxMap()[tx.id];
-    if (!current) {
-      const copy = JSON.parse(JSON.stringify(tx));
-      this.editingTxMap.update(prev => ({ ...prev, [tx.id]: copy }));
-      return copy;
-    }
-    return current;
+    return this.editingTxMap()[tx.id] || tx;
   }
 
   public onEditQuantityPriceChange(txId: string) {
@@ -314,6 +315,15 @@ export class TransactionsComponent {
       this.expandedTxId.set(null);
     } else {
       this.expandedTxId.set(txId);
+      // Pre-initialize drawer state on expand (defaults to 'ownership')
+      if (!this.activeDrawerTab()[txId]) {
+        this.activeDrawerTab.update(prev => ({ ...prev, [txId]: 'ownership' }));
+      }
+      const tx = this.service.transactions().find(t => t.id === txId);
+      if (tx && !this.editingTxMap()[txId]) {
+        const copy = JSON.parse(JSON.stringify(tx));
+        this.editingTxMap.update(prev => ({ ...prev, [txId]: copy }));
+      }
     }
   }
 
