@@ -240,99 +240,188 @@
             <tr *ngIf="expandedTxId() === tx.id" class="drawer-row" (click)="$event.stopPropagation()">
               <td [attr.colspan]="service.showNameTransactions() ? 11 : 10">
                 <div class="drawer-content animate-fade-in">
-                  <div class="drawer-title">
-                    <h4>Configure Ownership Splits</h4>
-                    <span class="tx-subtitle">
-                      {{ tx.type }} {{ tx.quantity > 0 ? (tx.quantity + ' shares of ' + tx.ticker) : '' }} on {{ tx.date | date:service.dateFormat() }}. Total: {{ tx.totalAmount | currency:tx.currency }}
-                    </span>
+                  
+                  <!-- Tab Controls & Delete Button Header -->
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                      <button 
+                        class="btn btn-sm" 
+                        [class.btn-primary]="activeDrawerTab()[tx.id] !== 'ownership'" 
+                        [class.btn-secondary]="activeDrawerTab()[tx.id] === 'ownership'"
+                        (click)="setDrawerTab(tx.id, 'edit')">
+                        ✏️ Edit Entry Details
+                      </button>
+                      <button 
+                        class="btn btn-sm" 
+                        [class.btn-primary]="activeDrawerTab()[tx.id] === 'ownership'" 
+                        [class.btn-secondary]="activeDrawerTab()[tx.id] !== 'ownership'"
+                        (click)="setDrawerTab(tx.id, 'ownership')">
+                        👥 Ownership Split
+                      </button>
+                    </div>
+
+                    <button 
+                      class="btn btn-danger btn-sm" 
+                      (click)="deleteTx(tx.id); $event.stopPropagation();" 
+                      style="font-size: 0.78rem; padding: 0.35rem 0.75rem;"
+                      title="Permanently delete this transaction from the ledger">
+                      🗑 Delete Entry
+                    </button>
                   </div>
 
-                  <div class="split-controls">
-                    <!-- Mode Selector -->
-                    <div class="mode-selector-group">
-                      <label class="control-label">Allocation Mode</label>
-                      <div class="segmented-control">
-                        <button 
-                          class="segment-btn" 
-                          [class.active]="getAllocationMode(tx) === 'allA'"
-                          (click)="setAllocationMode(tx, 'allA')">
-                          100% {{ service.personAName() }}
-                        </button>
-                        <button 
-                          class="segment-btn" 
-                          [class.active]="getAllocationMode(tx) === 'allB'"
-                          (click)="setAllocationMode(tx, 'allB')">
-                          100% {{ service.personBName() }}
-                        </button>
-                        <button 
-                          class="segment-btn" 
-                          [class.active]="getAllocationMode(tx) === 'split'"
-                          (click)="setAllocationMode(tx, 'split')">
-                          Custom Split
-                        </button>
+                  <!-- Tab 1: Edit Entry Details Form -->
+                  <div *ngIf="activeDrawerTab()[tx.id] !== 'ownership'" class="animate-fade-in">
+                    <div *ngIf="getEditingTx(tx) as edit" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem; background: rgba(255,255,255,0.015); border: 1px solid var(--card-border); padding: 1rem; border-radius: 10px;">
+                      
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Date</label>
+                        <input type="date" [(ngModel)]="edit.date" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Ticker</label>
+                        <input type="text" [(ngModel)]="edit.ticker" placeholder="e.g. AAPL" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px; text-transform: uppercase;">
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Type</label>
+                        <select [(ngModel)]="edit.type" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
+                          <option value="BUY">BUY</option>
+                          <option value="SELL">SELL</option>
+                          <option value="DIVIDEND">DIVIDEND</option>
+                          <option value="CASH TOP-UP">CASH TOP-UP</option>
+                        </select>
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Qty (Shares)</label>
+                        <input type="number" step="any" min="0" [(ngModel)]="edit.quantity" (input)="onEditQuantityPriceChange(tx.id)" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Price</label>
+                        <input type="number" step="any" min="0" [(ngModel)]="edit.price" (input)="onEditQuantityPriceChange(tx.id)" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Total Amount</label>
+                        <input type="number" step="any" min="0" [(ngModel)]="edit.totalAmount" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px; font-weight: 600;">
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Fees</label>
+                        <input type="number" step="any" min="0" [(ngModel)]="edit.fees" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Currency</label>
+                        <select [(ngModel)]="edit.currency" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
+                          <option *ngFor="let curr of service.visibleCurrencies()" [value]="curr">{{ curr }}</option>
+                        </select>
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 0.3rem; grid-column: span 2;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Account / Source</label>
+                        <input type="text" [(ngModel)]="edit.source" style="padding: 0.4rem 0.5rem; font-size: 0.82rem; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-main); border-radius: 6px;">
                       </div>
                     </div>
 
-                    <!-- Split input fields -->
-                    <div class="split-inputs-panel animate-fade-in" *ngIf="getAllocationMode(tx) === 'split'">
-                      <div class="split-input-field">
-                        <label class="control-label">Shares owned by {{ service.personBName() }}</label>
-                        <div class="input-with-limit">
-                          <input 
-                            type="number" 
-                            [value]="tx.personBShares" 
-                            (input)="onSharesSplitChange(tx, $event)"
-                            step="any"
-                            min="0" 
-                            [max]="tx.quantity"
-                            class="split-number-input">
-                          <span class="limit-label">/ {{ tx.quantity }} max shares</span>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 0.8rem; gap: 0.5rem;">
+                      <button class="btn btn-secondary btn-sm" (click)="toggleExpand(tx.id)">Cancel</button>
+                      <button class="btn btn-primary btn-sm" (click)="saveEditedTransaction(tx)" style="padding: 0.45rem 1.2rem; font-weight: 600;">
+                        💾 Save Changes
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Tab 2: Ownership Allocation Split -->
+                  <div *ngIf="activeDrawerTab()[tx.id] === 'ownership'" class="animate-fade-in">
+                    <div class="drawer-title" style="margin-bottom: 0.8rem;">
+                      <h4>Configure Ownership Splits</h4>
+                      <span class="tx-subtitle">
+                        {{ tx.type }} {{ tx.quantity > 0 ? (tx.quantity + ' shares of ' + tx.ticker) : '' }} on {{ tx.date | date:service.dateFormat() }}. Total: {{ tx.totalAmount | currency:tx.currency }}
+                      </span>
+                    </div>
+
+                    <div class="split-controls">
+                      <!-- Mode Selector -->
+                      <div class="mode-selector-group">
+                        <label class="control-label">Allocation Mode</label>
+                        <div class="segmented-control">
+                          <button 
+                            class="segment-btn" 
+                            [class.active]="getAllocationMode(tx) === 'allA'"
+                            (click)="setAllocationMode(tx, 'allA')">
+                            100% {{ service.personAName() }}
+                          </button>
+                          <button 
+                            class="segment-btn" 
+                            [class.active]="getAllocationMode(tx) === 'allB'"
+                            (click)="setAllocationMode(tx, 'allB')">
+                            100% {{ service.personBName() }}
+                          </button>
+                          <button 
+                            class="segment-btn" 
+                            [class.active]="getAllocationMode(tx) === 'split'"
+                            (click)="setAllocationMode(tx, 'split')">
+                            Custom Split
+                          </button>
                         </div>
                       </div>
-                    </div>
 
-                    <!-- Proportional Output Table -->
-                    <div class="proportional-outputs">
-                      <div class="owner-output-card a-card">
-                        <span class="owner-icon-indicator"></span>
-                        <div class="output-details">
-                          <div class="owner-header-name">{{ service.personAName() }}</div>
-                          <div class="output-stats">
-                            <span>
-                              Shares: <strong>{{ tx.personAShares | number:'1.0-6' }}</strong> ({{ getSharePct(tx, 'A') | number:'1.0-0' }}%)
-                            </span>
-                            <span>
-                              Cost Basis: <strong>{{ tx.personACostBasis | currency:tx.currency:'symbol':'1.2-2' }}</strong>
-                            </span>
+                      <!-- Split input fields -->
+                      <div class="split-inputs-panel animate-fade-in" *ngIf="getAllocationMode(tx) === 'split'">
+                        <div class="split-input-field">
+                          <label class="control-label">Shares owned by {{ service.personBName() }}</label>
+                          <div class="input-with-limit">
+                            <input 
+                              type="number" 
+                              [value]="tx.personBShares" 
+                              (input)="onSharesSplitChange(tx, $event)"
+                              step="any"
+                              min="0" 
+                              [max]="tx.quantity"
+                              class="split-number-input">
+                            <span class="limit-label">/ {{ tx.quantity }} max shares</span>
                           </div>
                         </div>
                       </div>
 
-                      <div class="owner-output-card b-card">
-                        <span class="owner-icon-indicator"></span>
-                        <div class="output-details">
-                          <div class="owner-header-name">{{ service.personBName() }}</div>
-                          <div class="output-stats">
-                            <span>
-                              Shares: <strong>{{ tx.personBShares | number:'1.0-6' }}</strong> ({{ getSharePct(tx, 'B') | number:'1.0-0' }}%)
-                            </span>
-                            <span>
-                              Cost Basis: <strong>{{ tx.personBCostBasis | currency:tx.currency:'symbol':'1.2-2' }}</strong>
-                            </span>
+                      <!-- Proportional Output Table -->
+                      <div class="proportional-outputs">
+                        <div class="owner-output-card a-card">
+                          <span class="owner-icon-indicator"></span>
+                          <div class="output-details">
+                            <div class="owner-header-name">{{ service.personAName() }}</div>
+                            <div class="output-stats">
+                              <span>
+                                Shares: <strong>{{ tx.personAShares | number:'1.0-6' }}</strong> ({{ getSharePct(tx, 'A') | number:'1.0-0' }}%)
+                              </span>
+                              <span>
+                                Cost Basis: <strong>{{ tx.personACostBasis | currency:tx.currency:'symbol':'1.2-2' }}</strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="owner-output-card b-card">
+                          <span class="owner-icon-indicator"></span>
+                          <div class="output-details">
+                            <div class="owner-header-name">{{ service.personBName() }}</div>
+                            <div class="output-stats">
+                              <span>
+                                Shares: <strong>{{ tx.personBShares | number:'1.0-6' }}</strong> ({{ getSharePct(tx, 'B') | number:'1.0-0' }}%)
+                              </span>
+                              <span>
+                                Cost Basis: <strong>{{ tx.personBCostBasis | currency:tx.currency:'symbol':'1.2-2' }}</strong>
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div class="drawer-actions" style="display: flex; justify-content: space-between; width: 100%;">
-                    <button class="btn btn-danger btn-sm" (click)="deleteTx(tx.id); $event.stopPropagation();" title="Permanently delete this transaction from the ledger" style="padding: 0.35rem 0.8rem; font-size: 0.75rem;">
-                      Delete Transaction
-                    </button>
-                    <button class="btn btn-secondary btn-sm" (click)="toggleExpand(tx.id)">
-                      Close Detail
-                    </button>
-                  </div>
                 </div>
               </td>
             </tr>

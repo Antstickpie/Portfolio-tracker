@@ -233,6 +233,82 @@ export class TransactionsComponent {
     }
   }
 
+  // Drawer Tab & Editing State
+  public editingTxMap = signal<Record<string, Transaction>>({});
+  public activeDrawerTab = signal<Record<string, 'edit' | 'ownership'>>({});
+
+  public setDrawerTab(txId: string, tab: 'edit' | 'ownership') {
+    this.activeDrawerTab.update(prev => ({ ...prev, [txId]: tab }));
+  }
+
+  public getEditingTx(tx: Transaction): Transaction {
+    const current = this.editingTxMap()[tx.id];
+    if (!current) {
+      const copy = JSON.parse(JSON.stringify(tx));
+      this.editingTxMap.update(prev => ({ ...prev, [tx.id]: copy }));
+      return copy;
+    }
+    return current;
+  }
+
+  public onEditQuantityPriceChange(txId: string) {
+    const edit = this.editingTxMap()[txId];
+    if (!edit) return;
+    const qty = Number(edit.quantity) || 0;
+    const price = Number(edit.price) || 0;
+    if (qty >= 0 && price >= 0) {
+      edit.totalAmount = parseFloat((qty * price).toFixed(2));
+    }
+  }
+
+  public saveEditedTransaction(tx: Transaction) {
+    const edit = this.editingTxMap()[tx.id];
+    if (!edit) return;
+
+    if (edit.quantity < 0 || edit.price < 0 || edit.totalAmount < 0) {
+      this.service.showToast('Values cannot be negative.', 'error');
+      return;
+    }
+
+    this.service.transactions.update(prev => {
+      return prev.map(t => {
+        if (t.id === tx.id) {
+          const qty = Number(edit.quantity) || 0;
+          const amt = Number(edit.totalAmount) || 0;
+
+          let bShares = Number(t.personBShares) || 0;
+          if (bShares > qty) bShares = qty;
+          const aShares = parseFloat((qty - bShares).toFixed(6));
+
+          let bCost = Number(t.personBCostBasis) || 0;
+          if (bCost > amt) bCost = amt;
+          const aCost = parseFloat((amt - bCost).toFixed(2));
+
+          return {
+            ...t,
+            date: edit.date || t.date,
+            ticker: (edit.ticker || t.ticker || '').toUpperCase().trim(),
+            type: edit.type || t.type,
+            quantity: qty,
+            price: Number(edit.price) || 0,
+            totalAmount: amt,
+            fees: Number(edit.fees) || 0,
+            currency: edit.currency || t.currency,
+            source: (edit.source || t.source || 'Manual Entries').trim(),
+            personBShares: bShares,
+            personAShares: aShares,
+            personBCostBasis: bCost,
+            personACostBasis: aCost
+          };
+        }
+        return t;
+      });
+    });
+
+    this.service.saveToStorage();
+    this.service.showToast(`Saved changes for ${edit.ticker || tx.ticker}!`, 'success');
+  }
+
   public toggleExpand(txId: string) {
     if (this.expandedTxId() === txId) {
       this.expandedTxId.set(null);
