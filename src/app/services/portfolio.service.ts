@@ -298,6 +298,8 @@ export class PortfolioService {
   // Google Drive Sync properties
   public googleClientId = signal<string>('309949315167-dvuguf67papta8jlu9hjdgljccli6njo.apps.googleusercontent.com');
   public googleFileName = signal<string>('portfolio_tracker_transactions.json');
+  public autoSyncGoogleDrive = signal<boolean>(true);
+  public activeTokenSignal = signal<string | null>(null);
   public isGoogleConnected = signal<boolean>(false);
   public googleUserEmail = signal<string>('');
   public lastGoogleSyncTime = signal<number | null>(null);
@@ -306,7 +308,9 @@ export class PortfolioService {
 
   private accessToken: string | null = null;
   private tokenClient: any = null;
-  private pendingGoogleDriveAction: 'upload' | 'download' | null = null;
+  private pendingGoogleDriveAction: 'upload' | 'download' | 'connect' | null = null;
+  private lastSyncedJsonHash: string | null = null;
+  private driveFileIdCache: string | null = null;
   private failedTickers = new Set<string>();
   private lastFetchTimeMap = new Map<string, number>();
   private lastDailyFetchMap = new Map<string, string>();
@@ -360,19 +364,32 @@ export class PortfolioService {
       if (!this.dateTo()) this.dateTo.set(defaultRange.to);
     }
 
-    // Auto-refresh prices when tab returns to focus after long idle time (> 2 minutes)
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          const last = this.lastRefreshTime();
-          const now = Date.now();
-          if (!last || (now - last > 2 * 60 * 1000)) {
-            if (typeof navigator !== 'undefined' && navigator.onLine) {
-              this.loadMarketPricesApi(false, true);
-            }
+    // Auto-refresh cloud sync & prices when returning to app (focus, tab switch, mobile unlock)
+    if (typeof window !== 'undefined') {
+      const handleReturnToApp = () => {
+        this.checkForCloudUpdatesSilent();
+        const last = this.lastRefreshTime();
+        const now = Date.now();
+        if (!last || (now - last > 2 * 60 * 1000)) {
+          if (typeof navigator !== 'undefined' && navigator.onLine) {
+            this.loadMarketPricesApi(false, true);
           }
         }
-      });
+      };
+
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') handleReturnToApp();
+        });
+      }
+      window.addEventListener('pageshow', handleReturnToApp);
+      window.addEventListener('focus', handleReturnToApp);
+      window.addEventListener('online', handleReturnToApp);
+
+      // Check for cloud updates 1 second after app startup
+      setTimeout(() => {
+        this.checkForCloudUpdatesSilent();
+      }, 1000);
     }
 
     effect(() => {
@@ -676,6 +693,11 @@ export class PortfolioService {
       const gconn = localStorage.getItem('pt_google_connected');
       if (gconn) this.isGoogleConnected.set(gconn === 'true');
 
+      this.getValidAccessToken();
+
+      const asgd = localStorage.getItem('pt_auto_sync_google_drive');
+      if (asgd !== null) this.autoSyncGoogleDrive.set(asgd === 'true');
+
       const gemail = localStorage.getItem('pt_google_user_email');
       if (gemail) this.googleUserEmail.set(gemail);
 
@@ -727,8 +749,6 @@ export class PortfolioService {
     localStorage.setItem('pt_use_proper_sectors', this.useProperSectors().toString());
 
     localStorage.setItem('pt_persons', JSON.stringify(this.persons()));
-    localStorage.setItem('pt_person_a_name', this.personAName());
-    localStorage.setItem('pt_person_b_name', this.personBName());
     localStorage.setItem('pt_date_format', this.dateFormat());
 
     // Persist fetch maps
@@ -755,11 +775,14 @@ export class PortfolioService {
 
     localStorage.setItem('pt_google_client_id', this.googleClientId());
     localStorage.setItem('pt_google_file_name', this.googleFileName());
+    localStorage.setItem('pt_auto_sync_google_drive', this.autoSyncGoogleDrive().toString());
     localStorage.setItem('pt_google_connected', this.isGoogleConnected().toString());
     localStorage.setItem('pt_google_user_email', this.googleUserEmail());
     if (this.lastGoogleSyncTime() !== null) {
       localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
     }
+
+    this.scheduleAutoUpload();
 
     localStorage.setItem('pt_default_currency', this.defaultCurrency());
     localStorage.setItem('pt_display_currency', this.displayCurrency());
@@ -2251,6 +2274,76 @@ export class PortfolioService {
     }
   }
 
+  public getValidAccessToken(): string | null {
+    if (this.accessToken) {
+      if (this.activeTokenSignal() !== this.accessToken) {
+        this.activeTokenSignal.set(this.accessToken);
+      }
+      return this.accessToken;
+    }
+    if (typeof localStorage === 'undefined') {
+      return null;
+    }
+    const token = localStorage.getItem('pt_google_access_token');
+    if (token) {
+      this.accessToken = token;
+      this.activeTokenSignal.set(token);
+      return token;
+    }
+    return null;
+  }
+
+  public async refreshAccessToken(): Promise<string | null> {
+    const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('pt_google_refresh_token') : null;
+    const clientId = this.googleClientId().trim();
+    if (!refreshToken || !clientId) return null;
+
+    try {
+      const resp = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          client_id: clientId,
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken
+        }).toString()
+      });
+
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data.access_token) {
+        const expiresIn = data.expires_in ? parseInt(data.expires_in, 10) : 3600;
+        this.setStoredAccessToken(data.access_token, expiresIn);
+        return data.access_token;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private setStoredAccessToken(token: string, expiresInSeconds: number = 3600) {
+    if (typeof localStorage === 'undefined') return;
+    this.accessToken = token;
+    this.activeTokenSignal.set(token);
+    const expiresAt = Date.now() + (expiresInSeconds * 1000);
+    localStorage.setItem('pt_google_access_token', token);
+    localStorage.setItem('pt_google_token_expires_at', expiresAt.toString());
+  }
+
+  private clearStoredAccessToken() {
+    this.accessToken = null;
+    this.activeTokenSignal.set(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('pt_google_access_token');
+      localStorage.removeItem('pt_google_token_expires_at');
+      localStorage.removeItem('pt_google_refresh_token');
+      localStorage.removeItem('pt_google_connected');
+    }
+  }
+
   // Google Drive REST API & SDK Sync Integration
   public initializeGoogleDriveSDK() {
     if (!this.googleClientId().trim()) {
@@ -2265,14 +2358,19 @@ export class PortfolioService {
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: async (resp: any) => {
           if (resp.error) {
-            this.showToast('Authentication failed: ' + resp.error, 'error');
+            if (this.pendingGoogleDriveAction === 'connect') {
+              this.showToast('Authentication failed: ' + resp.error, 'error');
+            }
             return;
           }
           if (resp.access_token) {
-            this.accessToken = resp.access_token;
+            const expiresIn = resp.expires_in ? parseInt(resp.expires_in, 10) : 3600;
+            this.setStoredAccessToken(resp.access_token, expiresIn);
             this.isGoogleConnected.set(true);
             localStorage.setItem('pt_google_connected', 'true');
-            this.showToast('Connected to Google Drive!', 'success');
+            if (this.pendingGoogleDriveAction === 'connect') {
+              this.showToast('Connected to Google Drive!', 'success');
+            }
             if (this.pendingGoogleDriveAction === 'upload') {
               this.uploadToGoogleDrive();
             } else if (this.pendingGoogleDriveAction === 'download') {
@@ -2292,18 +2390,19 @@ export class PortfolioService {
       this.showToast('Please enter your Google Client ID first.', 'error');
       return;
     }
+    this.pendingGoogleDriveAction = 'connect';
     if (!this.tokenClient) {
       this.initializeGoogleDriveSDK();
     }
     if (this.tokenClient) {
-      this.tokenClient.requestAccessToken({ prompt: 'consent' });
+      this.tokenClient.requestAccessToken({ prompt: 'select_account' });
     } else {
       this.showToast('Google GIS script is loading. Try again in a moment.', 'info');
     }
   }
 
   public disconnectGoogleDrive() {
-    this.accessToken = null;
+    this.clearStoredAccessToken();
     this.isGoogleConnected.set(false);
     this.googleUserEmail.set('');
     this.lastGoogleSyncTime.set(null);
@@ -2313,21 +2412,75 @@ export class PortfolioService {
     this.showToast('Disconnected from Google Drive.', 'info');
   }
 
-  private async findDriveFile(fileName: string): Promise<string | null> {
-    try {
-      const resp = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(fileName)}' and trashed=false&fields=files(id,name)`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`
-          }
+  private async fetchDriveApi(url: string, options: RequestInit = {}): Promise<Response> {
+    let token = this.getValidAccessToken();
+    const headers: Record<string, string> = {};
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((val, key) => { headers[key] = val; });
+      } else if (Array.isArray(options.headers)) {
+        options.headers.forEach(([key, val]) => { headers[key] = val; });
+      } else {
+        Object.assign(headers, options.headers);
+      }
+    }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    options.headers = headers;
+
+    let resp = await fetch(url, options);
+
+    if (resp.status === 401) {
+      this.clearStoredAccessToken();
+      const newToken = await new Promise<string | null>((resolve) => {
+        if (!this.tokenClient) {
+          this.initializeGoogleDriveSDK();
         }
+        if (!this.tokenClient) {
+          resolve(null);
+          return;
+        }
+        this.tokenClient.callback = (tokenResp: any) => {
+          if (tokenResp && tokenResp.access_token) {
+            const expiresIn = tokenResp.expires_in ? parseInt(tokenResp.expires_in, 10) : 3600;
+            this.setStoredAccessToken(tokenResp.access_token, expiresIn);
+            this.isGoogleConnected.set(true);
+            localStorage.setItem('pt_google_connected', 'true');
+            resolve(tokenResp.access_token);
+          } else {
+            resolve(null);
+          }
+        };
+        try {
+          this.tokenClient.requestAccessToken({ prompt: '' });
+        } catch (e) {
+          resolve(null);
+        }
+      });
+
+      if (newToken) {
+        headers['Authorization'] = `Bearer ${newToken}`;
+        options.headers = headers;
+        resp = await fetch(url, options);
+      }
+    }
+
+    return resp;
+  }
+
+  private async findDriveFile(fileName: string): Promise<string | null> {
+    if (this.driveFileIdCache) return this.driveFileIdCache;
+    try {
+      const resp = await this.fetchDriveApi(
+        `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(fileName)}' and trashed=false&fields=files(id,name)`
       );
       if (!resp.ok) {
         throw new Error(`Search failed: ${resp.statusText}`);
       }
       const data = await resp.json();
       if (data.files && data.files.length > 0) {
+        this.driveFileIdCache = data.files[0].id;
         return data.files[0].id;
       }
       return null;
@@ -2339,13 +2492,15 @@ export class PortfolioService {
 
   private async createDriveFile(fileName: string, content: any): Promise<string | null> {
     try {
+      const hash = content['hash'] || '';
       const metadata = {
         name: fileName,
-        mimeType: 'application/json'
+        mimeType: 'application/json',
+        properties: { contentHash: hash, lastUpdated: String(content['lastUpdated'] || '') }
       };
-      
+
       const boundary = 'foo_bar_boundary';
-      const multipartBody = 
+      const multipartBody =
         `\r\n--${boundary}\r\n` +
         `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
         `${JSON.stringify(metadata)}\r\n` +
@@ -2354,20 +2509,15 @@ export class PortfolioService {
         `${JSON.stringify(content)}\r\n` +
         `--${boundary}--`;
 
-      const resp = await fetch(
+      const resp = await this.fetchDriveApi(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            'Content-Type': `multipart/related; boundary=${boundary}`
-          },
+          headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
           body: multipartBody
         }
       );
-      if (!resp.ok) {
-        throw new Error(`Creation failed: ${resp.statusText}`);
-      }
+      if (!resp.ok) throw new Error(`Creation failed: ${resp.statusText}`);
       const data = await resp.json();
       return data.id;
     } catch (e) {
@@ -2378,15 +2528,26 @@ export class PortfolioService {
 
   private async updateDriveFile(fileId: string, content: any): Promise<boolean> {
     try {
-      const resp = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+      const hash = content['hash'] || '';
+      const metadata = {
+        properties: { contentHash: hash, lastUpdated: String(content['lastUpdated'] || '') }
+      };
+      const boundary = 'foo_bar_boundary';
+      const multipartBody =
+        `\r\n--${boundary}\r\n` +
+        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Type: application/json\r\n\r\n` +
+        `${JSON.stringify(content)}\r\n` +
+        `--${boundary}--`;
+
+      const resp = await this.fetchDriveApi(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
         {
           method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(content)
+          headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+          body: multipartBody
         }
       );
       return resp.ok;
@@ -2398,13 +2559,8 @@ export class PortfolioService {
 
   private async downloadDriveFile(fileId: string): Promise<any | null> {
     try {
-      const resp = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`
-          }
-        }
+      const resp = await this.fetchDriveApi(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
       );
       if (!resp.ok) {
         throw new Error(`Download failed: ${resp.statusText}`);
@@ -2413,6 +2569,157 @@ export class PortfolioService {
     } catch (e) {
       console.error('Error downloading file from Google Drive', e);
       return null;
+    }
+  }
+
+  private computeStringHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0;
+    }
+    return hash.toString(36);
+  }
+
+  public getLocalDataHash(): string {
+    const data = this.buildLocalData();
+    const { lastUpdated, ...content } = data;
+    return this.computeStringHash(JSON.stringify(content));
+  }
+
+  private autoUploadTimer: any = null;
+  private cloudCheckTimer: any = null;
+  private isUploading = false;
+
+  public scheduleAutoUpload() {
+    if (!this.autoSyncGoogleDrive() || !this.isGoogleConnected()) return;
+    const currentHash = this.getLocalDataHash();
+    if (this.lastSyncedJsonHash === currentHash) {
+      return;
+    }
+    if (this.autoUploadTimer) clearTimeout(this.autoUploadTimer);
+    this.autoUploadTimer = setTimeout(() => {
+      this.uploadToGoogleDriveSilent();
+    }, 3000);
+  }
+
+  public async ensureFreshToken(): Promise<string | null> {
+    return this.getValidAccessToken();
+  }
+
+  public async uploadToGoogleDriveSilent() {
+    if (!this.autoSyncGoogleDrive() || !this.isGoogleConnected() || this.isUploading) return;
+    const token = await this.ensureFreshToken();
+    if (!token) return;
+
+    const localData = this.buildLocalData();
+    const currentHash = localData['hash'] as string;
+
+    // In-memory shortcut
+    if (this.lastSyncedJsonHash === currentHash) return;
+
+    this.isUploading = true;
+    try {
+      const fileName = this.googleFileName().trim() || 'portfolio_tracker_transactions.json';
+
+      // Compare against Drive property hash — no full download needed
+      const fileDetails = await this.findDriveFileDetails(fileName);
+      if (fileDetails?.hash === currentHash) {
+        this.lastSyncedJsonHash = currentHash;
+        return;
+      }
+
+      const fileId = fileDetails?.id ?? await this.findDriveFile(fileName);
+      let success = false;
+      if (!fileId) {
+        const newId = await this.createDriveFile(fileName, localData);
+        success = !!newId;
+        if (newId) this.driveFileIdCache = newId;
+      } else {
+        success = await this.updateDriveFile(fileId, localData);
+      }
+      if (success) {
+        this.lastSyncedJsonHash = currentHash;
+        this.lastUpdated.set(localData['lastUpdated']);
+        const now = Date.now();
+        this.lastGoogleSyncTime.set(now);
+        localStorage.setItem('pt_last_google_sync', now.toString());
+      }
+    } catch (e) {
+      console.warn('Silent Google Drive upload failed', e);
+    } finally {
+      this.isUploading = false;
+    }
+  }
+
+  private async findDriveFileDetails(fileName: string): Promise<{ id: string; modifiedTime: string; hash?: string; lastUpdated?: number } | null> {
+    try {
+      const resp = await this.fetchDriveApi(
+        `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(fileName)}' and trashed=false&fields=files(id,name,modifiedTime,properties)`
+      );
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data.files && data.files.length > 0) {
+        const f = data.files[0];
+        this.driveFileIdCache = f.id;
+        return {
+          id: f.id,
+          modifiedTime: f.modifiedTime,
+          hash: f.properties?.contentHash,
+          lastUpdated: f.properties?.lastUpdated ? parseInt(f.properties.lastUpdated, 10) : undefined
+        };
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  public checkForCloudUpdatesSilent(force: boolean = false) {
+    if (this.cloudCheckTimer) clearTimeout(this.cloudCheckTimer);
+    this.cloudCheckTimer = setTimeout(() => this.runCloudCheck(force), 500);
+  }
+
+  private async runCloudCheck(force: boolean = false) {
+    if (!this.autoSyncGoogleDrive() || !this.isGoogleConnected() || this.isGoogleSyncing()) return;
+    this.isGoogleSyncing.set(true);
+    const token = await this.ensureFreshToken();
+    if (!token) { this.isGoogleSyncing.set(false); return; }
+
+    try {
+      const fileName = this.googleFileName().trim() || 'portfolio_tracker_transactions.json';
+      const fileDetails = await this.findDriveFileDetails(fileName);
+      if (!fileDetails) return;
+
+      const localData = this.buildLocalData();
+      const localHash = localData['hash'] as string;
+
+      // Hash from Drive property — no download needed to compare
+      if (!force && fileDetails.hash && fileDetails.hash === localHash) {
+        return;
+      }
+
+      const remoteTs = fileDetails.lastUpdated || 0;
+      const localTs = this.lastUpdated() || 0;
+
+      if (force || remoteTs > localTs) {
+        // Remote is newer — download and apply
+        const remoteData = await this.downloadDriveFile(fileDetails.id);
+        if (!remoteData) return;
+        this.applyRemoteData(remoteData);
+        const now = Date.now();
+        this.lastGoogleSyncTime.set(now);
+        localStorage.setItem('pt_last_google_sync', now.toString());
+        this.showToast('Synced automatically from Google Drive', 'info');
+      } else if (localTs > remoteTs) {
+        // Local is newer — push to Drive
+        this.uploadToGoogleDriveSilent();
+      }
+    } catch (e) {
+      console.warn('Silent Google Drive check failed', e);
+    } finally {
+      this.isGoogleSyncing.set(false);
     }
   }
 
@@ -2425,9 +2732,11 @@ export class PortfolioService {
     if (remoteData.visibleCurrencies) this.visibleCurrencies.set(remoteData.visibleCurrencies);
     if (remoteData.persons && Array.isArray(remoteData.persons)) {
       this.persons.set(remoteData.persons);
-    } else {
-      if (remoteData.personAName !== undefined) this.updatePersonName(0, remoteData.personAName);
-      if (remoteData.personBName !== undefined) this.updatePersonName(1, remoteData.personBName);
+    } else if (remoteData.personAName || remoteData.personBName) {
+      const p: string[] = [];
+      if (remoteData.personAName) p.push(remoteData.personAName);
+      if (remoteData.personBName) p.push(remoteData.personBName);
+      if (p.length > 0) this.persons.set(p);
     }
     if (remoteData.dateFormat) this.dateFormat.set(remoteData.dateFormat);
     if (remoteData.yearBasis) this.yearBasis.set(remoteData.yearBasis);
@@ -2455,11 +2764,12 @@ export class PortfolioService {
       localStorage.setItem('pt_splits_cache', JSON.stringify(remoteData.splitsCache));
     }
     this.saveToStorage();
+    this.lastSyncedJsonHash = this.getLocalDataHash();
   }
 
   public buildLocalData() {
     const cachedSplits = typeof localStorage !== 'undefined' ? localStorage.getItem('pt_splits_cache') : null;
-    return {
+    const payload: Record<string, any> = {
       version: '2.0',
       dbVersion: '2.0',
       transactions: this.transactions(),
@@ -2468,8 +2778,6 @@ export class PortfolioService {
       customSectors: this.customSectors(),
       visibleCurrencies: this.visibleCurrencies(),
       persons: this.persons(),
-      personAName: this.personAName(),
-      personBName: this.personBName(),
       dateFormat: this.dateFormat(),
       yearBasis: this.yearBasis(),
       financialYearStartMonth: this.financialYearStartMonth(),
@@ -2489,16 +2797,19 @@ export class PortfolioService {
       defaultCurrency: this.defaultCurrency(),
       displayCurrency: this.displayCurrency(),
       splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null,
-      lastUpdated: Date.now()
+      lastUpdated: this.lastUpdated() || Date.now()
     };
+    payload['hash'] = this.computeStringHash(JSON.stringify(payload));
+    return payload;
   }
 
   public async uploadToGoogleDrive() {
-    if (!this.accessToken) {
-      this.pendingGoogleDriveAction = 'upload';
-      this.connectGoogleDrive();
+    const token = await this.ensureFreshToken();
+    if (!token) {
+      this.showToast('Unable to sync with Google Drive. Check internet connection.', 'error');
       return;
     }
+
     const localCount = this.transactions().length;
     const ok = await this.showConfirm(
       'Upload to Google Drive',
@@ -2519,7 +2830,7 @@ export class PortfolioService {
         success = await this.updateDriveFile(fileId, localData);
       }
       if (success) {
-        this.lastUpdated.set(localData.lastUpdated);
+        this.lastUpdated.set(localData['lastUpdated']);
         this.lastGoogleSyncTime.set(Date.now());
         localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
         this.showToast('Uploaded to Google Drive successfully!', 'success');
@@ -2534,11 +2845,12 @@ export class PortfolioService {
   }
 
   public async downloadFromGoogleDrive() {
-    if (!this.accessToken) {
-      this.pendingGoogleDriveAction = 'download';
-      this.connectGoogleDrive();
+    const token = await this.ensureFreshToken();
+    if (!token) {
+      this.showToast('Unable to sync with Google Drive. Check internet connection.', 'error');
       return;
     }
+
     const ok = await this.showConfirm(
       'Download from Google Drive',
       `This will OVERWRITE your current local data with the Google Drive backup. Your local changes will be lost. Are you sure?`

@@ -160,6 +160,19 @@
               style="font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; width: 100%;">
           </div>
 
+          <!-- Auto-Sync Checkbox Toggle -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed rgba(255,255,255,0.08);">
+            <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500;">Auto-sync changes to cloud</span>
+            <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.76rem; color: var(--text-main);">
+              <input 
+                type="checkbox" 
+                [ngModel]="service.autoSyncGoogleDrive()" 
+                (ngModelChange)="service.autoSyncGoogleDrive.set($event); service.saveToStorage()"
+                style="accent-color: var(--primary); cursor: pointer;">
+              <span>{{ service.autoSyncGoogleDrive() ? 'Enabled' : 'Disabled' }}</span>
+            </label>
+          </div>
+
           <div style="margin-top: 0.75rem; display: flex; gap: 0.4rem; justify-content: flex-end;">
             <ng-container *ngIf="service.isGoogleConnected()">
               <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.disconnectGoogleDrive()">Disconnect</button>
