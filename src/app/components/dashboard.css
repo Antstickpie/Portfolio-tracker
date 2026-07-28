@@ -535,6 +535,13 @@
   flex-wrap: nowrap;
 }
 
+.chart-header-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 /* --- UNIFIED SINGLE BREAKPOINT SYSTEM (Breakpoint at 870px) --- */
 
 @media (max-width: 870px) {

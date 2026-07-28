@@ -169,7 +169,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public realizedLedgerSortMode = signal<'value' | 'pct'>('value');
   public totalCostSortMode = signal<'value' | 'pct'>('value');
   public currentValueSortMode = signal<'value' | 'pct'>('value');
-  public allocationBasis = signal<'value' | 'cost'>('value');
+  public allocationBasis = signal<'both' | 'value' | 'cost'>('both');
   public currentYear = new Date().getFullYear();
   public isCollapsed = signal<boolean>(false);
   public isRealizedCollapsed = signal<boolean>(false);
@@ -894,7 +894,56 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     return this.colors[index % this.colors.length];
   }
 
-  // Pre-calculate assets chart data
+  // Invested Money (Cost Basis) Asset Data (Inner Ring for Ghost Pie)
+  public investedAssetChartData = computed(() => {
+    const s = this.summary();
+    const total = s.totalCostBasis;
+    if (total === 0) return [];
+    
+    return s.positions
+      .filter((pos: PortfolioPosition) => pos.totalCost > 0)
+      .map((pos: PortfolioPosition) => {
+        return {
+          label: pos.ticker,
+          value: pos.totalCost,
+          pct: (pos.totalCost / total) * 100,
+        };
+      });
+  });
+
+  // Invested Money (Cost Basis) Sector Data (Inner Ring for Ghost Pie)
+  public investedSectorChartData = computed(() => {
+    const s = this.summary();
+    const total = s.totalCostBasis;
+    if (total === 0) return [];
+
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
+    const sectorsMap = new Map<string, number>();
+    s.positions.forEach((pos: PortfolioPosition) => {
+      const val = pos.totalCost;
+      if (val <= 0) return;
+      const sec = pos.sector || 'Other';
+      sectorsMap.set(sec, (sectorsMap.get(sec) || 0) + val);
+    });
+
+    const sectors: { label: string; value: number; pct: number; totalFormatted: string }[] = [];
+    sectorsMap.forEach((val, key) => {
+      sectors.push({
+        label: key,
+        value: val,
+        pct: (val / total) * 100,
+        totalFormatted: symbol + Math.round(val * rate).toLocaleString()
+      });
+    });
+
+    return sectors.sort((a, b) => b.value - a.value);
+  });
+
+  // Pre-calculate assets chart data (Outer Ring or Active Mode)
   public assetChartData = computed(() => {
     const s = this.summary();
     const isCost = this.allocationBasis() === 'cost';
@@ -913,7 +962,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       });
   });
 
-  // Pre-calculate sectors chart data with formatted totals
+  // Pre-calculate sectors chart data with formatted totals (Outer Ring or Active Mode)
   public sectorChartData = computed(() => {
     const s = this.summary();
     const isCost = this.allocationBasis() === 'cost';
@@ -1374,13 +1423,18 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     assets: { label: string; value: number; pct: number }[],
     sectors: { label: string; value: number; pct: number }[]
   ) {
-    this.drawDonutChart(this.assetCanvas, assets, 'Assets');
-    this.drawDonutChart(this.sectorCanvas, sectors, 'Sectors');
+    const isBoth = this.allocationBasis() === 'both';
+    const baselineAssets = isBoth ? this.investedAssetChartData() : [];
+    const baselineSectors = isBoth ? this.investedSectorChartData() : [];
+
+    this.drawDonutChart(this.assetCanvas, assets, baselineAssets, 'Assets');
+    this.drawDonutChart(this.sectorCanvas, sectors, baselineSectors, 'Sectors');
   }
 
   private drawDonutChart(
     canvasRef: ElementRef<HTMLCanvasElement> | undefined,
     data: { label: string; value: number; pct: number }[],
+    baselineData: { label: string; value: number; pct: number }[],
     centerText: string
   ) {
     if (!canvasRef) return;
@@ -1409,7 +1463,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const radius = Math.min(cx, cy) - 52;
     const innerRadius = radius * 0.48;
 
-    if (data.length === 0) {
+    if (data.length === 0 && baselineData.length === 0) {
       // Draw empty placeholder circle
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
@@ -1425,24 +1479,56 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    let startAngle = -0.5 * Math.PI; // Start at 12 o'clock
     const hoveredIdx = centerText === 'Assets' ? this.hoveredAssetIndex() : this.hoveredSectorIndex();
     const usedYRight: number[] = [];
     const usedYLeft: number[] = [];
+    const isLight = this.service.theme() === 'light';
+
+    // 1. Draw Inner Ring: Ghost Baseline (Invested Money / Cost Basis)
+    if (baselineData.length > 0) {
+      let startAngleBase = -0.5 * Math.PI;
+      const innerOuterR = radius - 14;
+      const innerInnerR = innerRadius - 2;
+      const strokeWidthBase = innerOuterR - innerInnerR;
+
+      baselineData.forEach((item, index) => {
+        const sliceAngle = (item.pct / 100) * 2 * Math.PI;
+        const endAngle = startAngleBase + sliceAngle;
+        const isHovered = (index === hoveredIdx);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, (innerOuterR + innerInnerR) / 2, startAngleBase, endAngle);
+        ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
+        ctx.globalAlpha = isHovered ? 0.75 : 0.35;
+        ctx.lineWidth = strokeWidthBase;
+        ctx.stroke();
+        ctx.restore();
+
+        startAngleBase = endAngle;
+      });
+    }
+
+    // 2. Draw Outer Ring: Active Value (Current Market Value)
+    let startAngle = -0.5 * Math.PI;
+    const hasBaseline = baselineData.length > 0;
+    const outerR = radius;
+    const outerInnerR = hasBaseline ? radius - 11 : innerRadius;
+    const strokeWidthOuter = outerR - outerInnerR;
 
     data.forEach((item, index) => {
       const sliceAngle = (item.pct / 100) * 2 * Math.PI;
       const endAngle = startAngle + sliceAngle;
-      
       const isHovered = (index === hoveredIdx);
-      const strokeWidth = radius - innerRadius;
 
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, (radius + innerRadius) / 2, startAngle, endAngle);
+      ctx.arc(cx, cy, (outerR + outerInnerR) / 2, startAngle, endAngle);
       ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
-      ctx.lineWidth = isHovered ? strokeWidth + 4 : strokeWidth;
+      ctx.lineWidth = isHovered ? strokeWidthOuter + 4 : strokeWidthOuter;
       ctx.lineCap = 'butt';
       ctx.stroke();
+      ctx.restore();
 
       // Draw label
       const labelText = `${item.label} ${item.pct.toFixed(1)}%`;
