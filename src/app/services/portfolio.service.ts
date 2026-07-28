@@ -2416,11 +2416,13 @@ export class PortfolioService {
     }
   }
 
-  private applyRemoteData(remoteData: any) {
+  public applyRemoteData(remoteData: any) {
+    if (!remoteData) return;
     if (remoteData.transactions) this.transactions.set(remoteData.transactions);
     if (remoteData.templates) this.templates.set(remoteData.templates);
     if (remoteData.tickerConfigs) this.tickerConfigs.set(remoteData.tickerConfigs);
     if (remoteData.customSectors) this.customSectors.set(remoteData.customSectors);
+    if (remoteData.visibleCurrencies) this.visibleCurrencies.set(remoteData.visibleCurrencies);
     if (remoteData.persons && Array.isArray(remoteData.persons)) {
       this.persons.set(remoteData.persons);
     } else {
@@ -2428,6 +2430,12 @@ export class PortfolioService {
       if (remoteData.personBName !== undefined) this.updatePersonName(1, remoteData.personBName);
     }
     if (remoteData.dateFormat) this.dateFormat.set(remoteData.dateFormat);
+    if (remoteData.yearBasis) this.yearBasis.set(remoteData.yearBasis);
+    if (remoteData.financialYearStartMonth !== undefined) this.financialYearStartMonth.set(Number(remoteData.financialYearStartMonth));
+    if (remoteData.financialYearStartDay !== undefined) this.financialYearStartDay.set(Number(remoteData.financialYearStartDay));
+    if (remoteData.costBasisMethod) this.costBasisMethod.set(remoteData.costBasisMethod);
+    if (remoteData.splitAdjustedSources) this.splitAdjustedSources.set(remoteData.splitAdjustedSources);
+    if (remoteData.disabledSources) this.disabledSources.set(remoteData.disabledSources);
     if (remoteData.showNameColumn !== undefined) this.showNameColumn.set(remoteData.showNameColumn);
     if (remoteData.showNameHoldings !== undefined) this.showNameHoldings.set(remoteData.showNameHoldings);
     if (remoteData.showNameRealized !== undefined) this.showNameRealized.set(remoteData.showNameRealized);
@@ -2443,28 +2451,44 @@ export class PortfolioService {
     if (remoteData.isSimulationModeActive !== undefined) this.isSimulationModeActive.set(remoteData.isSimulationModeActive);
     if (remoteData.defaultCurrency) this.defaultCurrency.set(remoteData.defaultCurrency);
     if (remoteData.displayCurrency) this.displayCurrency.set(remoteData.displayCurrency);
+    if (remoteData.splitsCache && typeof localStorage !== 'undefined') {
+      localStorage.setItem('pt_splits_cache', JSON.stringify(remoteData.splitsCache));
+    }
+    this.saveToStorage();
   }
 
-  private buildLocalData() {
+  public buildLocalData() {
+    const cachedSplits = typeof localStorage !== 'undefined' ? localStorage.getItem('pt_splits_cache') : null;
     return {
+      version: '2.0',
+      dbVersion: '2.0',
       transactions: this.transactions(),
       templates: this.templates(),
       tickerConfigs: this.tickerConfigs(),
       customSectors: this.customSectors(),
+      visibleCurrencies: this.visibleCurrencies(),
+      persons: this.persons(),
       personAName: this.personAName(),
       personBName: this.personBName(),
       dateFormat: this.dateFormat(),
+      yearBasis: this.yearBasis(),
+      financialYearStartMonth: this.financialYearStartMonth(),
+      financialYearStartDay: this.financialYearStartDay(),
+      costBasisMethod: this.costBasisMethod(),
+      useProperSectors: this.useProperSectors(),
+      splitAdjustedSources: this.splitAdjustedSources(),
+      disabledSources: this.disabledSources(),
       showNameColumn: this.showNameColumn(),
       showNameHoldings: this.showNameHoldings(),
       showNameRealized: this.showNameRealized(),
       showNameTransactions: this.showNameTransactions(),
       exchangeRates: this.exchangeRates(),
-      useProperSectors: this.useProperSectors(),
       historicalPrices: this.historicalPrices(),
       simulatedTransactions: this.simulatedTransactions(),
       isSimulationModeActive: this.isSimulationModeActive(),
       defaultCurrency: this.defaultCurrency(),
       displayCurrency: this.displayCurrency(),
+      splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null,
       lastUpdated: Date.now()
     };
   }

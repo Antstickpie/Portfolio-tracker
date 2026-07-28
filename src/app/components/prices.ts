@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
@@ -19,6 +19,21 @@ export class PricesComponent {
   public isRatesCollapsed = signal(false);
   public isPricesCollapsed = signal(false);
   public newCurrencyCode = '';
+
+  public filterTicker = signal('');
+  public sortBy = signal<string>('ticker');
+  public sortDirection = signal<'asc' | 'desc'>('asc');
+
+  constructor() {
+    const savedBy = localStorage.getItem('pt_prices_sort_by');
+    if (savedBy) this.sortBy.set(savedBy);
+
+    const savedDir = localStorage.getItem('pt_prices_sort_dir');
+    if (savedDir) this.sortDirection.set(savedDir as any);
+
+    effect(() => { localStorage.setItem('pt_prices_sort_by', this.sortBy()); });
+    effect(() => { localStorage.setItem('pt_prices_sort_dir', this.sortDirection()); });
+  }
 
   public exchangeRatePairs = computed(() => {
     const rates = this.service.exchangeRates();
@@ -47,9 +62,7 @@ export class PricesComponent {
       this.service.saveToStorage();
     }
   }
-  public filterTicker = signal('');
-  public sortBy = signal<string>('ticker');
-  public sortDirection = signal<'asc' | 'desc'>('asc');
+
 
   public trackByIndex(index: number): number {
     return index;
@@ -165,26 +178,7 @@ export class PricesComponent {
 
   // Backup to JSON file
   public exportPortfolioBackup() {
-    const cachedSplits = localStorage.getItem('pt_splits_cache');
-    const data = {
-      version: '2.0', // Set version to 2.0 to indicate transaction-currency standard is active
-      dbVersion: '2.0',
-      transactions: this.service.transactions(),
-      templates: this.service.templates(),
-      tickerConfigs: this.service.tickerConfigs(),
-      exchangeRates: this.service.exchangeRates(),
-      customSectors: this.service.customSectors(),
-      personAName: this.service.personAName(),
-      personBName: this.service.personBName(),
-      dateFormat: this.service.dateFormat(),
-      historicalPrices: this.service.historicalPrices(),
-      simulatedTransactions: this.service.simulatedTransactions(),
-      isSimulationModeActive: this.service.isSimulationModeActive(),
-      defaultCurrency: this.service.defaultCurrency(),
-      displayCurrency: this.service.displayCurrency(),
-      splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null
-    };
-    
+    const data = this.service.buildLocalData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -210,62 +204,12 @@ export class PricesComponent {
         if (backupDbVersion === '2.0') {
           localStorage.setItem('pt_db_version', '2.0');
         } else {
-          localStorage.removeItem('pt_db_version'); // Trigger migration on load
+          localStorage.removeItem('pt_db_version');
         }
 
-        if (data.transactions) {
-          this.service.transactions.set(data.transactions);
-        }
-        if (data.templates) {
-          this.service.templates.set(data.templates);
-        }
-        
-        // Handle tickerConfigs with legacy tickerMeta fallback
-        const configs = data.tickerConfigs || data.tickerMeta;
-        if (configs) {
-          this.service.tickerConfigs.set(configs);
-        }
-        
-        if (data.exchangeRates) {
-          this.service.exchangeRates.set(data.exchangeRates);
-        }
-        if (data.customSectors) {
-          this.service.customSectors.set(data.customSectors);
-        }
-        if (data.persons && Array.isArray(data.persons)) {
-          this.service.persons.set(data.persons);
-        } else {
-          if (data.personAName !== undefined) this.service.updatePersonName(0, data.personAName);
-          if (data.personBName !== undefined) this.service.updatePersonName(1, data.personBName);
-        }
-        if (data.dateFormat) {
-          this.service.dateFormat.set(data.dateFormat);
-        }
-        if (data.splitsCache) {
-          localStorage.setItem('pt_splits_cache', JSON.stringify(data.splitsCache));
-        }
-        if (data.historicalPrices) {
-          this.service.historicalPrices.set(data.historicalPrices);
-        }
-        if (data.simulatedTransactions) {
-          this.service.simulatedTransactions.set(data.simulatedTransactions);
-        }
-        if (data.isSimulationModeActive !== undefined) {
-          this.service.isSimulationModeActive.set(data.isSimulationModeActive);
-        }
-        if (data.defaultCurrency) {
-          this.service.defaultCurrency.set(data.defaultCurrency);
-        }
-        if (data.displayCurrency) {
-          this.service.displayCurrency.set(data.displayCurrency);
-        }
-        
-        this.service.saveToStorage();
-        
-        // Call loadFromStorage to trigger migration self-healing if version is legacy
-        this.service.loadFromStorage();
-        
-        this.service.showToast('Portfolio restored successfully from backup file!', 'success');
+        // Apply all settings and records
+        this.service.applyRemoteData(data);
+        this.service.showToast('Backup restored successfully!', 'success');
         input.value = '';
       } catch (err) {
         this.service.showToast('Error parsing backup file. Make sure it is a valid portfolio tracker JSON backup.', 'error');

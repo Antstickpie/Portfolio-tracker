@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
@@ -38,6 +38,17 @@ export class TransactionsComponent {
   }
   public sortBy = signal<'date' | 'price' | 'ticker' | 'type' | 'quantity' | 'totalAmount' | 'name'>('date');
   public sortDirection = signal<'asc' | 'desc'>('desc');
+
+  constructor() {
+    const savedBy = localStorage.getItem('pt_tx_sort_by');
+    if (savedBy) this.sortBy.set(savedBy as any);
+
+    const savedDir = localStorage.getItem('pt_tx_sort_dir');
+    if (savedDir) this.sortDirection.set(savedDir as any);
+
+    effect(() => { localStorage.setItem('pt_tx_sort_by', this.sortBy()); });
+    effect(() => { localStorage.setItem('pt_tx_sort_dir', this.sortDirection()); });
+  }
   
   // Track expanded transaction row
   public expandedTxId = signal<string | null>(null);

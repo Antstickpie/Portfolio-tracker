@@ -1077,12 +1077,52 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       this.historyPeriod.set(savedPeriod as any);
     }
 
+    // Load local-only table sort orders
+    const sb = localStorage.getItem('pt_holdings_sort_by');
+    if (sb) this.sortBy.set(sb);
+    const sd = localStorage.getItem('pt_holdings_sort_dir');
+    if (sd) this.sortDirection.set(sd as any);
+    const cpsm = localStorage.getItem('pt_current_price_sort_mode');
+    if (cpsm) this.currentPriceSortMode.set(cpsm as any);
+    const acsm = localStorage.getItem('pt_average_cost_sort_mode');
+    if (acsm) this.averageCostSortMode.set(acsm as any);
+    const tcsm = localStorage.getItem('pt_total_cost_sort_mode');
+    if (tcsm) this.totalCostSortMode.set(tcsm as any);
+    const cvsm = localStorage.getItem('pt_current_value_sort_mode');
+    if (cvsm) this.currentValueSortMode.set(cvsm as any);
+    const usm = localStorage.getItem('pt_unrealized_sort_mode');
+    if (usm) this.unrealizedSortMode.set(usm as any);
+    const rsm = localStorage.getItem('pt_realized_sort_mode');
+    if (rsm) this.realizedSortMode.set(rsm as any);
+    const trsm = localStorage.getItem('pt_total_return_sort_mode');
+    if (trsm) this.totalReturnSortMode.set(trsm as any);
+
+    const sbr = localStorage.getItem('pt_realized_ledger_sort_by');
+    if (sbr) this.sortByRealized.set(sbr);
+    const sdr = localStorage.getItem('pt_realized_ledger_sort_dir');
+    if (sdr) this.sortDirectionRealized.set(sdr as any);
+    const rlsm = localStorage.getItem('pt_realized_ledger_sort_mode');
+    if (rlsm) this.realizedLedgerSortMode.set(rlsm as any);
+
     effect(() => {
       localStorage.setItem('pt_dash_active_view', this.activeView());
     });
     effect(() => {
       localStorage.setItem('pt_dash_history_period', this.historyPeriod());
     });
+    effect(() => { localStorage.setItem('pt_holdings_sort_by', this.sortBy()); });
+    effect(() => { localStorage.setItem('pt_holdings_sort_dir', this.sortDirection()); });
+    effect(() => { localStorage.setItem('pt_current_price_sort_mode', this.currentPriceSortMode()); });
+    effect(() => { localStorage.setItem('pt_average_cost_sort_mode', this.averageCostSortMode()); });
+    effect(() => { localStorage.setItem('pt_total_cost_sort_mode', this.totalCostSortMode()); });
+    effect(() => { localStorage.setItem('pt_current_value_sort_mode', this.currentValueSortMode()); });
+    effect(() => { localStorage.setItem('pt_unrealized_sort_mode', this.unrealizedSortMode()); });
+    effect(() => { localStorage.setItem('pt_realized_sort_mode', this.realizedSortMode()); });
+    effect(() => { localStorage.setItem('pt_total_return_sort_mode', this.totalReturnSortMode()); });
+
+    effect(() => { localStorage.setItem('pt_realized_ledger_sort_by', this.sortByRealized()); });
+    effect(() => { localStorage.setItem('pt_realized_ledger_sort_dir', this.sortDirectionRealized()); });
+    effect(() => { localStorage.setItem('pt_realized_ledger_sort_mode', this.realizedLedgerSortMode()); });
 
     const timeStr = localStorage.getItem('pt_last_refresh_time');
     if (timeStr) {
