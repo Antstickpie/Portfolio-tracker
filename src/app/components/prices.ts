@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortfolioService } from '../services/portfolio.service';
 import { TickerConfig } from '../models/ticker-config.model';
@@ -473,7 +473,11 @@ export class PricesComponent {
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
-    return new Date(timestamp).toLocaleDateString();
+    try {
+      return formatDate(timestamp, this.service.dateFormat(), 'en-US');
+    } catch (e) {
+      return new Date(timestamp).toLocaleDateString();
+    }
   }
 
   public trackByTicker(index: number, item: any): string {

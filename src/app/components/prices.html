@@ -163,8 +163,8 @@
           <div style="margin-top: 0.75rem; display: flex; gap: 0.4rem; justify-content: flex-end;">
             <ng-container *ngIf="service.isGoogleConnected()">
               <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.disconnectGoogleDrive()">Disconnect</button>
-              <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">Restore Backup</button>
-              <button class="btn btn-primary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">Save Backup</button>
+              <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">Download from Drive</button>
+              <button class="btn btn-primary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">Upload to Drive</button>
             </ng-container>
             <ng-container *ngIf="!service.isGoogleConnected()">
               <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;" (click)="service.connectGoogleDrive()">Connect Account</button>
@@ -172,18 +172,18 @@
           </div>
         </div>
 
-        <!-- Local Database Backup -->
+        <!-- Local Computer Backup File -->
         <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.25rem;">
-          <h4 style="font-size: 0.88rem; margin: 0 0 0.5rem; font-weight: 600;">Backup File</h4>
+          <h4 style="font-size: 0.88rem; margin: 0 0 0.5rem; font-weight: 600;">Computer Backup File</h4>
           
           <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
-              <span style="font-size: 0.78rem; color: var(--text-muted);">Save Backup File</span>
-              <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()">Export (.json)</button>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Save backup to computer</span>
+              <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()">Download (.json)</button>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
-              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.5rem;">Restore Backup File</span>
+              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.5rem;">Load backup from computer</span>
               <input 
                 type="file" 
                 accept=".json" 
