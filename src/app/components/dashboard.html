@@ -373,7 +373,7 @@
         <!-- Sector Taxonomy Toggle -->
         <div class="currency-toggle" style="margin: 0;">
           <button class="currency-btn" [class.active]="!service.useProperSectors()" (click)="service.useProperSectors.set(false); service.saveToStorage()" title="Use custom sector mappings">
-            Custom Sectors
+            My Sectors
           </button>
           <button class="currency-btn" [class.active]="service.useProperSectors()" (click)="service.useProperSectors.set(true); service.saveToStorage()" title="Use live Yahoo Finance sectors">
             Market Sectors
@@ -381,8 +381,8 @@
         </div>
         <!-- Valuation Basis Toggle -->
         <div class="currency-toggle" style="margin: 0;">
-          <button class="currency-btn" [class.active]="allocationBasis() === 'both'" (click)="allocationBasis.set('both')" title="Dual-Ring Ghost Pie: Inner Ring = Invested (Cost Basis), Outer Ring = Current Value">
-            Invested vs Current 👻
+          <button class="currency-btn" [class.active]="allocationBasis() === 'both'" (click)="allocationBasis.set('both')" title="Inner Ring = Invested, Outer Ring = Current Value">
+            Invested vs Current
           </button>
           <button class="currency-btn" [class.active]="allocationBasis() === 'cost'" (click)="allocationBasis.set('cost')">
             Invested

@@ -88,21 +88,21 @@
 
         <!-- Cost basis toggler -->
         <div style="margin-top: 1.25rem;">
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Tax Tracking Method</label>
+          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Profit Calculation Method</label>
           <div style="display: flex; background: var(--button-group-bg); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; width: 100%;">
             <button 
               style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
               [style.background]="service.costBasisMethod() === 'fifo' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
               [style.color]="service.costBasisMethod() === 'fifo' ? '#fff' : 'var(--text-muted)'"
               (click)="setCostBasisMethod('fifo')">
-              FIFO Lots
+              First In, First Out (FIFO)
             </button>
             <button 
               style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
               [style.background]="service.costBasisMethod() === 'avg' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
               [style.color]="service.costBasisMethod() === 'avg' ? '#fff' : 'var(--text-muted)'"
               (click)="setCostBasisMethod('avg')">
-              Average Cost
+              Average Cost Basis
             </button>
           </div>
         </div>
@@ -163,8 +163,8 @@
           <div style="margin-top: 0.75rem; display: flex; gap: 0.4rem; justify-content: flex-end;">
             <ng-container *ngIf="service.isGoogleConnected()">
               <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.disconnectGoogleDrive()">Disconnect</button>
-              <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">Load Data</button>
-              <button class="btn btn-primary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">Backup Now</button>
+              <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">Restore Backup</button>
+              <button class="btn btn-primary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">Save Backup</button>
             </ng-container>
             <ng-container *ngIf="!service.isGoogleConnected()">
               <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;" (click)="service.connectGoogleDrive()">Connect Account</button>
@@ -174,16 +174,16 @@
 
         <!-- Local Database Backup -->
         <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.25rem;">
-          <h4 style="font-size: 0.88rem; margin: 0 0 0.5rem; font-weight: 600;">Local JSON Database</h4>
+          <h4 style="font-size: 0.88rem; margin: 0 0 0.5rem; font-weight: 600;">Backup File</h4>
           
           <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
-              <span style="font-size: 0.78rem; color: var(--text-muted);">Export database</span>
-              <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()">Download (.json)</button>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Save Backup File</span>
+              <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()">Export (.json)</button>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
-              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.5rem;">Import backup</span>
+              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.5rem;">Restore Backup File</span>
               <input 
                 type="file" 
                 accept=".json" 
@@ -274,26 +274,26 @@
       </div>
     </div>
 
-    <!-- Card 4: Danger Zone / Reset Ledger -->
+    <!-- Card 4: Danger Zone / Reset Data -->
     <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem; border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.02);">
       <div>
         <h3 style="color: #ef4444; display: flex; align-items: center; gap: 0.4rem;">
-          <span>⚠️ Danger Zone</span>
+          <span>⚠️ Reset Portfolio Data</span>
         </h3>
-        <p class="subtitle">Irreversible portfolio ledger actions.</p>
+        <p class="subtitle">Irreversible action to clear your transactions.</p>
         
         <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06);">
           <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 0.2rem;">
-            Clear All Ledger Data
+            Delete All Transactions
           </label>
           <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
-            Permanently delete all transaction entries, custom ownership splits, and history from your ledger.
+            Permanently delete all transaction entries, custom ownership splits, and history from your account.
           </p>
           
           <button (click)="clearAllLedger()" 
                   class="btn btn-danger" 
                   style="padding: 0.5rem 0.9rem; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
-            🗑 Clear All Ledger
+            🗑 Clear All Data
           </button>
         </div>
       </div>
