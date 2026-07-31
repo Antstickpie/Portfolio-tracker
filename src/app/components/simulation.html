@@ -224,51 +224,81 @@
         No trade simulations added yet. Use form above to model transactions.
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;" *ngIf="service.simulatedTransactions().length > 0">
-        <thead>
-          <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase;">
-            <th style="padding: 0.5rem 0.6rem;">Action</th>
-            <th style="padding: 0.5rem 0.6rem;">Account</th>
-            <th style="padding: 0.5rem 0.6rem;">Ticker</th>
-            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Shares</th>
-            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Price</th>
-            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Fees</th>
-            <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Net Subtotal</th>
-            <th style="padding: 0.5rem 0.6rem; text-align: center;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let sim of service.simulatedTransactions()" style="border-bottom: 1px solid rgba(255,255,255,0.02); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.01)'" onmouseout="this.style.background='transparent'">
-            <td style="padding: 0.65rem 0.6rem; font-weight: bold;">
-              <span [style.color]="sim.type === 'BUY' ? 'var(--primary)' : '#ef4444'">{{ sim.type }}</span>
-            </td>
-            <td style="padding: 0.65rem 0.6rem; font-weight: 500;">
-              {{ sim.account === 'A' ? service.personAName() : service.personBName() }}
-            </td>
-            <td style="padding: 0.65rem 0.6rem; font-weight: bold; color: var(--text-main);">
-              {{ sim.ticker }}
-            </td>
-            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
-              {{ sim.shares | number:'1.0-6' }}
-            </td>
-            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
-              {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ sim.price | number:'1.2-2' }}
-            </td>
-            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; color: var(--text-muted);">
-              {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ service.calculateSimulatedFees(sim) | number:'1.2-2' }}
-            </td>
-            <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; font-weight: 600;" [ngClass]="sim.type === 'BUY' ? 'text-danger' : 'text-success'">
-              {{ sim.type === 'BUY' ? '-' : '+' }}{{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ (sim.shares * sim.price + (sim.type === 'BUY' ? 1 : -1) * service.calculateSimulatedFees(sim)) | number:'1.2-2' }}
-            </td>
-            <td style="padding: 0.65rem 0.6rem; text-align: center;">
-              <div style="display: inline-flex; gap: 0.35rem; justify-content: center;">
-                <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" (click)="editSimulation(sim)">Edit</button>
-                <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" (click)="deleteSimulation(sim.id)">Delete</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <!-- Profit Summary Stats Banner -->
+      <div *ngIf="simulatedProfitSummary() as summary" style="margin-bottom: 1rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.75rem 1rem; border-radius: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem;">
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.82rem;">
+          <div>
+            <span style="color: var(--text-muted);">Simulated Capital: </span>
+            <span style="font-weight: 600; color: var(--text-main);">{{ summary.totalSimCostFormatted }}</span>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Market Value Today: </span>
+            <span style="font-weight: 600; color: var(--text-main);">{{ summary.totalTodayValFormatted }}</span>
+          </div>
+        </div>
+        <div style="font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 0.35rem;" [ngClass]="summary.isGain ? 'text-success' : 'text-danger'">
+          <span>Profit Today: {{ summary.totalProfitFormatted }}</span>
+          <span>({{ summary.totalProfitPctFormatted }})</span>
+          <span>{{ summary.isGain ? '▲' : '▼' }}</span>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;" *ngIf="service.simulatedTransactions().length > 0">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--card-border); color: var(--text-muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase;">
+              <th style="padding: 0.5rem 0.6rem;">Action</th>
+              <th style="padding: 0.5rem 0.6rem;">Account</th>
+              <th style="padding: 0.5rem 0.6rem;">Ticker</th>
+              <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Shares</th>
+              <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Sim Price</th>
+              <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Today Price</th>
+              <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Fees</th>
+              <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Net Subtotal</th>
+              <th class="num" style="padding: 0.5rem 0.6rem; text-align: right;">Profit / Loss Today</th>
+              <th style="padding: 0.5rem 0.6rem; text-align: center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let sim of service.simulatedTransactions()" style="border-bottom: 1px solid rgba(255,255,255,0.02); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.01)'" onmouseout="this.style.background='transparent'">
+              <td style="padding: 0.65rem 0.6rem; font-weight: bold;">
+                <span [style.color]="sim.type === 'BUY' ? 'var(--primary)' : '#ef4444'">{{ sim.type }}</span>
+              </td>
+              <td style="padding: 0.65rem 0.6rem; font-weight: 500;">
+                {{ sim.account === 'A' ? service.personAName() : service.personBName() }}
+              </td>
+              <td style="padding: 0.65rem 0.6rem; font-weight: bold; color: var(--text-main);">
+                {{ sim.ticker }}
+              </td>
+              <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
+                {{ sim.shares | number:'1.0-6' }}
+              </td>
+              <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
+                {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ sim.price | number:'1.2-2' }}
+              </td>
+              <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
+                {{ getSimulationProfitDetail(sim).todayPriceFormatted }}
+              </td>
+              <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; color: var(--text-muted);">
+                {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ service.calculateSimulatedFees(sim) | number:'1.2-2' }}
+              </td>
+              <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; font-weight: 600;" [ngClass]="sim.type === 'BUY' ? 'text-danger' : 'text-success'">
+                {{ sim.type === 'BUY' ? '-' : '+' }}{{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ (sim.shares * sim.price + (sim.type === 'BUY' ? 1 : -1) * service.calculateSimulatedFees(sim)) | number:'1.2-2' }}
+              </td>
+              <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; font-weight: 600;" [ngClass]="getSimulationProfitDetail(sim).isGain ? 'text-success' : 'text-danger'">
+                {{ getSimulationProfitDetail(sim).isGain ? '▲ ' : '▼ ' }}{{ getSimulationProfitDetail(sim).profitFormatted }}
+                <span style="font-size: 0.72rem; font-weight: 400; opacity: 0.9; margin-left: 0.15rem;">({{ getSimulationProfitDetail(sim).profitPctFormatted }})</span>
+              </td>
+              <td style="padding: 0.65rem 0.6rem; text-align: center;">
+                <div style="display: inline-flex; gap: 0.35rem; justify-content: center;">
+                  <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" (click)="editSimulation(sim)">Edit</button>
+                  <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" (click)="deleteSimulation(sim.id)">Delete</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- 3. Simulated Allocation Section Card (Exactly like Dashboard Allocation Section) -->

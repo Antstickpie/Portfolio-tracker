@@ -1517,7 +1517,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const cx = displayWidth / 2;
     const cy = displayHeight / 2;
-    const radius = Math.min(cx, cy) - 52;
+    const radius = Math.min(cx, cy) - (displayWidth < 400 ? 66 : 52);
     const innerRadius = radius * 0.48;
 
     if (data.length === 0 && baselineData.length === 0) {
@@ -1592,13 +1592,13 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% Cost)`;
+          const costLabel = displayWidth < 400 ? 'C' : 'Cost';
+          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${costLabel})`;
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;
 
       // Always draw labels OUTSIDE the chart with a pointer line to prevent slice text overflow
-        // Draw OUTSIDE the chart with a pointer line for small slices
         const startRad = (radius + innerRadius) / 2;
         const sx = cx + startRad * Math.cos(middleAngle);
         const sy = cy + startRad * Math.sin(middleAngle);
@@ -1629,10 +1629,24 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         }
         usedY.push(finalY);
 
-        const tx = ex + (isRight ? lineLength : -lineLength);
+        let tx = ex + (isRight ? lineLength : -lineLength);
         const ty = finalY;
 
         ctx.save();
+        ctx.font = '500 9px Outfit';
+        const textWidth = ctx.measureText(labelText).width;
+        let textX = tx + (isRight ? 4 : -4);
+
+        if (isRight) {
+          if (textX + textWidth > displayWidth - 4) {
+            textX = Math.max(tx, displayWidth - textWidth - 4);
+          }
+        } else {
+          if (textX - textWidth < 4) {
+            textX = Math.min(tx, textWidth + 4);
+          }
+        }
+
         // Draw subtle pointer line
         ctx.beginPath();
         ctx.moveTo(sx, sy);
@@ -1645,11 +1659,9 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
         // Draw label text next to line end
         ctx.fillStyle = isLight ? '#475569' : '#9ca3af';
-        ctx.font = '500 9px Outfit';
         ctx.textAlign = isRight ? 'left' : 'right';
         ctx.textBaseline = 'middle';
         
-        const textX = tx + (isRight ? 4 : -4);
         ctx.fillText(labelText, textX, ty);
         ctx.restore();
 

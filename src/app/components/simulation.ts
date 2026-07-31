@@ -290,6 +290,79 @@ export class SimulationComponent implements AfterViewInit {
     this.feesVal.set(null);
   }
 
+  public getSimulationProfitDetail(sim: SimulatedTransaction) {
+    const displayCurr = this.service.displayCurrency();
+    const tickerCurr = this.service.getTickerCurrency(sim.ticker);
+    const targetCurr = displayCurr === 'native' ? tickerCurr : displayCurr;
+    const rate = this.service.getExchangeRate(tickerCurr, targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
+    const configs = this.service.tickerConfigs();
+    const currentPriceUSD = configs[sim.ticker]?.currentPrice || sim.price;
+    const simPriceUSD = sim.price;
+    const shares = sim.shares;
+    const feesUSD = this.service.calculateSimulatedFees(sim);
+
+    let simCostUSD = 0;
+    let todayValUSD = 0;
+    let profitUSD = 0;
+
+    if (sim.type === 'BUY') {
+      simCostUSD = (shares * simPriceUSD) + feesUSD;
+      todayValUSD = shares * currentPriceUSD;
+      profitUSD = todayValUSD - simCostUSD;
+    } else {
+      simCostUSD = (shares * simPriceUSD) - feesUSD;
+      todayValUSD = shares * currentPriceUSD;
+      profitUSD = simCostUSD - todayValUSD;
+    }
+
+    const profitPct = simCostUSD > 0 ? (profitUSD / simCostUSD) * 100 : 0;
+    const isGain = profitUSD >= 0;
+
+    return {
+      todayPriceFormatted: symbol + (currentPriceUSD * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      simCostUSD,
+      todayValUSD,
+      profitUSD,
+      profitPct,
+      isGain,
+      profitFormatted: (isGain ? '+' : '-') + symbol + Math.abs(profitUSD * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      profitPctFormatted: (isGain ? '+' : '-') + Math.abs(profitPct).toFixed(1) + '%'
+    };
+  }
+
+  public simulatedProfitSummary = computed(() => {
+    const sims = this.service.simulatedTransactions();
+    if (sims.length === 0) return null;
+
+    let totalSimCostUSD = 0;
+    let totalTodayValUSD = 0;
+
+    sims.forEach(sim => {
+      const d = this.getSimulationProfitDetail(sim);
+      totalSimCostUSD += d.simCostUSD;
+      totalTodayValUSD += d.todayValUSD;
+    });
+
+    const totalProfitUSD = totalTodayValUSD - totalSimCostUSD;
+    const totalProfitPct = totalSimCostUSD > 0 ? (totalProfitUSD / totalSimCostUSD) * 100 : 0;
+    const isGain = totalProfitUSD >= 0;
+
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
+    return {
+      totalSimCostFormatted: symbol + Math.round(totalSimCostUSD * rate).toLocaleString(),
+      totalTodayValFormatted: symbol + Math.round(totalTodayValUSD * rate).toLocaleString(),
+      totalProfitFormatted: (isGain ? '+' : '-') + symbol + Math.abs(totalProfitUSD * rate).toLocaleString(),
+      totalProfitPctFormatted: (isGain ? '+' : '-') + Math.abs(totalProfitPct).toFixed(1) + '%',
+      isGain
+    };
+  });
+
   // Combine positions logic (matches Dashboard Combined)
   private combineSummaries(summaryA: PersonPortfolioSummary, summaryB: PersonPortfolioSummary): PersonPortfolioSummary {
     const positionsMap = new Map<string, PortfolioPosition>();
@@ -716,7 +789,7 @@ export class SimulationComponent implements AfterViewInit {
 
     const cx = displayWidth / 2;
     const cy = displayHeight / 2;
-    const radius = Math.min(cx, cy) - 52;
+    const radius = Math.min(cx, cy) - (displayWidth < 400 ? 66 : 52);
     const innerRadius = radius * 0.48;
 
     if (data.length === 0 && baselineData.length === 0) {
@@ -792,7 +865,8 @@ export class SimulationComponent implements AfterViewInit {
       if (baselineData.length > 0) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% Base)`;
+          const baseLabel = displayWidth < 400 ? 'B' : 'Base';
+          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${baseLabel})`;
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;
@@ -828,10 +902,24 @@ export class SimulationComponent implements AfterViewInit {
       }
       usedY.push(finalY);
 
-      const tx = ex + (isRight ? lineLength : -lineLength);
+      let tx = ex + (isRight ? lineLength : -lineLength);
       const ty = finalY;
 
       ctx.save();
+      ctx.font = '500 9px Outfit';
+      const textWidth = ctx.measureText(labelText).width;
+      let textX = tx + (isRight ? 4 : -4);
+
+      if (isRight) {
+        if (textX + textWidth > displayWidth - 4) {
+          textX = Math.max(tx, displayWidth - textWidth - 4);
+        }
+      } else {
+        if (textX - textWidth < 4) {
+          textX = Math.min(tx, textWidth + 4);
+        }
+      }
+
       // Draw subtle pointer line
       ctx.beginPath();
       ctx.moveTo(sx, sy);
@@ -843,11 +931,9 @@ export class SimulationComponent implements AfterViewInit {
 
       // Draw label text next to line end
       ctx.fillStyle = isLight ? '#475569' : '#9ca3af';
-      ctx.font = '500 9px Outfit';
       ctx.textAlign = isRight ? 'left' : 'right';
       ctx.textBaseline = 'middle';
       
-      const textX = tx + (isRight ? 4 : -4);
       ctx.fillText(labelText, textX, ty);
       ctx.restore();
 

@@ -573,6 +573,17 @@
     white-space: nowrap;
   }
 
+  @media (max-width: 640px) {
+    .chart-header-toggles {
+      flex-direction: column !important;
+      gap: 0.4rem !important;
+    }
+    .chart-header-toggles .currency-toggle {
+      width: 100% !important;
+      flex: 1 1 100% !important;
+    }
+  }
+
   .dashboard-header {
     padding: 0.75rem 0.85rem !important;
     margin-bottom: 0.4rem;
