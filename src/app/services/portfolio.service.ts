@@ -2275,19 +2275,16 @@ export class PortfolioService {
   }
 
   public getValidAccessToken(): string | null {
-    if (this.accessToken) {
-      if (this.activeTokenSignal() !== this.accessToken) {
-        this.activeTokenSignal.set(this.accessToken);
+    if (typeof localStorage === 'undefined') return null;
+    const token = this.accessToken || localStorage.getItem('pt_google_access_token');
+    const expiresAt = parseInt(localStorage.getItem('pt_google_token_expires_at') || '0', 10);
+
+    // If token exists and has not expired (with 1-minute buffer)
+    if (token && expiresAt > Date.now() + 60000) {
+      if (this.accessToken !== token) {
+        this.accessToken = token;
+        this.activeTokenSignal.set(token);
       }
-      return this.accessToken;
-    }
-    if (typeof localStorage === 'undefined') {
-      return null;
-    }
-    const token = localStorage.getItem('pt_google_access_token');
-    if (token) {
-      this.accessToken = token;
-      this.activeTokenSignal.set(token);
       return token;
     }
     return null;
@@ -2342,6 +2339,45 @@ export class PortfolioService {
       localStorage.removeItem('pt_google_refresh_token');
       localStorage.removeItem('pt_google_connected');
     }
+  }
+
+  private silentRefreshPromise: Promise<string | null> | null = null;
+
+  public requestSilentAccessToken(): Promise<string | null> {
+    if (this.silentRefreshPromise) return this.silentRefreshPromise;
+
+    this.silentRefreshPromise = new Promise<string | null>((resolve) => {
+      if (!this.tokenClient) {
+        this.initializeGoogleDriveSDK();
+      }
+      if (!this.tokenClient) {
+        this.silentRefreshPromise = null;
+        resolve(null);
+        return;
+      }
+
+      this.tokenClient.callback = (tokenResp: any) => {
+        this.silentRefreshPromise = null;
+        if (tokenResp && tokenResp.access_token) {
+          const expiresIn = tokenResp.expires_in ? parseInt(tokenResp.expires_in, 10) : 3600;
+          this.setStoredAccessToken(tokenResp.access_token, expiresIn);
+          this.isGoogleConnected.set(true);
+          localStorage.setItem('pt_google_connected', 'true');
+          resolve(tokenResp.access_token);
+        } else {
+          resolve(null);
+        }
+      };
+
+      try {
+        this.tokenClient.requestAccessToken({ prompt: '' });
+      } catch (e) {
+        this.silentRefreshPromise = null;
+        resolve(null);
+      }
+    });
+
+    return this.silentRefreshPromise;
   }
 
   // Google Drive REST API & SDK Sync Integration
@@ -2413,7 +2449,7 @@ export class PortfolioService {
   }
 
   private async fetchDriveApi(url: string, options: RequestInit = {}): Promise<Response> {
-    let token = this.getValidAccessToken();
+    let token = await this.ensureFreshToken();
     const headers: Record<string, string> = {};
     if (options.headers) {
       if (options.headers instanceof Headers) {
@@ -2432,33 +2468,12 @@ export class PortfolioService {
     let resp = await fetch(url, options);
 
     if (resp.status === 401) {
-      this.clearStoredAccessToken();
-      const newToken = await new Promise<string | null>((resolve) => {
-        if (!this.tokenClient) {
-          this.initializeGoogleDriveSDK();
-        }
-        if (!this.tokenClient) {
-          resolve(null);
-          return;
-        }
-        this.tokenClient.callback = (tokenResp: any) => {
-          if (tokenResp && tokenResp.access_token) {
-            const expiresIn = tokenResp.expires_in ? parseInt(tokenResp.expires_in, 10) : 3600;
-            this.setStoredAccessToken(tokenResp.access_token, expiresIn);
-            this.isGoogleConnected.set(true);
-            localStorage.setItem('pt_google_connected', 'true');
-            resolve(tokenResp.access_token);
-          } else {
-            resolve(null);
-          }
-        };
-        try {
-          this.tokenClient.requestAccessToken({ prompt: '' });
-        } catch (e) {
-          resolve(null);
-        }
-      });
-
+      this.accessToken = null;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('pt_google_access_token');
+        localStorage.removeItem('pt_google_token_expires_at');
+      }
+      const newToken = await this.requestSilentAccessToken();
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
         options.headers = headers;
@@ -2633,7 +2648,14 @@ export class PortfolioService {
   }
 
   public async ensureFreshToken(): Promise<string | null> {
-    return this.getValidAccessToken();
+    const valid = this.getValidAccessToken();
+    if (valid) return valid;
+
+    const isConnected = this.isGoogleConnected() || (typeof localStorage !== 'undefined' && localStorage.getItem('pt_google_connected') === 'true');
+    if (isConnected) {
+      return await this.requestSilentAccessToken();
+    }
+    return null;
   }
 
   public async uploadToGoogleDriveSilent() {
@@ -2834,7 +2856,8 @@ export class PortfolioService {
   public async uploadToGoogleDrive() {
     const token = await this.ensureFreshToken();
     if (!token) {
-      this.showToast('Unable to sync with Google Drive. Check internet connection.', 'error');
+      this.pendingGoogleDriveAction = 'upload';
+      this.connectGoogleDrive();
       return;
     }
 
@@ -2875,7 +2898,8 @@ export class PortfolioService {
   public async downloadFromGoogleDrive() {
     const token = await this.ensureFreshToken();
     if (!token) {
-      this.showToast('Unable to sync with Google Drive. Check internet connection.', 'error');
+      this.pendingGoogleDriveAction = 'download';
+      this.connectGoogleDrive();
       return;
     }
 
