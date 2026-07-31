@@ -2510,7 +2510,7 @@ export class PortfolioService {
         `--${boundary}--`;
 
       const resp = await this.fetchDriveApi(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&keepRevisionForever=true',
         {
           method: 'POST',
           headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -2519,6 +2519,7 @@ export class PortfolioService {
       );
       if (!resp.ok) throw new Error(`Creation failed: ${resp.statusText}`);
       const data = await resp.json();
+      if (data.id) this.pinDriveRevisions(data.id);
       return data.id;
     } catch (e) {
       console.error('Error creating file on Google Drive', e);
@@ -2543,17 +2544,44 @@ export class PortfolioService {
         `--${boundary}--`;
 
       const resp = await this.fetchDriveApi(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&keepRevisionForever=true`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
           body: multipartBody
         }
       );
+      if (resp.ok) this.pinDriveRevisions(fileId);
       return resp.ok;
     } catch (e) {
       console.error('Error updating file on Google Drive', e);
       return false;
+    }
+  }
+
+  private async pinDriveRevisions(fileId: string) {
+    try {
+      const resp = await this.fetchDriveApi(
+        `https://www.googleapis.com/drive/v3/files/${fileId}/revisions?fields=revisions(id,keepForever)`
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.revisions && Array.isArray(data.revisions)) {
+        for (const rev of data.revisions) {
+          if (!rev.keepForever) {
+            await this.fetchDriveApi(
+              `https://www.googleapis.com/drive/v3/files/${fileId}/revisions/${rev.id}`,
+              {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keepForever: true })
+              }
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error pinning Google Drive file revisions', e);
     }
   }
 
