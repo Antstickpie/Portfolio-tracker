@@ -1586,7 +1586,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% inv)`;
+          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% Cost)`;
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;
