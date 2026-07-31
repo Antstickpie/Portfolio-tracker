@@ -1501,8 +1501,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     // Scale canvas to match high-resolution screens (Retina displays)
     const dpr = window.devicePixelRatio || 1;
-    const displayWidth = Math.min(460, canvas.parentElement?.clientWidth || 460);
-    const displayHeight = displayWidth < 380 ? 260 : 320;
+    const containerWidth = canvas.parentElement?.clientWidth || 460;
+    const isMobile = containerWidth < 500;
+    const displayWidth = Math.min(540, Math.max(300, containerWidth));
+    const displayHeight = isMobile ? 270 : 330;
 
     canvas.style.width = displayWidth + 'px';
     canvas.style.height = displayHeight + 'px';
@@ -1517,8 +1519,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const cx = displayWidth / 2;
     const cy = displayHeight / 2;
-    const sideMargin = displayWidth < 400 ? 76 : 56;
-    const radius = Math.min(cx, cy) - sideMargin;
+    const sideMargin = isMobile ? 70 : 108;
+    const radius = Math.min(cx - sideMargin, cy - 42);
     const innerRadius = radius * 0.48;
 
     if (data.length === 0 && baselineData.length === 0) {
@@ -1590,7 +1592,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
       // Draw label
       let displayLabel = item.label;
-      if (displayWidth < 400) {
+      if (isMobile) {
         const abbrevs: Record<string, string> = {
           'Technology': 'Tech',
           'Semiconductors': 'Semis',
@@ -1607,11 +1609,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          if (displayWidth < 380) {
+          if (isMobile) {
             labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
           } else {
-            const costLabel = displayWidth < 420 ? 'C' : 'Cost';
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${costLabel})`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% Cost)`;
           }
         }
       }
@@ -1627,7 +1628,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         const ey = cy + elbowRad * Math.sin(middleAngle);
         
         const isRight = Math.cos(middleAngle) >= 0;
-        const lineLength = displayWidth < 400 ? 8 : 12;
+        const lineLength = isMobile ? 8 : 12;
         
         let finalY = ey;
         const minDistance = 11;
@@ -1650,7 +1651,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
         const ty = finalY;
         ctx.save();
-        const fontPx = displayWidth < 400 ? 8.5 : 9;
+        const fontPx = isMobile ? 8.5 : 9.5;
         ctx.font = `500 ${fontPx}px Outfit`;
         const textWidth = ctx.measureText(labelText).width;
 
