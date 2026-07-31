@@ -2860,10 +2860,10 @@ export class PortfolioService {
   }
 
   public async uploadToGoogleDrive() {
-    const token = await this.ensureFreshToken();
+    let token = this.getValidAccessToken();
+    if (!token) token = await this.ensureFreshToken();
     if (!token) {
-      this.pendingGoogleDriveAction = 'upload';
-      this.connectGoogleDrive();
+      this.showToast('Google Drive session expired. Please click Connect to re-authorize.', 'info');
       return;
     }
 
@@ -2902,10 +2902,10 @@ export class PortfolioService {
   }
 
   public async downloadFromGoogleDrive() {
-    const token = await this.ensureFreshToken();
+    let token = this.getValidAccessToken();
+    if (!token) token = await this.ensureFreshToken();
     if (!token) {
-      this.pendingGoogleDriveAction = 'download';
-      this.connectGoogleDrive();
+      this.showToast('Google Drive session expired. Please click Connect to re-authorize.', 'info');
       return;
     }
 
