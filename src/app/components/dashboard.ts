@@ -1517,7 +1517,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const cx = displayWidth / 2;
     const cy = displayHeight / 2;
-    const radius = Math.min(cx, cy) - (displayWidth < 400 ? 66 : 52);
+    const sideMargin = displayWidth < 400 ? 76 : 56;
+    const radius = Math.min(cx, cy) - sideMargin;
     const innerRadius = radius * 0.48;
 
     if (data.length === 0 && baselineData.length === 0) {
@@ -1592,8 +1593,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          const costLabel = displayWidth < 400 ? 'C' : 'Cost';
-          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${costLabel})`;
+          if (displayWidth < 380) {
+            labelText = `${item.label} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
+          } else {
+            const costLabel = displayWidth < 420 ? 'C' : 'Cost';
+            labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${costLabel})`;
+          }
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;
@@ -1608,7 +1613,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         const ey = cy + elbowRad * Math.sin(middleAngle);
         
         const isRight = Math.cos(middleAngle) >= 0;
-        const lineLength = 12;
+        const lineLength = displayWidth < 400 ? 8 : 12;
         
         let finalY = ey;
         const minDistance = 11;
@@ -1629,22 +1634,24 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         }
         usedY.push(finalY);
 
-        let tx = ex + (isRight ? lineLength : -lineLength);
         const ty = finalY;
-
         ctx.save();
-        ctx.font = '500 9px Outfit';
+        const fontPx = displayWidth < 400 ? 8.5 : 9;
+        ctx.font = `500 ${fontPx}px Outfit`;
         const textWidth = ctx.measureText(labelText).width;
-        let textX = tx + (isRight ? 4 : -4);
 
+        let textX = 0;
+        let tx = 0;
         if (isRight) {
-          if (textX + textWidth > displayWidth - 4) {
-            textX = Math.max(tx, displayWidth - textWidth - 4);
-          }
+          const rawTextX = ex + lineLength + 4;
+          textX = Math.min(rawTextX, displayWidth - textWidth - 4);
+          if (textX < ex + 4) textX = ex + 4;
+          tx = textX - 4;
         } else {
-          if (textX - textWidth < 4) {
-            textX = Math.min(tx, textWidth + 4);
-          }
+          const rawTextX = ex - lineLength - 4;
+          textX = Math.max(rawTextX, textWidth + 4);
+          if (textX > ex - 4) textX = ex - 4;
+          tx = textX + 4;
         }
 
         // Draw subtle pointer line
