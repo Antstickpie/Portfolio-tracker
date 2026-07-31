@@ -252,7 +252,7 @@
               {{ sim.shares | number:'1.0-6' }}
             </td>
             <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right;">
-              {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ sim.price | number:'1.2-4' }}
+              {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ sim.price | number:'1.2-2' }}
             </td>
             <td class="num font-mono" style="padding: 0.65rem 0.6rem; text-align: right; color: var(--text-muted);">
               {{ service.getCurrencySymbol(service.getTickerCurrency(sim.ticker)) }}{{ service.calculateSimulatedFees(sim) | number:'1.2-2' }}

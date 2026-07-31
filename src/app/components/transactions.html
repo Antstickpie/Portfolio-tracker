@@ -215,7 +215,7 @@
               <td class="num font-mono">{{ tx.quantity | number:'1.0-6' }}</td>
               <td class="num font-mono">{{ tx.price | currency:tx.currency:'symbol':'1.2-2' }}</td>
               <td class="num font-mono bold">{{ tx.totalAmount | currency:tx.currency:'symbol':'1.2-2' }}</td>
-              <td class="num font-mono text-muted" style="font-size: 0.78rem;">{{ tx.fees ? (tx.fees | currency:tx.currency:'symbol':'1.2-4') : '0.00' }}</td>
+              <td class="num font-mono text-muted" style="font-size: 0.78rem;">{{ tx.fees ? (tx.fees | currency:tx.currency:'symbol':'1.2-2') : '0.00' }}</td>
               
               <!-- Ownership Split Summary Column -->
               <td style="min-width: 170px;">

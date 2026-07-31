@@ -565,7 +565,7 @@ export class SimulationComponent implements AfterViewInit {
       ticker: posForCurr.ticker,
       name: posForCurr.name,
       sector: posForCurr.sector || 'Other',
-      priceFormatted: symbol + (currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      priceFormatted: symbol + (currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       
       // Before / Baseline values
       beforeValFormatted: symbol + Math.round(beforeValUSD * rate).toLocaleString(),

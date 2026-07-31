@@ -1021,10 +1021,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       sector: pos.sector || 'Other',
       pct: data[idx].pct,
       investedPct: investedItem ? investedItem.pct : 0,
-      priceFormatted: symbol + (pos.currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      priceFormatted: symbol + (pos.currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       valueFormatted: symbol + Math.round(rawVal * rate).toLocaleString(),
       shares: pos.totalShares,
-      avgCostFormatted: symbol + (pos.averageCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      avgCostFormatted: symbol + (pos.averageCost * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       purchaseValueFormatted: symbol + Math.round(pos.totalShares * pos.averageCost * rate).toLocaleString()
     };
   });

@@ -334,7 +334,7 @@
           
           <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
             <span style="color: #9ca3af;">Avg Cost:</span>
-            <span style="font-weight: bold; color: #fff;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ (hoveredPt.avgCost || 0) | number:'1.2-4' }}</span>
+            <span style="font-weight: bold; color: #fff;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ (hoveredPt.avgCost || 0) | number:'1.2-2' }}</span>
           </div>
           
           <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.08);">
