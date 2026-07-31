@@ -2277,17 +2277,23 @@ export class PortfolioService {
   public getValidAccessToken(): string | null {
     if (typeof localStorage === 'undefined') return null;
     const token = this.accessToken || localStorage.getItem('pt_google_access_token');
-    const expiresAt = parseInt(localStorage.getItem('pt_google_token_expires_at') || '0', 10);
+    const expiresAtStr = localStorage.getItem('pt_google_token_expires_at');
 
-    // If token exists and has not expired (with 1-minute buffer)
-    if (token && expiresAt > Date.now() + 60000) {
-      if (this.accessToken !== token) {
-        this.accessToken = token;
-        this.activeTokenSignal.set(token);
+    if (!token) return null;
+
+    // Only reject if expiration timestamp is explicitly set in localStorage AND has passed
+    if (expiresAtStr) {
+      const expiresAt = parseInt(expiresAtStr, 10);
+      if (expiresAt > 0 && Date.now() >= expiresAt - 60000) {
+        return null;
       }
-      return token;
     }
-    return null;
+
+    if (this.accessToken !== token) {
+      this.accessToken = token;
+      this.activeTokenSignal.set(token);
+    }
+    return token;
   }
 
   public async refreshAccessToken(): Promise<string | null> {
@@ -2342,36 +2348,28 @@ export class PortfolioService {
   }
 
   private silentRefreshPromise: Promise<string | null> | null = null;
+  private silentRefreshResolve: ((token: string | null) => void) | null = null;
 
   public requestSilentAccessToken(): Promise<string | null> {
     if (this.silentRefreshPromise) return this.silentRefreshPromise;
 
     this.silentRefreshPromise = new Promise<string | null>((resolve) => {
+      this.silentRefreshResolve = resolve;
+
       if (!this.tokenClient) {
         this.initializeGoogleDriveSDK();
       }
       if (!this.tokenClient) {
+        this.silentRefreshResolve = null;
         this.silentRefreshPromise = null;
         resolve(null);
         return;
       }
 
-      this.tokenClient.callback = (tokenResp: any) => {
-        this.silentRefreshPromise = null;
-        if (tokenResp && tokenResp.access_token) {
-          const expiresIn = tokenResp.expires_in ? parseInt(tokenResp.expires_in, 10) : 3600;
-          this.setStoredAccessToken(tokenResp.access_token, expiresIn);
-          this.isGoogleConnected.set(true);
-          localStorage.setItem('pt_google_connected', 'true');
-          resolve(tokenResp.access_token);
-        } else {
-          resolve(null);
-        }
-      };
-
       try {
         this.tokenClient.requestAccessToken({ prompt: '' });
       } catch (e) {
+        this.silentRefreshResolve = null;
         this.silentRefreshPromise = null;
         resolve(null);
       }
@@ -2393,24 +2391,32 @@ export class PortfolioService {
         client_id: this.googleClientId().trim(),
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: async (resp: any) => {
-          if (resp.error) {
-            if (this.pendingGoogleDriveAction === 'connect') {
-              this.showToast('Authentication failed: ' + resp.error, 'error');
-            }
-            return;
-          }
-          if (resp.access_token) {
+          const resolveSilent = this.silentRefreshResolve;
+          this.silentRefreshResolve = null;
+          this.silentRefreshPromise = null;
+
+          if (resp && resp.access_token) {
             const expiresIn = resp.expires_in ? parseInt(resp.expires_in, 10) : 3600;
             this.setStoredAccessToken(resp.access_token, expiresIn);
             this.isGoogleConnected.set(true);
             localStorage.setItem('pt_google_connected', 'true');
-            if (this.pendingGoogleDriveAction === 'connect') {
+
+            if (resolveSilent) resolveSilent(resp.access_token);
+
+            const action = this.pendingGoogleDriveAction;
+            this.pendingGoogleDriveAction = null;
+
+            if (action === 'connect') {
               this.showToast('Connected to Google Drive!', 'success');
-            }
-            if (this.pendingGoogleDriveAction === 'upload') {
+            } else if (action === 'upload') {
               this.uploadToGoogleDrive();
-            } else if (this.pendingGoogleDriveAction === 'download') {
+            } else if (action === 'download') {
               this.downloadFromGoogleDrive();
+            }
+          } else {
+            if (resolveSilent) resolveSilent(null);
+            if (resp?.error && this.pendingGoogleDriveAction === 'connect') {
+              this.showToast('Authentication failed: ' + resp.error, 'error');
             }
             this.pendingGoogleDriveAction = null;
           }
