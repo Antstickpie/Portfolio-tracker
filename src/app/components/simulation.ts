@@ -782,7 +782,13 @@ export class SimulationComponent implements AfterViewInit {
       ctx.restore();
 
       // Draw label
-      const labelText = `${item.label} ${item.pct.toFixed(1)}%`;
+      let labelText = `${item.label} ${item.pct.toFixed(1)}%`;
+      if (baselineData.length > 0) {
+        const baseItem = baselineData.find(b => b.label === item.label);
+        if (baseItem) {
+          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% base)`;
+        }
+      }
       const middleAngle = startAngle + sliceAngle / 2;
 
       // Always draw labels OUTSIDE the chart with a pointer line to prevent slice text overflow

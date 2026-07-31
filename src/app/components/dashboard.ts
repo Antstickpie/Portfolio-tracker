@@ -1013,12 +1013,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     
     const isCost = this.allocationBasis() === 'cost';
     const rawVal = isCost ? pos.totalCost : pos.currentValue;
+    const investedItem = this.investedAssetChartData().find(b => b.label === pos.ticker);
 
     return {
       ticker: pos.ticker,
       name: pos.name,
       sector: pos.sector || 'Other',
       pct: data[idx].pct,
+      investedPct: investedItem ? investedItem.pct : 0,
       priceFormatted: symbol + (pos.currentPrice * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
       valueFormatted: symbol + Math.round(rawVal * rate).toLocaleString(),
       shares: pos.totalShares,
@@ -1026,6 +1028,15 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       purchaseValueFormatted: symbol + Math.round(pos.totalShares * pos.averageCost * rate).toLocaleString()
     };
   });
+
+  public getHoveredSectorInvestedPct(): number | null {
+    const idx = this.hoveredSectorIndex();
+    const data = this.sectorChartData();
+    if (idx === -1 || !data[idx]) return null;
+    const sectorName = data[idx].label;
+    const item = this.investedSectorChartData().find(b => b.label === sectorName);
+    return item ? item.pct : null;
+  }
 
   public showNativePicker(inputEl: HTMLInputElement) {
     try {
@@ -1571,7 +1582,13 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       ctx.restore();
 
       // Draw label
-      const labelText = `${item.label} ${item.pct.toFixed(1)}%`;
+      let labelText = `${item.label} ${item.pct.toFixed(1)}%`;
+      if (hasBaseline) {
+        const baseItem = baselineData.find(b => b.label === item.label);
+        if (baseItem) {
+          labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% inv)`;
+        }
+      }
       const middleAngle = startAngle + sliceAngle / 2;
 
       // Always draw labels OUTSIDE the chart with a pointer line to prevent slice text overflow
