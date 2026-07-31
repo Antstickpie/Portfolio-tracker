@@ -295,12 +295,11 @@ export class PortfolioService {
     }
   }
   
-  // Google Drive Sync properties
   public googleClientId = signal<string>('309949315167-dvuguf67papta8jlu9hjdgljccli6njo.apps.googleusercontent.com');
   public googleFileName = signal<string>('portfolio_tracker_transactions.json');
   public autoSyncGoogleDrive = signal<boolean>(true);
   public activeTokenSignal = signal<string | null>(null);
-  public isGoogleConnected = signal<boolean>(false);
+  public isGoogleConnected = computed(() => !!this.activeTokenSignal() && !!this.getValidAccessToken());
   public googleUserEmail = signal<string>('');
   public lastGoogleSyncTime = signal<number | null>(null);
   public isGoogleSyncing = signal<boolean>(false);
@@ -689,9 +688,6 @@ export class PortfolioService {
 
       const fn = localStorage.getItem('pt_google_file_name');
       if (fn) this.googleFileName.set(fn);
-
-      const gconn = localStorage.getItem('pt_google_connected');
-      if (gconn) this.isGoogleConnected.set(gconn === 'true');
 
       this.getValidAccessToken();
 
@@ -2398,7 +2394,6 @@ export class PortfolioService {
           if (resp && resp.access_token) {
             const expiresIn = resp.expires_in ? parseInt(resp.expires_in, 10) : 3600;
             this.setStoredAccessToken(resp.access_token, expiresIn);
-            this.isGoogleConnected.set(true);
             localStorage.setItem('pt_google_connected', 'true');
 
             if (resolveSilent) resolveSilent(resp.access_token);
@@ -2445,13 +2440,11 @@ export class PortfolioService {
 
   public disconnectGoogleDrive() {
     this.clearStoredAccessToken();
-    this.isGoogleConnected.set(false);
     this.googleUserEmail.set('');
     this.lastGoogleSyncTime.set(null);
     localStorage.removeItem('pt_google_connected');
     localStorage.removeItem('pt_google_user_email');
     localStorage.removeItem('pt_last_google_sync');
-    this.showToast('Disconnected from Google Drive.', 'info');
   }
 
   private async fetchDriveApi(url: string, options: RequestInit = {}): Promise<Response> {
@@ -2863,7 +2856,8 @@ export class PortfolioService {
     let token = this.getValidAccessToken();
     if (!token) token = await this.ensureFreshToken();
     if (!token) {
-      this.showToast('Google Drive session expired. Please click Connect to re-authorize.', 'info');
+      this.pendingGoogleDriveAction = 'upload';
+      this.connectGoogleDrive();
       return;
     }
 
@@ -2905,7 +2899,8 @@ export class PortfolioService {
     let token = this.getValidAccessToken();
     if (!token) token = await this.ensureFreshToken();
     if (!token) {
-      this.showToast('Google Drive session expired. Please click Connect to re-authorize.', 'info');
+      this.pendingGoogleDriveAction = 'download';
+      this.connectGoogleDrive();
       return;
     }
 
