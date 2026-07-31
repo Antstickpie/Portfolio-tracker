@@ -606,10 +606,16 @@ export class SimulationComponent implements AfterViewInit {
         const rate = this.service.getExchangeRate('USD', targetCurr);
         const symbol = this.service.getCurrencySymbol(targetCurr);
 
+        const returnPct = p.unrealizedReturnPct || 0;
+        const isGain = (p.unrealizedProfit || 0) >= 0;
+
         return {
           ticker: p.ticker,
           pct: (valUSD / data[idx].value) * 100,
-          valueFormatted: symbol + Math.round(valUSD * rate).toLocaleString()
+          valueFormatted: symbol + Math.round(p.currentValue * rate).toLocaleString(),
+          costFormatted: symbol + Math.round(p.totalCost * rate).toLocaleString(),
+          returnPct: Math.abs(returnPct),
+          isGain: isGain
         };
       })
       .sort((a, b) => b.pct - a.pct);

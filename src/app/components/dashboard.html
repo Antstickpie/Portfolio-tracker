@@ -481,16 +481,22 @@
               </span>
             </div>
           </div>
-          <div class="overlay-list">
-            <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()">
-              <span class="stock-symbol">{{ stock.ticker }}</span>
-              <div class="progress-track">
+            <div class="overlay-item" *ngFor="let stock of hoveredSectorStocks()" style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; padding: 0.2rem 0;">
+              <div style="display: flex; align-items: center; gap: 0.3rem; min-width: 90px;">
+                <span class="stock-symbol" style="width: auto; font-weight: 700;">{{ stock.ticker }}</span>
+                <span style="font-size: 0.68rem; font-weight: 600;" [ngClass]="stock.isGain ? 'text-success' : 'text-danger'">
+                  {{ stock.isGain ? '▲' : '▼' }}{{ stock.returnPct | number:'1.0-1' }}%
+                </span>
+              </div>
+              <div class="progress-track" style="flex: 1; min-width: 25px;">
                 <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="getSectorColor(hoveredSectorIndex())"></span>
               </div>
-              <span class="stock-pct">{{ stock.pct | number:'1.0-0' }}%</span>
-              <span class="stock-val">{{ stock.valueFormatted }}</span>
+              <span class="stock-pct" style="width: auto; font-size: 0.7rem;">{{ stock.pct | number:'1.0-0' }}%</span>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; font-family: 'Consolas', monospace; font-size: 0.72rem; line-height: 1.25; text-align: right; margin-left: 0.2rem;">
+                <span style="color: var(--text-main); font-weight: 600;">{{ stock.valueFormatted }}</span>
+                <span style="color: var(--text-muted); font-size: 0.65rem;">Cost: {{ stock.costFormatted }}</span>
+              </div>
             </div>
-          </div>
         </div>
 
         <div class="chart-content">
