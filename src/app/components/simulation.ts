@@ -862,15 +862,29 @@ export class SimulationComponent implements AfterViewInit {
       ctx.restore();
 
       // Draw label
-      let labelText = `${item.label} ${item.pct.toFixed(1)}%`;
+      let displayLabel = item.label;
+      if (displayWidth < 400) {
+        const abbrevs: Record<string, string> = {
+          'Technology': 'Tech',
+          'Semiconductors': 'Semis',
+          'Financials': 'Fin',
+          'Consumer': 'Cons',
+          'Industrials': 'Ind',
+          'Healthcare': 'Health',
+          'Communication': 'Comm'
+        };
+        if (abbrevs[displayLabel]) displayLabel = abbrevs[displayLabel];
+      }
+
+      let labelText = `${displayLabel} ${item.pct.toFixed(1)}%`;
       if (baselineData.length > 0) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
           if (displayWidth < 380) {
-            labelText = `${item.label} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
           } else {
             const baseLabel = displayWidth < 420 ? 'B' : 'Base';
-            labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${baseLabel})`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${baseLabel})`;
           }
         }
       }
@@ -923,7 +937,6 @@ export class SimulationComponent implements AfterViewInit {
       } else {
         const rawTextX = ex - lineLength - 4;
         textX = Math.max(rawTextX, textWidth + 4);
-        if (textX > ex - 4) textX = ex - 4;
         tx = textX + 4;
       }
 

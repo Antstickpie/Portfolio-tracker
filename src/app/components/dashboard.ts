@@ -1589,15 +1589,29 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       ctx.restore();
 
       // Draw label
-      let labelText = `${item.label} ${item.pct.toFixed(1)}%`;
+      let displayLabel = item.label;
+      if (displayWidth < 400) {
+        const abbrevs: Record<string, string> = {
+          'Technology': 'Tech',
+          'Semiconductors': 'Semis',
+          'Financials': 'Fin',
+          'Consumer': 'Cons',
+          'Industrials': 'Ind',
+          'Healthcare': 'Health',
+          'Communication': 'Comm'
+        };
+        if (abbrevs[displayLabel]) displayLabel = abbrevs[displayLabel];
+      }
+
+      let labelText = `${displayLabel} ${item.pct.toFixed(1)}%`;
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
           if (displayWidth < 380) {
-            labelText = `${item.label} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
           } else {
             const costLabel = displayWidth < 420 ? 'C' : 'Cost';
-            labelText = `${item.label} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${costLabel})`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% ${costLabel})`;
           }
         }
       }
@@ -1650,7 +1664,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         } else {
           const rawTextX = ex - lineLength - 4;
           textX = Math.max(rawTextX, textWidth + 4);
-          if (textX > ex - 4) textX = ex - 4;
           tx = textX + 4;
         }
 
