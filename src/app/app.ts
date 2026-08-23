@@ -22,6 +22,7 @@ import { PortfolioService } from './services/portfolio.service';
 export class App {
   public service = inject(PortfolioService);
   public activeTab = signal<'dashboard' | 'ledger' | 'prices' | 'simulation'>('dashboard');
+  public currentYear = new Date().getFullYear();
 
   // True when only demo data is loaded (no real user data yet)
   public isDemoMode = computed(() => {

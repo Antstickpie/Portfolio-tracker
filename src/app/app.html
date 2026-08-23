@@ -154,9 +154,8 @@
     <app-simulation *ngIf="activeTab() === 'simulation'"></app-simulation>
   </main>
 
-  <!-- Global Footer -->
   <footer class="app-footer" style="text-align: center; width: 100%; padding: 1.5rem 0 2rem 0; color: var(--text-muted); font-size: 0.8rem;">
-    <p style="margin: 0; text-align: center;">Portfolio Tracker &copy; 2026. Data stored locally in browser.</p>
+    <p style="margin: 0; text-align: center;">Portfolio Tracker &copy; {{ currentYear }}. Data stored locally in browser.</p>
   </footer>
 </div>
 
