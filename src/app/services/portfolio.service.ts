@@ -391,12 +391,6 @@ export class PortfolioService {
       }, 1000);
     }
 
-    effect(() => {
-      this.transactions();
-      untracked(() => {
-        this.failedTickers.clear();
-      });
-    });
 
     effect(() => {
       const activePairs = this.getExchangeRatePairs();
@@ -1659,11 +1653,21 @@ export class PortfolioService {
     resolve: (symbol: string | null) => void;
   } | null>(null);
 
+  public dismissToast(id: string) {
+    this.toasts.update((prev) => prev.filter((t) => t.id !== id));
+  }
+
   public showToast(message: string, type: 'success' | 'error' | 'info' = 'success', duration = 3500) {
+    if (!message) return;
+    // Deduplicate if same message already visible
+    const current = this.toasts();
+    if (current.some(t => t.message === message)) return;
+
     const id = 'toast-' + Math.random().toString(36).substring(2, 9);
-    this.toasts.update((prev) => [...prev, { id, message, type }]);
+    // Limit to max 3 toasts on screen at once
+    this.toasts.update((prev) => [...prev.slice(-2), { id, message, type }]);
     setTimeout(() => {
-      this.toasts.update((prev) => prev.filter((t) => t.id !== id));
+      this.dismissToast(id);
     }, duration);
   }
 
@@ -1693,72 +1697,82 @@ export class PortfolioService {
   public async selectYahooSymbol(ticker: string): Promise<string | null> {
     const cleanTicker = ticker.toUpperCase().trim();
     const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
-    const searchResponse = await this.fetchWithProxy(searchTarget, true);
-    if (!searchResponse.ok) {
+    try {
+      const searchResponse = await this.fetchWithProxy(searchTarget, true);
+      if (!searchResponse.ok) {
+        this.showToast('Could not fetch search results from Yahoo.', 'error');
+        return null;
+      }
+      const searchData = await searchResponse.json();
+      const results = searchData?.quotes || [];
+      
+      if (results.length === 0) {
+        this.showToast(`No Yahoo symbols found for "${ticker}"`, 'info');
+        return null;
+      }
+
+      // Fetch prices and currencies with concurrency limit for the top search results to help the user choose
+      const topQuotes = results.slice(0, 8);
+      const symbols = topQuotes.map((q: any) => q.symbol).filter(Boolean);
+      const priceResults = await this.runConcurrent(
+        symbols,
+        async (sym: string) => {
+          try {
+            const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`;
+            const resp = await this.fetchWithProxy(target, true);
+            if (resp.ok) {
+              const d = await resp.json();
+              const meta = d?.chart?.result?.[0]?.meta;
+              if (meta) {
+                let price = parseFloat(meta.regularMarketPrice);
+                if (price === null || isNaN(price) || price <= 0) {
+                  price = parseFloat(meta.chartPreviousClose);
+                }
+                return {
+                  symbol: sym,
+                  price: !isNaN(price) && price > 0 ? price : null,
+                  currency: (meta.currency || 'USD').toUpperCase()
+                };
+              }
+            }
+          } catch (e) {
+            // ignore error
+          }
+          return { symbol: sym, price: null, currency: 'USD' };
+        },
+        3,
+        50
+      );
+
+      const priceMap = new Map<string, { price: number | null; currency: string }>();
+      priceResults.forEach((r: any) => {
+        if (r) priceMap.set(r.symbol, { price: r.price, currency: r.currency });
+      });
+
+      return new Promise<string | null>((resolve) => {
+        this.searchSymbolModal.set({
+          ticker,
+          results: topQuotes.map((q: any) => {
+            const pInfo = priceMap.get(q.symbol) || { price: null, currency: 'USD' };
+            return {
+              symbol: q.symbol,
+              name: q.longname || q.shortname || ticker,
+              exchange: q.exchange,
+              quoteType: q.quoteType || 'EQUITY',
+              price: pInfo.price,
+              currency: pInfo.currency
+            };
+          }),
+          resolve: (val) => {
+            this.searchSymbolModal.set(null);
+            resolve(val);
+          }
+        });
+      });
+    } catch (e) {
       this.showToast('Could not fetch search results from Yahoo.', 'error');
       return null;
     }
-    const searchData = await searchResponse.json();
-    const results = searchData?.quotes || [];
-    
-    if (results.length === 0) {
-      this.showToast(`No Yahoo symbols found for "${ticker}"`, 'info');
-      return null;
-    }
-
-    // Fetch prices and currencies in parallel for the top search results to help the user choose
-    const symbols = results.map((q: any) => q.symbol).filter(Boolean);
-    const pricePromises = symbols.map(async (sym: string) => {
-      try {
-        const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`;
-        const resp = await this.fetchWithProxy(target, true);
-        if (resp.ok) {
-          const d = await resp.json();
-          const meta = d?.chart?.result?.[0]?.meta;
-          if (meta) {
-            let price = parseFloat(meta.regularMarketPrice);
-            if (price === null || isNaN(price) || price <= 0) {
-              price = parseFloat(meta.chartPreviousClose);
-            }
-            return {
-              symbol: sym,
-              price: !isNaN(price) && price > 0 ? price : null,
-              currency: (meta.currency || 'USD').toUpperCase()
-            };
-          }
-        }
-      } catch (e) {
-        // ignore error
-      }
-      return { symbol: sym, price: null, currency: 'USD' };
-    });
-
-    const priceResults = await Promise.all(pricePromises);
-    const priceMap = new Map<string, { price: number | null; currency: string }>();
-    priceResults.forEach((r: any) => {
-      priceMap.set(r.symbol, { price: r.price, currency: r.currency });
-    });
-
-    return new Promise<string | null>((resolve) => {
-      this.searchSymbolModal.set({
-        ticker,
-        results: results.map((q: any) => {
-          const pInfo = priceMap.get(q.symbol) || { price: null, currency: 'USD' };
-          return {
-            symbol: q.symbol,
-            name: q.longname || q.shortname || ticker,
-            exchange: q.exchange,
-            quoteType: q.quoteType || 'EQUITY',
-            price: pInfo.price,
-            currency: pInfo.currency
-          };
-        }),
-        resolve: (val) => {
-          this.searchSymbolModal.set(null);
-          resolve(val);
-        }
-      });
-    });
   }
 
   public failedLogos = signal<Set<string>>((() => {
@@ -1826,6 +1840,19 @@ export class PortfolioService {
     return tx ? tx.currency : 'USD';
   }
 
+  public async runConcurrent<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency = 4, delayBetweenMs = 60): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += concurrency) {
+      const chunk = items.slice(i, i + concurrency);
+      const chunkResults = await Promise.all(chunk.map(fn));
+      results.push(...chunkResults);
+      if (i + concurrency < items.length && delayBetweenMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayBetweenMs));
+      }
+    }
+    return results;
+  }
+
   // Query a free API to update current stock prices
   public async loadMarketPricesApi(force: boolean = false, silent: boolean = false) {
     if (force) {
@@ -1841,9 +1868,7 @@ export class PortfolioService {
       return;
     }
 
-
-
-    if (!silent) this.showToast('Fetching real-time market rates with autocomplete discovery...', 'info');
+    if (!silent) this.showToast('Fetching real-time market rates...', 'info');
 
     try {
       let updatedCount = 0;
@@ -1886,77 +1911,113 @@ export class PortfolioService {
             this.markTickerNotFound(originalTicker);
             return;
           }
-          if (!chartResponse.ok) return;
 
-          const data = await chartResponse.json();
-          const result = data?.chart?.result?.[0];
-          const chartMeta = result?.meta;
-          if (!chartMeta) return;
-
-          let price: number | null = null;
-          const closes = result.indicators?.quote?.[0]?.close || [];
-          for (let i = closes.length - 1; i >= 0; i--) {
-            if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-              price = parseFloat(closes[i]);
-              break;
-            }
-          }
-          if (price === null || isNaN(price) || price <= 0) {
-            price = parseFloat(chartMeta.regularMarketPrice);
-          }
-          if (price === null || isNaN(price) || price <= 0) {
-            price = parseFloat(chartMeta.chartPreviousClose);
-          }
-
-          let currency: string = (chartMeta.currency || 'USD').toUpperCase();
-          if (!isNaN(price) && price > 0) {
-            if (currency === 'GBP' || chartMeta.currency === 'GBp') {
-              if (chartMeta.currency === 'GBp') price = price / 100;
-              currency = 'GBP';
-            }
-
-            // Extract splits
-            const events = result?.events;
-            if (events?.splits) {
-              const splitsArr: { date: string; ratio: number }[] = [];
-              Object.values(events.splits).forEach((s: any) => {
-                if (s.numerator && s.denominator) {
-                  const d = new Date(s.date * 1000);
-                  const dateStr = d.toISOString().slice(0, 10);
-                  splitsArr.push({ date: dateStr, ratio: s.numerator / s.denominator });
+          if (chartResponse.ok) {
+            const data = await chartResponse.json();
+            const result = data?.chart?.result?.[0];
+            const chartMeta = result?.meta;
+            if (chartMeta) {
+              let price: number | null = null;
+              const closes = result.indicators?.quote?.[0]?.close || [];
+              for (let i = closes.length - 1; i >= 0; i--) {
+                if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+                  price = parseFloat(closes[i]);
+                  break;
                 }
-              });
-              if (splitsArr.length > 0) {
-                splitsArr.sort((a, b) => a.date.localeCompare(b.date));
-                const existingCfg = this.tickerConfigs()[originalTicker];
-                if (!existingCfg?.splits || JSON.stringify(existingCfg.splits) !== JSON.stringify(splitsArr)) {
-                  this.tickerConfigs.update(p => ({
-                    ...p,
-                    [originalTicker]: { ...(p[originalTicker] || {}), splits: splitsArr }
-                  }));
+              }
+              if (price === null || isNaN(price) || price <= 0) {
+                price = parseFloat(chartMeta.regularMarketPrice);
+              }
+              if (price === null || isNaN(price) || price <= 0) {
+                price = parseFloat(chartMeta.chartPreviousClose);
+              }
+
+              let currency: string = (chartMeta.currency || 'USD').toUpperCase();
+              if (!isNaN(price) && price > 0) {
+                if (currency === 'GBP' || chartMeta.currency === 'GBp') {
+                  if (chartMeta.currency === 'GBp') price = price / 100;
+                  currency = 'GBP';
+                }
+
+                // Extract splits
+                const events = result?.events;
+                if (events?.splits) {
+                  const splitsArr: { date: string; ratio: number }[] = [];
+                  Object.values(events.splits).forEach((s: any) => {
+                    if (s.numerator && s.denominator) {
+                      const d = new Date(s.date * 1000);
+                      const dateStr = d.toISOString().slice(0, 10);
+                      splitsArr.push({ date: dateStr, ratio: s.numerator / s.denominator });
+                    }
+                  });
+                  if (splitsArr.length > 0) {
+                    splitsArr.sort((a, b) => a.date.localeCompare(b.date));
+                    const existingCfg = this.tickerConfigs()[originalTicker];
+                    if (!existingCfg?.splits || JSON.stringify(existingCfg.splits) !== JSON.stringify(splitsArr)) {
+                      this.tickerConfigs.update(p => ({
+                        ...p,
+                        [originalTicker]: { ...(p[originalTicker] || {}), splits: splitsArr }
+                      }));
+                    }
+                  }
+                }
+
+                const current = meta[originalTicker] || {};
+                const finalSector = current.sector || 'Other';
+                const finalName = chartMeta.longName || chartMeta.shortName || current.name || originalTicker;
+                const finalLogo = current.logoData;
+                this.updateTickerConfig(originalTicker, price, finalSector, finalName, currency, finalLogo);
+                bulkUpdatedSet.add(originalTicker);
+                updatedCount++;
+                return;
+              }
+            }
+          }
+
+          // Fallback 1: Stooq CSV quote endpoint
+          try {
+            const stooqSymbol = resolvedSymbol.includes('.') ? resolvedSymbol : `${resolvedSymbol}.US`;
+            const stooqTarget = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSymbol.toLowerCase())}&f=sd2t2ohlcv&h&e=csv`;
+            const stooqResp = await this.fetchWithProxy(stooqTarget, true);
+            if (stooqResp.ok) {
+              const text = await stooqResp.text();
+              const lines = text.trim().split('\n');
+              if (lines.length >= 2) {
+                const cols = lines[1].split(',');
+                const closeVal = parseFloat(cols[6]);
+                if (!isNaN(closeVal) && closeVal > 0) {
+                  const current = meta[originalTicker] || {};
+                  this.updateTickerConfig(
+                    originalTicker,
+                    closeVal,
+                    current.sector || 'Other',
+                    current.name || originalTicker,
+                    current.priceCurrency || 'USD',
+                    current.logoData
+                  );
+                  bulkUpdatedSet.add(originalTicker);
+                  updatedCount++;
+                  return;
                 }
               }
             }
-
-            const current = meta[originalTicker] || {};
-            const finalSector = current.sector || 'Other';
-            const finalName = chartMeta.longName || chartMeta.shortName || current.name || originalTicker;
-            const finalLogo = current.logoData;
-            this.updateTickerConfig(originalTicker, price, finalSector, finalName, currency, finalLogo);
-            bulkUpdatedSet.add(originalTicker);
-            updatedCount++;
+          } catch (stooqErr) {
+            // ignore
           }
         } catch (e) {
           // Network errors or tab wake-up glitches are not 404s — preserve existing prices
         }
       };
 
-      // Fetch all symbols in parallel via v8 chart
-      await Promise.all(
-        Array.from(symbolMap.entries()).map(([resolved, original]) => fetchViaChart(resolved, original))
+      // Fetch all symbols with concurrency limit to prevent proxy rate-limiting (429)
+      await this.runConcurrent(
+        Array.from(symbolMap.entries()),
+        ([resolved, original]) => fetchViaChart(resolved, original),
+        4,
+        80
       );
 
-      // Autocomplete discovery helper for remaining tickers
+      // Autocomplete discovery helper for remaining un-updated tickers (silently in background)
       const fetchWithSelfDiscovery = async (ticker: string): Promise<{ ticker: string, price: number, priceCurrency: string, sector?: string, name?: string, logoData?: string, yahooSymbol?: string } | null> => {
         try {
           const cleanTicker = ticker.toUpperCase().trim();
@@ -1977,29 +2038,22 @@ export class PortfolioService {
             name = config.name || cleanTicker;
             sector = config.sector || 'Other';
           } else {
-            let selectedSymbol: string | null = null;
-            if (force) {
-              selectedSymbol = await this.selectYahooSymbol(cleanTicker);
-            } else {
-              // Silently resolve to first match in background auto-refreshes
-              const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
-              const searchResponse = await this.fetchWithProxy(searchTarget, true);
-              if (searchResponse.ok) {
-                const searchData = await searchResponse.json();
-                const quotes = searchData?.quotes || [];
-                let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
-                if (!quote && quotes.length > 0) {
-                  quote = quotes[0];
-                }
-                if (quote) {
-                  selectedSymbol = quote.symbol.toUpperCase();
-                  name = quote.longname || quote.shortname || cleanTicker;
-                  sector = quote.sector || 'Other';
-                }
+            // Silently resolve via search endpoint
+            const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
+            const searchResponse = await this.fetchWithProxy(searchTarget, true);
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              const quotes = searchData?.quotes || [];
+              let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
+              if (!quote && quotes.length > 0) {
+                quote = quotes[0];
+              }
+              if (quote) {
+                resolvedSymbol = quote.symbol.toUpperCase();
+                name = quote.longname || quote.shortname || cleanTicker;
+                sector = quote.sector || 'Other';
               }
             }
-            if (!selectedSymbol) return null;
-            resolvedSymbol = selectedSymbol;
           }
 
           const cleanResolved = encodeURIComponent(resolvedSymbol);
@@ -2063,9 +2117,6 @@ export class PortfolioService {
           }
         } catch (e) {
           console.warn(`Failed to self-discover price/info for ${ticker}:`, e);
-          if (typeof window !== 'undefined' && window.navigator.onLine) {
-            this.markTickerNotFound(ticker);
-          }
         }
         return null;
       };
@@ -2077,42 +2128,41 @@ export class PortfolioService {
         return !isNotFound && !bulkUpdatedSet.has(t);
       });
       if (remainingTickers.length > 0) {
-        for (const ticker of remainingTickers) {
-          const res = await fetchWithSelfDiscovery(ticker);
-          if (res) {
-            const price = res.price;
-            const current = meta[ticker] || {
-              ticker,
-              currentPrice: price,
-              priceCurrency: res.priceCurrency || 'USD',
-              sector: res.sector || 'Other',
-              name: res.name || ticker,
-              logoData: res.logoData
-            };
-            
-            const finalSector = res.sector || current.sector || 'Other';
-            const finalName = res.name || current.name || ticker;
-            const finalLogo = res.logoData || current.logoData;
-            
-            if (res.yahooSymbol && res.yahooSymbol !== ticker && current.yahooSymbol !== res.yahooSymbol) {
-              this.showToast(`Auto-resolved ticker "${ticker}" to Yahoo symbol "${res.yahooSymbol}". Please verify this in Prices/Settings.`, 'info', 10000);
+        await this.runConcurrent(
+          remainingTickers,
+          async (ticker) => {
+            const res = await fetchWithSelfDiscovery(ticker);
+            if (res) {
+              const price = res.price;
+              const current = meta[ticker] || {
+                ticker,
+                currentPrice: price,
+                priceCurrency: res.priceCurrency || 'USD',
+                sector: res.sector || 'Other',
+                name: res.name || ticker,
+                logoData: res.logoData
+              };
+              
+              const finalSector = res.sector || current.sector || 'Other';
+              const finalName = res.name || current.name || ticker;
+              const finalLogo = res.logoData || current.logoData;
+              
+              if (res.yahooSymbol && res.yahooSymbol !== ticker && current.yahooSymbol !== res.yahooSymbol) {
+                this.showToast(`Auto-resolved ticker "${ticker}" to Yahoo symbol "${res.yahooSymbol}".`, 'info', 6000);
+              }
+              
+              this.updateTickerConfig(ticker, price, finalSector, finalName, res.priceCurrency, finalLogo, res.yahooSymbol);
+              updatedCount++;
             }
-            
-            this.updateTickerConfig(ticker, price, finalSector, finalName, res.priceCurrency, finalLogo, res.yahooSymbol);
-            updatedCount++;
-          } else {
-            // Self-discovery failed or user cancelled search modal
-            this.markTickerNotFound(ticker);
-            if (force) {
-              this.showToast(`Yahoo symbol selection cancelled for "${ticker}". Storing as unresolved (Error).`, 'error', 6000);
-            }
-          }
-        }
+          },
+          3,
+          100
+        );
       }
 
-
-      if (updatedCount === 0) {
-        throw new Error('All tickers failed to fetch');
+      if (updatedCount === 0 && !silent) {
+        this.showToast('Could not reach market data API right now. Keeping existing prices.', 'info');
+        return;
       }
 
       // Save successful refresh timestamp
@@ -2122,11 +2172,7 @@ export class PortfolioService {
     } catch (err) {
       console.warn('Real-time fetch failed:', err);
       if (!silent) {
-        this.showToast('Real-time API fetch failed.', 'error');
-        this.showAlert(
-          'Real-time Fetch Failed',
-          'We were unable to contact the Yahoo Finance API (rate-limiting or offline). Keeping last known prices.'
-        );
+        this.showToast('Market prices refresh postponed (network/rate limit). Keeping saved prices.', 'info');
       }
     }
   }
@@ -2210,45 +2256,110 @@ export class PortfolioService {
   public async loadExchangeRatesApi(force: boolean = false, silent: boolean = false) {
     const pairs = this.getExchangeRatePairs();
 
-
     if (!silent) this.showToast('Fetching current exchange rates...', 'info');
 
     try {
       const updatedRates: Record<string, number> = {};
       let updatedCount = 0;
 
-      const fetchRate = async (pair: string): Promise<{ pair: string, price: number } | null> => {
-        try {
-          const parts = pair.split('/');
-          const ticker = `${parts[0]}${parts[1]}=X`;
-          const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
-          
-          const response = await this.fetchWithProxy(chartTarget, true);
-          if (response.ok) {
-            const data = await response.json();
-            const chartMeta = data?.chart?.result?.[0]?.meta;
-            if (chartMeta) {
-              const price = parseFloat(chartMeta.regularMarketPrice || chartMeta.chartPreviousClose);
-              if (!isNaN(price) && price > 0) {
-                return { pair, price };
+      // 1. Try Frankfurter API first (Direct CORS open API, fastest & most reliable)
+      try {
+        const resp = await fetch('https://api.frankfurter.app/latest?from=USD', { signal: AbortSignal.timeout(3500) });
+        if (resp.ok) {
+          const data = await resp.json();
+          const rates: Record<string, number> = data?.rates || {};
+          rates['USD'] = 1.0;
+
+          pairs.forEach(pair => {
+            const [base, quote] = pair.split('/');
+            const baseRate = rates[base];
+            const quoteRate = rates[quote];
+            if (baseRate && quoteRate) {
+              const calc = quoteRate / baseRate;
+              if (calc > 0) {
+                updatedRates[pair] = parseFloat(calc.toFixed(6));
+                updatedCount++;
               }
             }
+          });
+        }
+      } catch (e) {
+        // Frankfurter fallback
+      }
+
+      // 2. Try Open Exchange Rate API if needed
+      if (updatedCount < pairs.length) {
+        try {
+          const resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(3500) });
+          if (resp.ok) {
+            const data = await resp.json();
+            const rates: Record<string, number> = data?.rates || {};
+            rates['USD'] = 1.0;
+
+            pairs.forEach(pair => {
+              if (updatedRates[pair] === undefined) {
+                const [base, quote] = pair.split('/');
+                const baseRate = rates[base];
+                const quoteRate = rates[quote];
+                if (baseRate && quoteRate) {
+                  const calc = quoteRate / baseRate;
+                  if (calc > 0) {
+                    updatedRates[pair] = parseFloat(calc.toFixed(6));
+                    updatedCount++;
+                  }
+                }
+              }
+            });
           }
         } catch (e) {
-          console.warn(`Failed to fetch rate for ${pair}:`, e);
+          // ignore
         }
-        return null;
-      };
+      }
 
-      const promises = pairs.map(pair => fetchRate(pair));
-      const results = await Promise.all(promises);
-      
-      pairs.forEach((pair, idx) => {
-        const res = results[idx];
-        if (res) {
-          updatedRates[res.pair] = parseFloat(res.price.toFixed(6));
-          updatedCount++;
-        } else {
+      // 3. Fallback to Yahoo chart endpoint for any remaining missing pairs
+      const remainingPairs = pairs.filter(p => updatedRates[p] === undefined);
+      if (remainingPairs.length > 0) {
+        const fetchRate = async (pair: string): Promise<{ pair: string, price: number } | null> => {
+          try {
+            const parts = pair.split('/');
+            const ticker = `${parts[0]}${parts[1]}=X`;
+            const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
+            
+            const response = await this.fetchWithProxy(chartTarget, true);
+            if (response.ok) {
+              const data = await response.json();
+              const chartMeta = data?.chart?.result?.[0]?.meta;
+              if (chartMeta) {
+                const price = parseFloat(chartMeta.regularMarketPrice || chartMeta.chartPreviousClose);
+                if (!isNaN(price) && price > 0) {
+                  return { pair, price };
+                }
+              }
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch rate for ${pair}:`, e);
+          }
+          return null;
+        };
+
+        const results = await this.runConcurrent(
+          remainingPairs,
+          pair => fetchRate(pair),
+          4,
+          80
+        );
+
+        remainingPairs.forEach((pair, idx) => {
+          const res = results[idx];
+          if (res) {
+            updatedRates[res.pair] = parseFloat(res.price.toFixed(6));
+            updatedCount++;
+          }
+        });
+      }
+
+      pairs.forEach(pair => {
+        if (updatedRates[pair] === undefined) {
           const prev = this.exchangeRates()[pair];
           if (prev !== undefined) {
             updatedRates[pair] = prev;
@@ -2261,11 +2372,9 @@ export class PortfolioService {
         this.saveToStorage();
         localStorage.setItem('pt_last_rates_refresh_time', Date.now().toString());
         if (!silent) this.showToast(`Successfully refreshed ${updatedCount} exchange rates!`, 'success');
-      } else {
-        throw new Error('All rates failed to fetch');
       }
-    } catch (err) {
-      console.warn('Exchange rates fetch failed:', err);
+    } catch (e) {
+      console.warn('Exchange rates fetch failed:', e);
       if (!silent) this.showToast('Failed to fetch exchange rates.', 'error');
     }
   }
@@ -2940,197 +3049,187 @@ export class PortfolioService {
     await this.uploadToGoogleDrive();
   }
 
+  private isFetchingHistory = false;
+
   public async fetchHistoricalPricesForTickers(tickers: string[], range: string = '1mo') {
-    const pricesObj = { ...this.historicalPrices() };
-    let updated = false;
+    if (this.isFetchingHistory) return;
+    this.isFetchingHistory = true;
 
-    // Filter to tickers with transactions and resolve symbols
-    const activeTickers = tickers.map(t => t.toUpperCase().trim()).filter(Boolean);
+    try {
+      const pricesObj = { ...this.historicalPrices() };
+      let updated = false;
 
-    // Calculate first transaction date for each ticker
-    const firstTxDateMap = new Map<string, string>();
-    this.transactions().forEach(t => {
-      const ticker = (t.ticker || '').toUpperCase().trim();
-      const txDateStr = (t.date || '').slice(0, 10);
-      if (ticker && txDateStr) {
-        const existing = firstTxDateMap.get(ticker);
-        if (!existing || txDateStr < existing) {
-          firstTxDateMap.set(ticker, txDateStr);
-        }
-      }
-    });
+      // Filter to tickers with transactions and resolve symbols
+      const activeTickers = tickers.map(t => t.toUpperCase().trim()).filter(Boolean);
 
-    // Determine oldest date needed for the requested range
-    const limitDate = new Date();
-    let daysNeeded = 30;
-    if (range === '3mo') daysNeeded = 90;
-    else if (range === '6mo') daysNeeded = 180;
-    else if (range === '1y') daysNeeded = 365;
-    else if (range === '2y') daysNeeded = 730;
-    else if (range === '5y') daysNeeded = 1825;
-    else if (range === 'max') daysNeeded = 10000;
-    limitDate.setDate(limitDate.getDate() - daysNeeded);
-    const limitDateStr = limitDate.toISOString().slice(0, 10);
-
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const now = Date.now();
-    const cooldownMs = 15 * 60 * 1000; // 15 minutes cooldown
-
-    const rangeLevels: Record<string, number> = {
-      '1mo': 1,
-      '3mo': 2,
-      '6mo': 3,
-      '1y': 4,
-      '2y': 5,
-      '5y': 6,
-      'max': 7
-    };
-    const requestedLevel = rangeLevels[range] || 1;
-
-    for (const ticker of activeTickers) {
-      const config = this.tickerConfigs()[ticker];
-      if (config && config.notFound) {
-        const isFresh = !config.notFoundTime || (now - config.notFoundTime < 7 * 24 * 60 * 60 * 1000);
-        if (isFresh) continue; // Skip invalid tickers for 7 days
-      }
-      if (this.failedTickers.has(ticker)) {
-        continue;
-      }
-
-      // 1. Check if we already fetched this range (or a larger one) today
-      const maxFetchedLevel = this.maxFetchedRangeLevelMap.get(ticker) || 0;
-      if (maxFetchedLevel >= requestedLevel) {
-        continue;
-      }
-
-      // 2. Check range-specific cooldown
-      const cooldownKey = `${ticker}_${range}`;
-      const lastFetch = this.lastFetchTimeMap.get(cooldownKey) || 0;
-      if (now - lastFetch < cooldownMs) {
-        continue;
-      }
-
-      // 3. Check if cache already covers the requested range and today's latest prices
-      const tickerCache = pricesObj[ticker];
-      if (tickerCache) {
-        const cacheDates = Object.keys(tickerCache).sort();
-        if (cacheDates.length > 0) {
-          const firstTxDate = firstTxDateMap.get(ticker) || limitDateStr;
-          const targetStartDateStr = firstTxDate > limitDateStr ? firstTxDate : limitDateStr;
-
-          const cacheMinTime = new Date(cacheDates[0]).getTime();
-          const targetMinTime = new Date(targetStartDateStr).getTime();
-          const daysDiff = (cacheMinTime - targetMinTime) / (1000 * 60 * 60 * 24);
-
-          const hasOlderData = daysDiff <= 3; // Allow up to 3 days gap for weekends/holidays
-          const fetchedToday = this.lastDailyFetchMap.get(ticker) === todayStr;
-          const hasTodayData = cacheDates[cacheDates.length - 1] >= todayStr || fetchedToday;
-
-          if (hasOlderData && hasTodayData) {
-            this.maxFetchedRangeLevelMap.set(ticker, Math.max(maxFetchedLevel, requestedLevel));
-            continue; // Skip fetch! Cache is already complete!
+      // Calculate first transaction date for each ticker
+      const firstTxDateMap = new Map<string, string>();
+      this.transactions().forEach(t => {
+        const ticker = (t.ticker || '').toUpperCase().trim();
+        const txDateStr = (t.date || '').slice(0, 10);
+        if (ticker && txDateStr) {
+          const existing = firstTxDateMap.get(ticker);
+          if (!existing || txDateStr < existing) {
+            firstTxDateMap.set(ticker, txDateStr);
           }
         }
-      }
+      });
 
-      // Add a 150ms delay between requests to prevent rate limiting (429)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Determine oldest date needed for the requested range
+      const limitDate = new Date();
+      let daysNeeded = 30;
+      if (range === '3mo') daysNeeded = 90;
+      else if (range === '6mo') daysNeeded = 180;
+      else if (range === '1y') daysNeeded = 365;
+      else if (range === '2y') daysNeeded = 730;
+      else if (range === '5y') daysNeeded = 1825;
+      else if (range === 'max') daysNeeded = 10000;
+      limitDate.setDate(limitDate.getDate() - daysNeeded);
+      const limitDateStr = limitDate.toISOString().slice(0, 10);
 
-      this.lastFetchTimeMap.set(cooldownKey, now);
-      this.maxFetchedRangeLevelMap.set(ticker, Math.max(maxFetchedLevel, requestedLevel));
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const now = Date.now();
+      const cooldownMs = 15 * 60 * 1000; // 15 minutes cooldown
 
-      try {
-        const meta = this.tickerConfigs();
-        const config = meta[ticker];
-        let resolvedSymbol = (config && config.yahooSymbol) ? config.yahooSymbol : ticker;
+      const rangeLevels: Record<string, number> = {
+        '1mo': 1,
+        '3mo': 2,
+        '6mo': 3,
+        '1y': 4,
+        '2y': 5,
+        '5y': 6,
+        'max': 7
+      };
+      const requestedLevel = rangeLevels[range] || 1;
 
-        let targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
-        let resp = await this.fetchWithProxy(targetUrl, true);
-        if (resp.status === 404) {
-          this.markTickerNotFound(ticker);
+      for (const ticker of activeTickers) {
+        const config = this.tickerConfigs()[ticker];
+        if (config && config.notFound) {
+          const isFresh = !config.notFoundTime || (now - config.notFoundTime < 7 * 24 * 60 * 60 * 1000);
+          if (isFresh) continue; // Skip invalid tickers for 7 days
+        }
+        if (this.failedTickers.has(ticker)) {
           continue;
         }
 
-        // If direct fetch fails, and it's not rate-limited, and no custom symbol override was set, try search discovery
-        if (!resp.ok && resp.status !== 429 && !(config && config.yahooSymbol)) {
-          const searchTarget = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(ticker)}`;
-          const searchResponse = await this.fetchWithProxy(searchTarget, true);
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json();
-            const quotes = searchData?.quotes || [];
-            const quote = quotes.find((q: any) => q.isEquity || q.quoteType === 'EQUITY' || q.quoteType === 'ETF');
-            if (quote) {
-              resolvedSymbol = quote.symbol.toUpperCase();
-              targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
-              resp = await this.fetchWithProxy(targetUrl, true);
-              if (resp.status === 404) {
-                this.markTickerNotFound(ticker);
+        // 1. Check if we already fetched this range (or a larger one) today
+        const maxFetchedLevel = this.maxFetchedRangeLevelMap.get(ticker) || 0;
+        if (maxFetchedLevel >= requestedLevel) {
+          continue;
+        }
+
+        // 2. Check range-specific cooldown
+        const cooldownKey = `${ticker}_${range}`;
+        const lastFetch = this.lastFetchTimeMap.get(cooldownKey) || 0;
+        if (now - lastFetch < cooldownMs) {
+          continue;
+        }
+
+        // 3. Check if cache already covers the requested range and today's latest prices
+        const tickerCache = pricesObj[ticker];
+        if (tickerCache) {
+          const cacheDates = Object.keys(tickerCache).sort();
+          if (cacheDates.length > 0) {
+            const firstTxDate = firstTxDateMap.get(ticker) || limitDateStr;
+            const targetStartDateStr = firstTxDate > limitDateStr ? firstTxDate : limitDateStr;
+
+            const cacheMinTime = new Date(cacheDates[0]).getTime();
+            const targetMinTime = new Date(targetStartDateStr).getTime();
+            const daysDiff = (cacheMinTime - targetMinTime) / (1000 * 60 * 60 * 24);
+
+            const hasOlderData = daysDiff <= 3; // Allow up to 3 days gap for weekends/holidays
+            const fetchedToday = this.lastDailyFetchMap.get(ticker) === todayStr;
+            const hasTodayData = cacheDates[cacheDates.length - 1] >= todayStr || fetchedToday;
+
+            if (hasOlderData && hasTodayData) {
+              this.maxFetchedRangeLevelMap.set(ticker, Math.max(maxFetchedLevel, requestedLevel));
+              continue; // Skip fetch! Cache is already complete!
+            }
+          }
+        }
+
+        // Add a 150ms delay between requests to prevent rate limiting (429)
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        this.lastFetchTimeMap.set(cooldownKey, now);
+        this.maxFetchedRangeLevelMap.set(ticker, Math.max(maxFetchedLevel, requestedLevel));
+
+        try {
+          const meta = this.tickerConfigs();
+          const config = meta[ticker];
+          let resolvedSymbol = (config && config.yahooSymbol) ? config.yahooSymbol : ticker;
+
+          let targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
+          let resp = await this.fetchWithProxy(targetUrl, true);
+          if (resp.status === 404) {
+            this.failedTickers.add(ticker);
+            continue;
+          }
+
+          // If direct fetch fails, and it's not rate-limited, and no custom symbol override was set, try search discovery
+          if (!resp.ok && resp.status !== 429 && !(config && config.yahooSymbol)) {
+            const searchTarget = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(ticker)}`;
+            const searchResponse = await this.fetchWithProxy(searchTarget, true);
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              const quotes = searchData?.quotes || [];
+              const quote = quotes.find((q: any) => q.isEquity || q.quoteType === 'EQUITY' || q.quoteType === 'ETF');
+              if (quote) {
+                resolvedSymbol = quote.symbol.toUpperCase();
+                targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
+                resp = await this.fetchWithProxy(targetUrl, true);
+                if (resp.status === 404) {
+                  this.failedTickers.add(ticker);
+                  continue;
+                }
+              } else {
+                this.failedTickers.add(ticker);
                 continue;
               }
             } else {
-              this.markTickerNotFound(ticker);
+              this.failedTickers.add(ticker);
               continue;
             }
-          } else {
-            this.markTickerNotFound(ticker);
-            continue;
           }
-        }
 
-        if (resp.ok) {
-          const json = await resp.json();
-          const result = json.chart?.result?.[0];
-          if (result) {
-            const timestamps = result.timestamp || [];
-            const closes = result.indicators?.quote?.[0]?.close || [];
-            const tickerPrices: Record<string, number> = {};
-            
-            timestamps.forEach((ts: number, idx: number) => {
-              const closeVal = closes[idx];
-              if (closeVal !== null && !isNaN(closeVal) && closeVal > 0) {
-                const date = new Date(ts * 1000);
-                const dateStr = date.toISOString().slice(0, 10);
-                tickerPrices[dateStr] = closeVal;
-              }
-            });
+          if (resp.ok) {
+            const json = await resp.json();
+            const result = json.chart?.result?.[0];
+            if (result) {
+              const timestamps = result.timestamp || [];
+              const closes = result.indicators?.quote?.[0]?.close || [];
+              const tickerPrices: Record<string, number> = {};
+              
+              timestamps.forEach((ts: number, idx: number) => {
+                const closeVal = closes[idx];
+                if (closeVal !== null && !isNaN(closeVal) && closeVal > 0) {
+                  const date = new Date(ts * 1000);
+                  const dateStr = date.toISOString().slice(0, 10);
+                  tickerPrices[dateStr] = closeVal;
+                }
+              });
 
-            pricesObj[ticker] = { ...pricesObj[ticker], ...tickerPrices };
-            updated = true;
-            this.lastDailyFetchMap.set(ticker, todayStr);
-
-            // Save immediately to prevent loss of progress
-            this.historicalPrices.set({ ...pricesObj });
-            localStorage.setItem('pt_historical_prices', JSON.stringify(pricesObj));
-          } else {
-            // No result, treat as failed
-            this.failedTickers.add(ticker);
-            if (!pricesObj[ticker]) {
-              pricesObj[ticker] = {};
-              this.historicalPrices.set({ ...pricesObj });
-              localStorage.setItem('pt_historical_prices', JSON.stringify(pricesObj));
+              pricesObj[ticker] = { ...pricesObj[ticker], ...tickerPrices };
+              updated = true;
+              this.lastDailyFetchMap.set(ticker, todayStr);
+            } else {
+              this.failedTickers.add(ticker);
             }
+          } else {
+            this.failedTickers.add(ticker);
           }
-        } else {
-          // Response not OK (e.g. 404, 429), treat as failed
+        } catch (e) {
+          console.warn(`Failed to fetch history for ${ticker}:`, e);
           this.failedTickers.add(ticker);
-          if (!pricesObj[ticker]) {
-            pricesObj[ticker] = {};
-            this.historicalPrices.set({ ...pricesObj });
-            localStorage.setItem('pt_historical_prices', JSON.stringify(pricesObj));
-          }
-        }
-      } catch (e) {
-        console.warn(`Failed to fetch history for ${ticker}:`, e);
-        this.failedTickers.add(ticker);
-        if (typeof window !== 'undefined' && window.navigator.onLine) {
-          this.markTickerNotFound(ticker);
-        }
-        if (!pricesObj[ticker]) {
-          pricesObj[ticker] = {};
-          this.historicalPrices.set({ ...pricesObj });
-          localStorage.setItem('pt_historical_prices', JSON.stringify(pricesObj));
         }
       }
+
+      if (updated) {
+        this.historicalPrices.set({ ...pricesObj });
+        localStorage.setItem('pt_historical_prices', JSON.stringify(pricesObj));
+      }
+    } finally {
+      this.isFetchingHistory = false;
     }
   }
 
@@ -3171,37 +3270,75 @@ export class PortfolioService {
   }
 
   private async fetchWithProxy(targetUrl: string, cacheNoStore = false): Promise<Response> {
+    let urlWithTs = targetUrl;
     if (cacheNoStore) {
       const sep = targetUrl.includes('?') ? '&' : '?';
-      targetUrl = `${targetUrl}${sep}_ts=${Date.now()}`;
+      urlWithTs = `${targetUrl}${sep}_ts=${Date.now()}`;
     }
-    
-    // Use AbortSignal.timeout to prevent long hangs on slow proxies
-    const options: RequestInit = {
-      ...(cacheNoStore ? { cache: 'no-store' } : {}),
-      signal: AbortSignal.timeout(4000)
+
+    const abortTimeout = (ms: number) => {
+      if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+        return AbortSignal.timeout(ms);
+      }
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
     };
 
-    // 1. Try corsproxy.io (raw URL format)
-    try {
-      const resp = await fetch(`https://corsproxy.io/?${targetUrl}`, options);
-      // Return immediately on successful response or definitive client error (e.g. 404)
-      if (resp.status !== 401 && resp.status !== 403 && resp.status < 500) return resp;
-    } catch (e) {
-      // network error or timeout, try next
+    const options: RequestInit = {
+      ...(cacheNoStore ? { cache: 'no-store' } : {}),
+      signal: abortTimeout(4500)
+    };
+
+    const proxyList = [
+      // 1. CodeTabs (high reliability CORS proxy)
+      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+      // 2. corsproxy.io url parameter
+      (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+      // 3. corsproxy.io raw path
+      (u: string) => `https://corsproxy.io/?${u}`,
+      // 4. allorigins raw
+      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      // 5. thingproxy
+      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
+    ];
+
+    for (const proxyFn of proxyList) {
+      try {
+        const proxyUrl = proxyFn(urlWithTs);
+        const resp = await fetch(proxyUrl, options);
+        // Valid status: 200-299 OK or 404 from target
+        if (resp.ok || resp.status === 404) {
+          return resp;
+        }
+        // If 401, 403, 429, 500+ -> proxy blocked/rate limited, try next
+      } catch (e) {
+        // network error or timeout -> try next
+      }
     }
 
-    // 2. Try api.allorigins.win
+    // 6. Try allorigins JSON envelope as fallback
     try {
-      const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, options);
-      if (resp.status !== 401 && resp.status !== 403 && resp.status < 500) return resp;
+      const getUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWithTs)}`;
+      const getResp = await fetch(getUrl, options);
+      if (getResp.ok) {
+        const data = await getResp.json();
+        if (data && typeof data.contents === 'string') {
+          return new Response(data.contents, {
+            status: data.status?.http_code || 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
     } catch (e) {
-      // network error or timeout, try next
+      // ignore
     }
 
-    // 3. Direct fetch as last resort (no timeout/abort to ensure direct compatibility)
-    const directOptions = cacheNoStore ? { cache: 'no-store' as RequestCache } : {};
-    return fetch(targetUrl, directOptions);
+    // 7. Direct fetch as last resort
+    const directOptions: RequestInit = {
+      ...(cacheNoStore ? { cache: 'no-store' as RequestCache } : {})
+    };
+    return fetch(urlWithTs, directOptions);
   }
 
   public async refreshMarketData(force: boolean = false) {

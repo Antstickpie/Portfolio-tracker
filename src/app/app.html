@@ -164,7 +164,10 @@
   <div 
     *ngFor="let toast of service.toasts()" 
     class="toast-item glass-card animate-slide-in"
-    [class]="toast.type">
+    [class]="toast.type"
+    (click)="service.dismissToast(toast.id)"
+    style="cursor: pointer;"
+    title="Click to dismiss">
     <span class="toast-icon" *ngIf="toast.type === 'success'">✓</span>
     <span class="toast-icon" *ngIf="toast.type === 'error'">✕</span>
     <span class="toast-icon" *ngIf="toast.type === 'info'">ℹ</span>
