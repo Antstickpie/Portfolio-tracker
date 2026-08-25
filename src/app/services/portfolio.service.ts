@@ -108,6 +108,7 @@ export class PortfolioService {
   public disabledSources = signal<string[]>([]);
   public defaultCurrency = signal<string>('EUR');
   public displayCurrency = signal<string>('native');
+  public finnhubApiKey = signal<string>('');
   public lastRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
@@ -715,6 +716,9 @@ export class PortfolioService {
       const lu = localStorage.getItem('pt_last_updated');
       if (lu) this.lastUpdated.set(parseInt(lu, 10));
 
+      const fkey = localStorage.getItem('pt_finnhub_api_key');
+      if (fkey) this.finnhubApiKey.set(fkey);
+
       const sims = localStorage.getItem('pt_simulated_transactions');
       if (sims) this.simulatedTransactions.set(JSON.parse(sims));
 
@@ -776,6 +780,7 @@ export class PortfolioService {
 
     localStorage.setItem('pt_default_currency', this.defaultCurrency());
     localStorage.setItem('pt_display_currency', this.displayCurrency());
+    localStorage.setItem('pt_finnhub_api_key', this.finnhubApiKey());
 
     localStorage.setItem('pt_split_adjusted_sources', JSON.stringify(this.splitAdjustedSources()));
     localStorage.setItem('pt_cost_basis_method', this.costBasisMethod());
@@ -1696,7 +1701,7 @@ export class PortfolioService {
 
   public async selectYahooSymbol(ticker: string): Promise<string | null> {
     const cleanTicker = ticker.toUpperCase().trim();
-    const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
+    const searchTarget = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
     try {
       const searchResponse = await this.fetchWithProxy(searchTarget, true);
       if (!searchResponse.ok) {
@@ -1718,7 +1723,7 @@ export class PortfolioService {
         symbols,
         async (sym: string) => {
           try {
-            const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`;
+            const target = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`;
             const resp = await this.fetchWithProxy(target, true);
             if (resp.ok) {
               const d = await resp.json();
@@ -1905,7 +1910,35 @@ export class PortfolioService {
 
       const fetchViaChart = async (resolvedSymbol: string, originalTicker: string) => {
         try {
-          const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?includePrePost=true&events=split`;
+          // 1. Try Finnhub direct quote if API key is provided (No proxy needed, open CORS)
+          const finnhubKey = this.finnhubApiKey().trim();
+          if (finnhubKey) {
+            try {
+              const finnSymbol = originalTicker.replace(/\..*$/, '').toUpperCase().trim();
+              const finnResp = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(finnSymbol)}&token=${encodeURIComponent(finnhubKey)}`, { signal: AbortSignal.timeout(3000) });
+              if (finnResp.ok) {
+                const finnData = await finnResp.json();
+                if (finnData && typeof finnData.c === 'number' && finnData.c > 0) {
+                  const current = meta[originalTicker] || {};
+                  this.updateTickerConfig(
+                    originalTicker,
+                    finnData.c,
+                    current.sector || 'Other',
+                    current.name || originalTicker,
+                    current.priceCurrency || 'USD',
+                    current.logoData
+                  );
+                  bulkUpdatedSet.add(originalTicker);
+                  updatedCount++;
+                  return;
+                }
+              }
+            } catch (e) {
+              // fallback to Yahoo/Stooq
+            }
+          }
+
+          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?includePrePost=true&events=split`;
           const chartResponse = await this.fetchWithProxy(chartTarget, true);
           if (chartResponse.status === 404) {
             this.markTickerNotFound(originalTicker);
@@ -2039,7 +2072,7 @@ export class PortfolioService {
             sector = config.sector || 'Other';
           } else {
             // Silently resolve via search endpoint
-            const searchTarget = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
+            const searchTarget = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
             const searchResponse = await this.fetchWithProxy(searchTarget, true);
             if (searchResponse.ok) {
               const searchData = await searchResponse.json();
@@ -2057,7 +2090,7 @@ export class PortfolioService {
           }
 
           const cleanResolved = encodeURIComponent(resolvedSymbol);
-          const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanResolved}?includePrePost=true&events=split`;
+          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${cleanResolved}?includePrePost=true&events=split`;
           
           const chartResponse = await this.fetchWithProxy(chartTarget, true);
           if (!chartResponse.ok) return null;
@@ -2323,7 +2356,7 @@ export class PortfolioService {
           try {
             const parts = pair.split('/');
             const ticker = `${parts[0]}${parts[1]}=X`;
-            const chartTarget = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
+            const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}`;
             
             const response = await this.fetchWithProxy(chartTarget, true);
             if (response.ok) {
@@ -3159,7 +3192,7 @@ export class PortfolioService {
           const config = meta[ticker];
           let resolvedSymbol = (config && config.yahooSymbol) ? config.yahooSymbol : ticker;
 
-          let targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
+          let targetUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
           let resp = await this.fetchWithProxy(targetUrl, true);
           if (resp.status === 404) {
             this.failedTickers.add(ticker);
@@ -3176,7 +3209,7 @@ export class PortfolioService {
               const quote = quotes.find((q: any) => q.isEquity || q.quoteType === 'EQUITY' || q.quoteType === 'ETF');
               if (quote) {
                 resolvedSymbol = quote.symbol.toUpperCase();
-                targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
+                targetUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
                 resp = await this.fetchWithProxy(targetUrl, true);
                 if (resp.status === 404) {
                   this.failedTickers.add(ticker);
@@ -3287,20 +3320,18 @@ export class PortfolioService {
 
     const options: RequestInit = {
       ...(cacheNoStore ? { cache: 'no-store' } : {}),
-      signal: abortTimeout(4500)
+      signal: abortTimeout(2200)
     };
 
     const proxyList = [
-      // 1. CodeTabs (high reliability CORS proxy)
-      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-      // 2. corsproxy.io url parameter
-      (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-      // 3. corsproxy.io raw path
-      (u: string) => `https://corsproxy.io/?${u}`,
-      // 4. allorigins raw
+      // 1. allorigins raw (fastest)
       (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      // 5. thingproxy
-      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
+      // 2. corsproxy.io
+      (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+      // 3. thingproxy
+      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`,
+      // 4. CodeTabs
+      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
     ];
 
     for (const proxyFn of proxyList) {
@@ -3317,7 +3348,7 @@ export class PortfolioService {
       }
     }
 
-    // 6. Try allorigins JSON envelope as fallback
+    // 5. Try allorigins JSON envelope as fallback
     try {
       const getUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWithTs)}`;
       const getResp = await fetch(getUrl, options);
@@ -3334,7 +3365,7 @@ export class PortfolioService {
       // ignore
     }
 
-    // 7. Direct fetch as last resort
+    // 6. Direct fetch as last resort
     const directOptions: RequestInit = {
       ...(cacheNoStore ? { cache: 'no-store' as RequestCache } : {})
     };

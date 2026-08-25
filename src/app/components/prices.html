@@ -116,6 +116,19 @@
               <span>{{ src }}</span>
             </label>
           </div>
+        <!-- Finnhub API Key (Direct Stock Quotes) -->
+        <div style="margin-top: 1.25rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin: 0;">Finnhub API Key (Optional)</label>
+            <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--primary); text-decoration: none;">Get Free Key ↗</a>
+          </div>
+          <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 0.5rem 0;">Direct high-speed quotes without CORS proxies.</p>
+          <input
+            type="password"
+            [ngModel]="service.finnhubApiKey()"
+            (ngModelChange)="service.finnhubApiKey.set($event); service.saveToStorage()"
+            placeholder="Paste free Finnhub token..."
+            style="font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; width: 100%; box-sizing: border-box;">
         </div>
       </div>
 
