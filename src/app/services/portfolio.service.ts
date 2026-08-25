@@ -2046,8 +2046,8 @@ export class PortfolioService {
       await this.runConcurrent(
         Array.from(symbolMap.entries()),
         ([resolved, original]) => fetchViaChart(resolved, original),
-        4,
-        80
+        2,
+        150
       );
 
       // Autocomplete discovery helper for remaining un-updated tickers (silently in background)
@@ -3302,6 +3302,8 @@ export class PortfolioService {
     return `${c} - Uses daily exchange rate on transaction date.`;
   }
 
+  private proxyRoundRobinIdx = 0;
+
   private async fetchWithProxy(targetUrl: string, cacheNoStore = false): Promise<Response> {
     let urlWithTs = targetUrl;
     if (cacheNoStore) {
@@ -3320,21 +3322,26 @@ export class PortfolioService {
 
     const options: RequestInit = {
       ...(cacheNoStore ? { cache: 'no-store' } : {}),
-      signal: abortTimeout(2200)
+      signal: abortTimeout(2500)
     };
 
     const proxyList = [
-      // 1. allorigins raw (fastest)
+      // 1. allorigins raw
       (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
       // 2. corsproxy.io
       (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
       // 3. thingproxy
       (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`,
       // 4. CodeTabs
-      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+      // 5. corsproxy.io direct query
+      (u: string) => `https://corsproxy.io/?${u}`
     ];
 
-    for (const proxyFn of proxyList) {
+    // Load balance starting proxy across requests to prevent 429 rate limiting on any single proxy
+    const startIdx = (this.proxyRoundRobinIdx++) % proxyList.length;
+    for (let i = 0; i < proxyList.length; i++) {
+      const proxyFn = proxyList[(startIdx + i) % proxyList.length];
       try {
         const proxyUrl = proxyFn(urlWithTs);
         const resp = await fetch(proxyUrl, options);
@@ -3348,7 +3355,7 @@ export class PortfolioService {
       }
     }
 
-    // 5. Try allorigins JSON envelope as fallback
+    // Fallback: allorigins JSON envelope
     try {
       const getUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWithTs)}`;
       const getResp = await fetch(getUrl, options);
@@ -3365,11 +3372,12 @@ export class PortfolioService {
       // ignore
     }
 
-    // 6. Direct fetch as last resort
-    const directOptions: RequestInit = {
-      ...(cacheNoStore ? { cache: 'no-store' as RequestCache } : {})
-    };
-    return fetch(urlWithTs, directOptions);
+    // Return safe synthetic response without attempting direct unproxied browser fetch (which triggers red CORS errors)
+    return new Response(JSON.stringify({ error: 'Proxy unavailable' }), {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   public async refreshMarketData(force: boolean = false) {
