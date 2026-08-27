@@ -1845,12 +1845,20 @@ export class PortfolioService {
     return tx ? tx.currency : 'USD';
   }
 
-  public async runConcurrent<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency = 4, delayBetweenMs = 60): Promise<R[]> {
+  public async runConcurrent<T, R>(
+    items: T[], 
+    fn: (item: T) => Promise<R>, 
+    concurrency = 4, 
+    delayBetweenMs = 60,
+    shouldAbort?: () => boolean
+  ): Promise<R[]> {
     const results: R[] = [];
     for (let i = 0; i < items.length; i += concurrency) {
+      if (shouldAbort && shouldAbort()) break;
       const chunk = items.slice(i, i + concurrency);
       const chunkResults = await Promise.all(chunk.map(fn));
       results.push(...chunkResults);
+      if (shouldAbort && shouldAbort()) break;
       if (i + concurrency < items.length && delayBetweenMs > 0) {
         await new Promise(resolve => setTimeout(resolve, delayBetweenMs));
       }
@@ -1907,8 +1915,11 @@ export class PortfolioService {
 
       // Fetch prices via v8 chart API per symbol (v7 quote requires crumb auth)
       const bulkUpdatedSet = new Set<string>();
+      let consecutiveErrors = 0;
+      let circuitBreakerTripped = false;
 
       const fetchViaChart = async (resolvedSymbol: string, originalTicker: string) => {
+        if (circuitBreakerTripped) return;
         try {
           // 1. Try Finnhub direct quote if API key is provided (No proxy needed, open CORS)
           const finnhubKey = this.finnhubApiKey().trim();
@@ -1930,11 +1941,12 @@ export class PortfolioService {
                   );
                   bulkUpdatedSet.add(originalTicker);
                   updatedCount++;
+                  consecutiveErrors = 0;
                   return;
                 }
               }
             } catch (e) {
-              // fallback to Yahoo/Stooq
+              // fallback to Yahoo
             }
           }
 
@@ -2002,53 +2014,38 @@ export class PortfolioService {
                 this.updateTickerConfig(originalTicker, price, finalSector, finalName, currency, finalLogo);
                 bulkUpdatedSet.add(originalTicker);
                 updatedCount++;
+                consecutiveErrors = 0;
                 return;
               }
             }
           }
 
-          // Fallback 1: Stooq CSV quote endpoint
-          try {
-            const stooqSymbol = resolvedSymbol.includes('.') ? resolvedSymbol : `${resolvedSymbol}.US`;
-            const stooqTarget = `https://stooq.com/q/l/?s=${encodeURIComponent(stooqSymbol.toLowerCase())}&f=sd2t2ohlcv&h&e=csv`;
-            const stooqResp = await this.fetchWithProxy(stooqTarget, true);
-            if (stooqResp.ok) {
-              const text = await stooqResp.text();
-              const lines = text.trim().split('\n');
-              if (lines.length >= 2) {
-                const cols = lines[1].split(',');
-                const closeVal = parseFloat(cols[6]);
-                if (!isNaN(closeVal) && closeVal > 0) {
-                  const current = meta[originalTicker] || {};
-                  this.updateTickerConfig(
-                    originalTicker,
-                    closeVal,
-                    current.sector || 'Other',
-                    current.name || originalTicker,
-                    current.priceCurrency || 'USD',
-                    current.logoData
-                  );
-                  bulkUpdatedSet.add(originalTicker);
-                  updatedCount++;
-                  return;
-                }
-              }
-            }
-          } catch (stooqErr) {
-            // ignore
+          // If proxy failed / returned error, register consecutive error
+          consecutiveErrors++;
+          if (consecutiveErrors >= 2) {
+            circuitBreakerTripped = true;
           }
         } catch (e) {
-          // Network errors or tab wake-up glitches are not 404s — preserve existing prices
+          consecutiveErrors++;
+          if (consecutiveErrors >= 2) {
+            circuitBreakerTripped = true;
+          }
         }
       };
 
-      // Fetch all symbols with concurrency limit to prevent proxy rate-limiting (429)
+      // Fetch symbols with early abort on circuit breaker
       await this.runConcurrent(
         Array.from(symbolMap.entries()),
         ([resolved, original]) => fetchViaChart(resolved, original),
         2,
-        150
+        150,
+        () => circuitBreakerTripped
       );
+
+      if (circuitBreakerTripped) {
+        if (!silent) this.showToast('Market proxy unavailable. Keeping existing prices.', 'info');
+        return;
+      }
 
       // Autocomplete discovery helper for remaining un-updated tickers (silently in background)
       const fetchWithSelfDiscovery = async (ticker: string): Promise<{ ticker: string, price: number, priceCurrency: string, sector?: string, name?: string, logoData?: string, yahooSymbol?: string } | null> => {
@@ -3328,12 +3325,8 @@ export class PortfolioService {
     const proxyList = [
       // 1. allorigins raw
       (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      // 2. corsproxy.io
-      (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-      // 3. CodeTabs
-      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-      // 4. corsproxy.io direct query
-      (u: string) => `https://corsproxy.io/?${u}`
+      // 2. CodeTabs
+      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
     ];
 
     // Load balance starting proxy across requests to prevent 429 rate limiting on any single proxy
