@@ -1145,11 +1145,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (timeStr) {
       const parsedTime = parseInt(timeStr, 10);
       this.service.lastRefreshTime.set(parsedTime);
-      if (Date.now() - parsedTime > 180000) {
-        this.refreshMarketDataSilently();
-      }
-    } else {
-      this.refreshMarketDataSilently();
     }
 
     // Fetch historical prices only when period, transactions, date filters, or view changes
@@ -2206,13 +2201,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   private startAutoRefreshInterval() {
-    this.stopAutoRefreshInterval();
-    // Auto-refresh every 3 minutes (180,000 ms) while visible (avoids rate limits/getting banned)
-    this.activeIntervalId = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        this.refreshMarketDataSilently();
-      }
-    }, 180000);
+    // Handled centrally in PortfolioService countdown loop
   }
 
   private stopAutoRefreshInterval() {
@@ -2223,17 +2212,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   private handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-      const last = this.service.lastRefreshTime() || 0;
-      const now = Date.now();
-      // If last refresh was > 5 minutes (300,000 ms) ago, sync prices on tab return
-      if (now - last > 300000) {
-        this.refreshMarketDataSilently();
-      }
-      this.startAutoRefreshInterval();
-    } else {
-      this.stopAutoRefreshInterval();
-    }
+    // Visibility return handled centrally in PortfolioService
   }
 
   private async refreshMarketDataSilently() {

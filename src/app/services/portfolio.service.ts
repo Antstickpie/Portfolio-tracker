@@ -471,9 +471,6 @@ export class PortfolioService {
       }
     }
 
-    // Initialize countdown immediately
-    this.updateNextSyncCountdown();
-
     // Smart auto-refresh prices and countdown loop (runs every second)
     setInterval(() => {
       this.updateNextSyncCountdown();
@@ -486,18 +483,21 @@ export class PortfolioService {
       return;
     }
     const last = this.lastRefreshTime();
+    const intervalMs = 3 * 60 * 1000;
     if (!last) {
+      const now = Date.now();
+      this.lastRefreshTime.set(now);
+      localStorage.setItem('pt_last_refresh_time', now.toString());
       this.refreshMarketData(false);
       this.nextSyncCountdown.set('3m 00s');
       return;
     }
     const elapsed = Date.now() - last;
-    const intervalMs = 3 * 60 * 1000;
     if (elapsed >= intervalMs) {
       this.refreshMarketData(false);
       this.nextSyncCountdown.set('3m 00s');
     } else {
-      const remaining = intervalMs - elapsed;
+      const remaining = Math.max(0, intervalMs - elapsed);
       const minutes = Math.floor(remaining / 60000);
       const seconds = Math.floor((remaining % 60000) / 1000);
       this.nextSyncCountdown.set(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
@@ -3330,11 +3330,9 @@ export class PortfolioService {
       (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
       // 2. corsproxy.io
       (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-      // 3. thingproxy
-      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`,
-      // 4. CodeTabs
+      // 3. CodeTabs
       (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-      // 5. corsproxy.io direct query
+      // 4. corsproxy.io direct query
       (u: string) => `https://corsproxy.io/?${u}`
     ];
 
@@ -3382,13 +3380,17 @@ export class PortfolioService {
 
   public async refreshMarketData(force: boolean = false) {
     if (this.isSyncing()) return;
+    const now = Date.now();
+    const last = this.lastRefreshTime();
+    if (!force && last && (now - last < 60000)) return; // 60s cooldown minimum
+
     this.isSyncing.set(true);
+    this.lastRefreshTime.set(now);
+    localStorage.setItem('pt_last_refresh_time', now.toString());
+
     try {
       await this.loadMarketPricesApi(force, true);
       await this.loadExchangeRatesApi(force, true);
-      const now = Date.now();
-      localStorage.setItem('pt_last_refresh_time', now.toString());
-      this.lastRefreshTime.set(now);
       if (force) {
         this.showToast('All prices and exchange rates up to date!', 'success');
       }
