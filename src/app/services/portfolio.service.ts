@@ -2292,9 +2292,9 @@ export class PortfolioService {
       const updatedRates: Record<string, number> = {};
       let updatedCount = 0;
 
-      // 1. Try Frankfurter API first (Direct CORS open API, fastest & most reliable)
+      // 1. Try Open Exchange Rate API first (Direct CORS open API, fastest & most reliable)
       try {
-        const resp = await fetch('https://api.frankfurter.app/latest?from=USD', { signal: AbortSignal.timeout(3500) });
+        const resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(3500) });
         if (resp.ok) {
           const data = await resp.json();
           const rates: Record<string, number> = data?.rates || {};
@@ -2314,13 +2314,13 @@ export class PortfolioService {
           });
         }
       } catch (e) {
-        // Frankfurter fallback
+        // Open ER fallback
       }
 
-      // 2. Try Open Exchange Rate API if needed
+      // 2. Try Frankfurter API as secondary direct provider
       if (updatedCount < pairs.length) {
         try {
-          const resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(3500) });
+          const resp = await fetch('https://api.frankfurter.dev/v1/latest?from=USD', { signal: AbortSignal.timeout(3500) });
           if (resp.ok) {
             const data = await resp.json();
             const rates: Record<string, number> = data?.rates || {};
@@ -3132,7 +3132,12 @@ export class PortfolioService {
       };
       const requestedLevel = rangeLevels[range] || 1;
 
+      let consecutiveHistoryErrors = 0;
       for (const ticker of activeTickers) {
+        if (consecutiveHistoryErrors >= 2) {
+          break; // Stop fetching remaining tickers if proxy is down
+        }
+
         const config = this.tickerConfigs()[ticker];
         if (config && config.notFound) {
           const isFresh = !config.notFoundTime || (now - config.notFoundTime < 7 * 24 * 60 * 60 * 1000);
@@ -3196,31 +3201,13 @@ export class PortfolioService {
             continue;
           }
 
-          // If direct fetch fails, and it's not rate-limited, and no custom symbol override was set, try search discovery
-          if (!resp.ok && resp.status !== 429 && !(config && config.yahooSymbol)) {
-            const searchTarget = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(ticker)}`;
-            const searchResponse = await this.fetchWithProxy(searchTarget, true);
-            if (searchResponse.ok) {
-              const searchData = await searchResponse.json();
-              const quotes = searchData?.quotes || [];
-              const quote = quotes.find((q: any) => q.isEquity || q.quoteType === 'EQUITY' || q.quoteType === 'ETF');
-              if (quote) {
-                resolvedSymbol = quote.symbol.toUpperCase();
-                targetUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${range}&interval=1d&events=split`;
-                resp = await this.fetchWithProxy(targetUrl, true);
-                if (resp.status === 404) {
-                  this.failedTickers.add(ticker);
-                  continue;
-                }
-              } else {
-                this.failedTickers.add(ticker);
-                continue;
-              }
-            } else {
-              this.failedTickers.add(ticker);
-              continue;
-            }
+          if (!resp.ok) {
+            consecutiveHistoryErrors++;
+            if (consecutiveHistoryErrors >= 2) break;
+            continue;
           }
+
+          consecutiveHistoryErrors = 0;
 
           if (resp.ok) {
             const json = await resp.json();
