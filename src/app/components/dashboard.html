@@ -134,12 +134,9 @@
       <div class="value" [ngClass]="summary().totalUnrealized >= 0 ? 'text-success' : 'text-danger'">
         {{ formatVal(summary().totalUnrealized, 'USD', 2, undefined, true) }}
       </div>
-      <div class="sub-value" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <div class="sub-value">
         <span class="badge" [ngClass]="summary().totalUnrealized >= 0 ? 'badge-success' : 'badge-danger'">
           {{ summary().totalUnrealized >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(unrealizedPercentage()) | number:'1.2-2' }}%
-        </span>
-        <span style="font-size: 0.72rem; color: var(--text-muted);">
-          Cost: {{ formatVal(summary().totalCostBasis, 'USD', 0) }}
         </span>
       </div>
       <div class="metric-hint">▼ Holdings Analysis</div>
@@ -154,12 +151,7 @@
       <div class="value" [ngClass]="summary().totalRealized >= 0 ? 'text-success' : 'text-danger'">
         {{ formatVal(summary().totalRealized, 'USD', 2, undefined, true) }}
       </div>
-      <div class="sub-value" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <span>From completed sales</span>
-        <span *ngIf="summary().totalRealized !== 0" style="font-size: 0.72rem; color: var(--text-muted);">
-          {{ summary().totalRealized >= 0 ? '+' : '' }}{{ (summary().totalRealized / (summary().totalCostBasis || 1) * 100) | number:'1.2-2' }}%
-        </span>
-      </div>
+      <div class="sub-value">From completed sales</div>
       <div class="metric-hint">▼ Realized Gains Ledger</div>
     </div>
 
@@ -180,22 +172,13 @@
          [class.card-danger]="summary().totalReturn < 0"
          [class.card-success]="summary().totalReturn >= 0"
          (click)="scrollToTable()" title="View holdings table">
-      <div class="label" style="display: flex; justify-content: space-between; align-items: center;">
-        <span>Total Return</span>
-        <span style="font-size: 0.68rem; font-weight: normal; color: var(--text-muted); text-transform: none;">
-          Unrealized + Realized
-        </span>
-      </div>
+      <div class="label">Total Return</div>
       <div class="value" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
         {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
       </div>
-      <div class="sub-value" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <span>
-          {{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span>
-        </span>
-        <span style="font-size: 0.72rem; color: var(--text-muted);">
-          Cost: {{ formatVal(summary().totalCostBasis, 'USD', 0) }}
-        </span>
+      <div class="sub-value" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <span>{{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span></span>
+        <span style="font-size: 0.72rem; color: var(--text-muted);">Cost: {{ formatVal(summary().totalCostBasis, 'USD') }}</span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
