@@ -323,7 +323,15 @@
               style="width: 100%; box-sizing: border-box;">
           </div>
           <div>
-            <label class="input-label" style="font-size: 0.72rem;">Annual Exemption ({{ service.defaultCurrency() }})</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="input-label" style="font-size: 0.72rem; margin: 0;">Annual Exemption</label>
+              <select
+                [ngModel]="service.taxExemptionCurrency()"
+                (ngModelChange)="service.taxExemptionCurrency.set($event); service.saveToStorage()"
+                style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: var(--primary); font-weight: 600; font-size: 0.68rem; padding: 0.1rem 0.35rem; outline: none; cursor: pointer;">
+                <option *ngFor="let c of service.visibleCurrencies()" [value]="c" style="background: #0d1117; color: #ffffff;">{{ c }}</option>
+              </select>
+            </div>
             <input
               type="number"
               step="50"
@@ -332,7 +340,7 @@
               (ngModelChange)="service.taxExemptionLimit.set($event !== null && $event !== '' ? +$event : null); service.saveToStorage()"
               placeholder="e.g. 1000"
               class="person-input"
-              style="width: 100%; box-sizing: border-box;">
+              style="width: 100%; box-sizing: border-box; margin-top: 0.2rem;">
           </div>
         </div>
 

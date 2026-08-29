@@ -878,8 +878,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (totalProfit <= 0) return 0;
     const rate = this.service.taxRate();
     if (!rate || rate <= 0) return 0;
-    const exemption = this.service.taxExemptionLimit() || 0;
-    const taxableProfit = Math.max(0, totalProfit - exemption);
+    const exemptionRaw = this.service.taxExemptionLimit() || 0;
+    const exemptionCurr = this.service.taxExemptionCurrency() || this.service.defaultCurrency();
+    const exemptionInUSD = exemptionRaw * this.service.getExchangeRate(exemptionCurr, 'USD');
+    const taxableProfit = Math.max(0, totalProfit - exemptionInUSD);
     return taxableProfit * (rate / 100);
   });
 

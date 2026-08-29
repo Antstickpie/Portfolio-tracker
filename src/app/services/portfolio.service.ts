@@ -113,6 +113,7 @@ export class PortfolioService {
   public marketProxyUrl = signal<string>(PortfolioService.DEFAULT_MARKET_PROXY);
   public taxRate = signal<number | null>(null);
   public taxExemptionLimit = signal<number | null>(null);
+  public taxExemptionCurrency = signal<string>('EUR');
   public lastRefreshTime = signal<number | null>(null);
   public lastRatesRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
@@ -746,6 +747,9 @@ export class PortfolioService {
       if (tel !== null && tel !== '') this.taxExemptionLimit.set(parseFloat(tel));
       else this.taxExemptionLimit.set(null);
 
+      const tec = localStorage.getItem('pt_tax_exemption_currency');
+      if (tec) this.taxExemptionCurrency.set(tec);
+
       const sims = localStorage.getItem('pt_simulated_transactions');
       if (sims) this.simulatedTransactions.set(JSON.parse(sims));
 
@@ -819,6 +823,7 @@ export class PortfolioService {
     } else {
       localStorage.removeItem('pt_tax_exemption_limit');
     }
+    localStorage.setItem('pt_tax_exemption_currency', this.taxExemptionCurrency());
 
     localStorage.setItem('pt_split_adjusted_sources', JSON.stringify(this.splitAdjustedSources()));
     localStorage.setItem('pt_cost_basis_method', this.costBasisMethod());
@@ -3070,8 +3075,9 @@ export class PortfolioService {
     if (remoteData.isSimulationModeActive !== undefined) this.isSimulationModeActive.set(remoteData.isSimulationModeActive);
     if (remoteData.defaultCurrency) this.defaultCurrency.set(remoteData.defaultCurrency);
     if (remoteData.displayCurrency) this.displayCurrency.set(remoteData.displayCurrency);
-    if (remoteData.taxRate !== undefined) this.taxRate.set(Number(remoteData.taxRate));
-    if (remoteData.taxExemptionLimit !== undefined) this.taxExemptionLimit.set(Number(remoteData.taxExemptionLimit));
+    if (remoteData.taxRate !== undefined) this.taxRate.set(remoteData.taxRate !== null ? Number(remoteData.taxRate) : null);
+    if (remoteData.taxExemptionLimit !== undefined) this.taxExemptionLimit.set(remoteData.taxExemptionLimit !== null ? Number(remoteData.taxExemptionLimit) : null);
+    if (remoteData.taxExemptionCurrency) this.taxExemptionCurrency.set(remoteData.taxExemptionCurrency);
     if (remoteData.splitsCache && typeof localStorage !== 'undefined') {
       localStorage.setItem('pt_splits_cache', JSON.stringify(remoteData.splitsCache));
     }
@@ -3141,6 +3147,7 @@ export class PortfolioService {
       displayCurrency: this.displayCurrency(),
       taxRate: this.taxRate(),
       taxExemptionLimit: this.taxExemptionLimit(),
+      taxExemptionCurrency: this.taxExemptionCurrency(),
       splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null,
       lastUpdated: this.lastUpdated() || Date.now()
     };
