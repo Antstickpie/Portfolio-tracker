@@ -1,514 +1,476 @@
-<div class="animate-fade-in">
+<div class="animate-fade-in settings-container">
+  <!-- Header -->
   <div class="glass-card settings-header">
-    <h1>Settings & Preferences</h1>
-    <p class="subtitle">Configure owner names, calculation engines, manage cloud sync, and customize asset parameters.</p>
+    <div class="settings-header-left">
+      <h2>⚙ Settings & Preferences</h2>
+      <p class="subtitle">Configure portfolio owners, active currencies, live exchange rates, cloud sync, and asset catalog.</p>
+    </div>
   </div>
 
-  <!-- SECTION 1: SETTINGS DASHBOARD GRID -->
-  <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-    <!-- Card 1: Preferences & Calculations -->
-    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem;">
-      <div>
-        <h3>Preferences & Calculations</h3>
-        <p class="subtitle">Set owner names, date formats, and tax/split engine methods.</p>
-        
-        <div style="margin-top: 1rem;">
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">
-            Portfolio Owners / Persons
-          </label>
-          <div style="display: flex; flex-direction: column; gap: 0.55rem;">
-            <div *ngFor="let p of service.persons(); let i = index; trackBy: trackByIndex" style="display: flex; align-items: center; gap: 0.5rem;">
-              <input type="text" 
-                     [value]="p" 
-                     (input)="updatePersonName(i, $any($event.target).value)" 
-                     [placeholder]="'Person ' + (i + 1)" 
-                     style="flex: 1; padding: 0.45rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none;">
-              
-              <button *ngIf="service.persons().length > 1" 
-                      (click)="removePerson(i)" 
-                      title="Remove person"
-                      style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; border-radius: 6px; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: all 0.2s;">
+  <!-- TOP COMPACT GRID (4 Compact Cards: Owners, Currencies & Formats, Exchange Rates, Cloud Backup) -->
+  <div class="settings-top-grid">
+    <!-- Card 1: Portfolio Owners -->
+    <div class="glass-card setting-box">
+      <div class="box-header">
+        <h3>👥 Portfolio Owners</h3>
+        <p class="subtitle">Names for allocations.</p>
+      </div>
+
+      <div class="persons-list">
+        <div *ngFor="let p of service.persons(); let i = index; trackBy: trackByIndex" class="person-row">
+          <span class="person-avatar" [style.background]="i === 0 ? 'var(--primary)' : 'var(--secondary)'">
+            {{ p.charAt(0).toUpperCase() }}
+          </span>
+          <input
+            type="text"
+            [value]="p"
+            (blur)="updatePersonName(i, $any($event.target).value)"
+            placeholder="Owner Name"
+            class="person-input">
+          <button
+            *ngIf="service.persons().length > 1"
+            (click)="removePerson(i)"
+            class="btn-icon-remove"
+            title="Remove person">
+            ✕
+          </button>
+        </div>
+
+        <div class="add-person-bar">
+          <button class="btn btn-primary btn-xs" (click)="addPerson()">
+            + Add Person
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Currency & Formats -->
+    <div class="glass-card setting-box">
+      <div class="box-header">
+        <h3>🌐 Currency & Formats</h3>
+        <p class="subtitle">Default currency and styles.</p>
+      </div>
+
+      <div class="form-group-stack">
+        <div>
+          <label class="input-label">Default Currency</label>
+          <select 
+            [ngModel]="service.defaultCurrency()" 
+            (ngModelChange)="service.defaultCurrency.set($event); service.saveToStorage()" 
+            class="settings-select">
+            <option *ngFor="let curr of service.visibleCurrencies()" [value]="curr" style="background: #0d1117;">
+              {{ curr }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="input-label">Active Currencies</label>
+          <div class="currency-chips-wrap">
+            <span *ngFor="let curr of service.visibleCurrencies(); let i = index" class="currency-chip">
+              <strong>{{ curr }}</strong>
+              <button
+                *ngIf="service.visibleCurrencies().length > 1"
+                (click)="removeVisibleCurrency(i)"
+                class="currency-chip-del"
+                title="Remove currency">
                 ✕
               </button>
-            </div>
+            </span>
+          </div>
 
-            <button (click)="addPerson()" 
-                    style="margin-top: 0.3rem; padding: 0.45rem 0.8rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; width: fit-content;">
-              + Add Person
+          <div class="add-currency-bar">
+            <input
+              type="text"
+              [(ngModel)]="newCurrencyCode"
+              placeholder="e.g. CAD, JPY..."
+              class="person-input"
+              style="flex: 1; text-transform: uppercase;"
+              (keydown.enter)="addVisibleCurrency()">
+            <button class="btn btn-secondary btn-xs" (click)="addVisibleCurrency()" [disabled]="!newCurrencyCode.trim()">
+              + Add
             </button>
           </div>
         </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-          <div class="form-group" style="display: flex; flex-direction: column; gap: 0.4rem;">
-            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Date Format</label>
-            <select 
-              [ngModel]="service.dateFormat()" 
-              (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()"
-              style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+          <div>
+            <label class="input-label">Date Format</label>
+            <select [ngModel]="service.dateFormat()" (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()" class="settings-select">
               <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
               <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
               <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
               <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
             </select>
           </div>
-          <div class="form-group" style="display: flex; flex-direction: column; gap: 0.4rem;">
-            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Year Basis</label>
-            <select 
-              [ngModel]="service.yearBasis()" 
-              (ngModelChange)="service.setYearBasis($event)"
-              style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
-              <option value="calendar" style="background: #0d1117;">Calendar Year</option>
-              <option value="financial" style="background: #0d1117;">Financial Year</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Financial year month/day detail inline -->
-        <div *ngIf="service.yearBasis() === 'financial'" style="margin-top: 1rem; padding: 0.8rem; background: rgba(255, 255, 255, 0.01); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 1rem; align-items: center;">
-          <div style="flex: 1;">
-            <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Start Month</label>
-            <select 
-              [ngModel]="service.financialYearStartMonth()" 
-              (ngModelChange)="service.setFinancialYearStartMonth(+$event)"
-              style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
-              <option *ngFor="let m of [1,2,3,4,5,6,7,8,9,10,11,12]" [value]="m" style="background: #0d1117;">{{ getMonthName(m) }}</option>
-            </select>
-          </div>
-          <div style="flex: 1;">
-            <label style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Start Day</label>
-            <select 
-              [ngModel]="service.financialYearStartDay()" 
-              (ngModelChange)="service.setFinancialYearStartDay(+$event)"
-              style="width: 100%; padding: 0.4rem; border-radius: 4px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: #fff; outline: none; cursor: pointer; font-size: 0.8rem;">
-              <option *ngFor="let d of getDaysArray()" [value]="d" style="background: #0d1117;">{{ d }}</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Cost basis toggler -->
-        <div style="margin-top: 1.25rem;">
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Profit Calculation Method</label>
-          <div style="display: flex; background: var(--button-group-bg); padding: 3px; border-radius: 10px; border: 1px solid var(--card-border); height: 38px; box-sizing: border-box; width: 100%;">
-            <button 
-              style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
-              [style.background]="service.costBasisMethod() === 'fifo' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
-              [style.color]="service.costBasisMethod() === 'fifo' ? '#fff' : 'var(--text-muted)'"
-              (click)="setCostBasisMethod('fifo')">
-              First In, First Out (FIFO)
-            </button>
-            <button 
-              style="flex: 1; background: transparent; border: none; outline: none; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;"
-              [style.background]="service.costBasisMethod() === 'avg' ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'transparent'"
-              [style.color]="service.costBasisMethod() === 'avg' ? '#fff' : 'var(--text-muted)'"
-              (click)="setCostBasisMethod('avg')">
-              Average Cost Basis
-            </button>
-          </div>
-        </div>
-
-        <!-- Split-adjusted toggles -->
-        <div style="margin-top: 1.25rem;" *ngIf="allSources().length > 0">
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Split-Adjusted Accounts</label>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-            <label *ngFor="let src of allSources()" style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem; transition: all 0.15s;" [style.borderColor]="isSplitAdjusted(src) ? 'var(--primary)' : 'rgba(255,255,255,0.06)'" [style.background]="isSplitAdjusted(src) ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.01)'">
-              <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
-              <span>{{ src }}</span>
-            </label>
-          </div>
-        <!-- Finnhub API Key (Direct Stock Quotes) -->
-        <div style="margin-top: 1.25rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
-            <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin: 0;">Finnhub API Key (Optional)</label>
-            <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--primary); text-decoration: none;">Get Free Key ↗</a>
-          </div>
-          <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 0.5rem 0;">Direct high-speed quotes without CORS proxies.</p>
-          <input
-            type="password"
-            [ngModel]="service.finnhubApiKey()"
-            (ngModelChange)="service.finnhubApiKey.set($event); service.saveToStorage()"
-            placeholder="Paste free Finnhub token..."
-            style="font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; width: 100%; box-sizing: border-box;">
-        </div>
-      </div>
-
-
-    </div>
-
-    <!-- Card 2: Data & Backup -->
-    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem;">
-      <div>
-        <h3>Data & Cloud Sync</h3>
-        <p class="subtitle">Access your data securely across devices or download backups locally.</p>
-        
-        <!-- Google Sync Area -->
-        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.75rem; border-radius: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="-21 0 130 80" width="18" height="18" style="display: block;">
-                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 3.15.85 6.1 2.6 8.85z" fill="#0066da"/>
-                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.45h27.5z" fill="#00ac47"/>
-                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.9 1.2-4.45h-27.5l5.85 11.5z" fill="#ea4335"/>
-                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
-                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
-                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-3.15-.85-6.1-2.6-8.85z" fill="#ffba00"/>
-              </svg>
-              <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">Google Drive Sync</span>
-            </div>
-            <span *ngIf="service.isGoogleConnected()" style="color: #0f9d58; font-size: 0.75rem; font-weight: bold;">● Connected</span>
-          </div>
-
-          <div *ngIf="service.isGoogleConnected() && service.lastGoogleSyncTime()" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.5rem; padding-left: 0.1rem;">
-            Last backup: {{ formatSyncTime(service.lastGoogleSyncTime()!) }}
-          </div>
 
           <div>
-            <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Sync File Name</label>
-            <input
-              type="text"
-              [ngModel]="service.googleFileName()"
-              (ngModelChange)="service.googleFileName.set($event)"
-              placeholder="portfolio_tracker_transactions.json"
-              style="font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; width: 100%;">
-          </div>
-
-          <!-- Auto-Sync Checkbox Toggle -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed rgba(255,255,255,0.08);">
-            <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500;">Auto-sync changes to cloud when connected</span>
-            <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.76rem; color: var(--text-main);">
-              <input 
-                type="checkbox" 
-                [ngModel]="service.autoSyncGoogleDrive()" 
-                (ngModelChange)="service.autoSyncGoogleDrive.set($event); service.saveToStorage()"
-                style="accent-color: var(--primary); cursor: pointer;">
-              <span>{{ service.autoSyncGoogleDrive() ? 'Enabled' : 'Disabled' }}</span>
-            </label>
-          </div>
-
-          <div style="margin-top: 0.75rem; display: flex; gap: 0.4rem; justify-content: flex-end;">
-            <button class="btn btn-secondary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">Download from Drive</button>
-            <button class="btn btn-primary btn-xs" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">Upload to Drive</button>
-          </div>
-        </div>
-
-        <!-- Local Computer Backup File -->
-        <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.25rem;">
-          <h4 style="font-size: 0.88rem; margin: 0 0 0.5rem; font-weight: 600;">Computer Backup File</h4>
-          
-          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
-              <span style="font-size: 0.78rem; color: var(--text-muted);">Save backup to computer</span>
-              <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()">Download (.json)</button>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 0.5rem 0.75rem; border-radius: 6px;">
-              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.5rem;">Load backup from computer</span>
-              <input 
-                type="file" 
-                accept=".json" 
-                (change)="importPortfolioBackup($event)"
-                class="file-input"
-                style="width: 140px; padding: 0.2rem; font-size: 0.7rem;"
-                id="backup-upload">
-            </div>
+            <label class="input-label">Profit Method</label>
+            <select [ngModel]="service.costBasisMethod()" (ngModelChange)="setCostBasisMethod($event)" class="settings-select">
+              <option value="fifo" style="background: #0d1117;">FIFO (First In)</option>
+              <option value="avg" style="background: #0d1117;">Average Cost</option>
+            </select>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Card 3: Sector & Currencies -->
-    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem;">
-      <div>
-        <h3>Sectors & Currencies</h3>
-        <p class="subtitle">Customize labels for stock sectors and toggle active dashboard exchange currencies.</p>
-        
-        <!-- Sector classification -->
-        <div>
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Sectors</label>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
-            <span
-              *ngFor="let s of service.customSectors(); let i = index"
-              style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.55rem; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: var(--text-main);">
-              {{ s }}
-              <button
-                (click)="removeSector(i)"
-                style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0; transition: color 0.15s;"
-                onmouseover="this.style.color='#ef4444'"
-                onmouseout="this.style.color='var(--text-muted)'">&times;</button>
-            </span>
-          </div>
-          <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.5rem;">
-            <input
-              type="text"
-              [(ngModel)]="newSectorName"
-              placeholder="New sector..."
-              (keydown.enter)="addSector()"
-              style="flex: 1; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; font-size: 0.78rem;">
-            <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.6rem;" (click)="addSector()" [disabled]="!newSectorName.trim()">+ Add</button>
-          </div>
+    <!-- Card 3: Currency Rates Table -->
+    <div class="glass-card setting-box">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.3rem;">
+        <div class="box-header">
+          <h3 style="margin: 0;">💱 Currency Rates</h3>
+          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Live rates for cash.</p>
         </div>
-
-        <!-- Dashboard currency toggle list -->
-        <div style="margin-top: 1.25rem;">
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Dashboard Currencies</label>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
-            <span
-              *ngFor="let curr of service.visibleCurrencies(); let i = index"
-              style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.55rem; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: var(--text-main);">
-              {{ service.getCurrencyBtnLabel(curr) }}
-              <button
-                (click)="removeVisibleCurrency(i)"
-                style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0; transition: color 0.15s;"
-                onmouseover="this.style.color='#ef4444'"
-                onmouseout="this.style.color='var(--text-muted)'">&times;</button>
-            </span>
-          </div>
-          <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.5rem;">
-            <input
-              type="text"
-              [(ngModel)]="newCurrencyCode"
-              placeholder="e.g. CAD, JPY..."
-              (keydown.enter)="addVisibleCurrency()"
-              style="flex: 1; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); outline: none; font-size: 0.78rem; text-transform: uppercase;">
-            <button class="btn btn-primary btn-xs" style="padding: 0.35rem 0.6rem;" (click)="addVisibleCurrency()" [disabled]="!newCurrencyCode.trim()">+ Add</button>
-          </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.6rem; background: rgba(255,255,255,0.02); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.05); text-align: left;">
-            💡 <strong>EUR</strong> uses the <em>calendar year average exchange rate</em> tax rule for realized gains. Other currencies (like <strong>INR</strong>) use the <em>historical daily exchange rate</em> on the transaction date.
-          </div>
-        </div>
-
-        <!-- Default Currency Selection -->
-        <div style="margin-top: 1.25rem;">
-          <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Default Currency</label>
-          <select 
-            [ngModel]="service.defaultCurrency()" 
-            (ngModelChange)="service.defaultCurrency.set($event); service.saveToStorage()"
-            style="width: 100%; padding: 0.48rem; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-main); outline: none; cursor: pointer; font-size: 0.8rem;">
-            <option *ngFor="let curr of service.visibleCurrencies()" [value]="curr" style="background: #0d1117;">{{ curr }}</option>
-          </select>
-          <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.4rem;">
-            This currency will be used for aggregate charts and calculations when "Native" is selected or when starting the app.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 4: Danger Zone / Reset Data -->
-    <div class="glass-card" style="display: flex; flex-direction: column; gap: 1rem; border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.02);">
-      <div>
-        <h3 style="color: #ef4444; display: flex; align-items: center; gap: 0.4rem;">
-          <span>⚠️ Reset Portfolio Data</span>
-        </h3>
-        <p class="subtitle">Irreversible action to clear your transactions.</p>
-        
-        <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06);">
-          <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 0.2rem;">
-            Delete All Transactions
-          </label>
-          <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.4;">
-            Permanently delete all transaction entries, custom ownership splits, and history from your account.
-          </p>
-          
-          <button (click)="clearAllLedger()" 
-                  class="btn btn-danger" 
-                  style="padding: 0.5rem 0.9rem; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
-            🗑 Clear All Data
+        <div style="display: flex; gap: 0.3rem;">
+          <button 
+            class="btn btn-xs" 
+            [class.btn-primary]="isEditingRates()" 
+            [class.btn-secondary]="!isEditingRates()"
+            (click)="isEditingRates.set(!isEditingRates())">
+            {{ isEditingRates() ? '✓ Save' : '✏ Edit' }}
+          </button>
+          <button 
+            class="btn btn-secondary btn-xs" 
+            (click)="service.loadExchangeRatesApi(true)"
+            [disabled]="service.isSyncing()">
+            {{ service.isSyncing() ? '...' : '🔄 Live' }}
           </button>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- SECTION 2: EXCHANGE RATES (FULL WIDTH) -->
-  <div class="glass-card rates-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
-      <h3 (click)="isRatesCollapsed.set(!isRatesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-        Currency Exchange Rates
-        <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isRatesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
-      </h3>
-      <div style="display: flex; gap: 0.5rem;" *ngIf="!isRatesCollapsed()">
-        <button 
-          class="btn btn-sm" 
-          [class.btn-primary]="isEditingRates()" 
-          [class.btn-secondary]="!isEditingRates()"
-          (click)="isEditingRates.set(!isEditingRates())">
-          {{ isEditingRates() ? 'Save' : 'Edit Override' }}
-        </button>
-      </div>
-    </div>
-    <p class="subtitle" *ngIf="!isRatesCollapsed()">Customize or fetch current conversion rates between major currencies.</p>
-    
-    <div class="table-container rates-table" style="margin-top: 1rem; max-height: 250px; overflow-y: auto;" *ngIf="!isRatesCollapsed()">
-      <table>
-        <thead>
-          <tr>
-            <th>Currency Pair</th>
-            <th style="text-align: right; padding-right: 1.5rem;">Exchange Rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let pair of exchangeRatePairs()">
-            <td class="bold-ticker">{{ pair.name }}</td>
-            <td style="text-align: right; padding-right: 1.5rem; vertical-align: middle;">
+      <div class="rates-box-table">
+        <!-- Fixed Header -->
+        <div style="display: flex; justify-content: space-between; padding: 0.4rem 0.75rem; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">
+          <span>Pair</span>
+          <span>Rate</span>
+        </div>
+
+        <!-- Scrollable Rows Body -->
+        <div style="max-height: 140px; overflow-y: auto;">
+          <div *ngFor="let pair of exchangeRatePairs()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <span class="bold-ticker font-mono" style="font-size: 0.78rem;">
+              {{ pair.name }}
+            </span>
+            <div>
               <input 
                 *ngIf="isEditingRates()"
                 type="number" 
                 step="0.0001"
                 [ngModel]="pair.rate" 
                 (ngModelChange)="updateExchangeRate(pair.key, $event)"
-                class="table-inline-input price-input"
-                style="width: 100px; text-align: right; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 0.2rem 0.4rem; color: #fff;">
-              <span *ngIf="!isEditingRates()" class="font-mono" style="font-size: 0.9rem; padding-right: 0.4rem; font-weight: bold; color: var(--text-main);">
+                class="table-inline-input font-mono"
+                style="width: 75px; text-align: right; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 0.1rem 0.25rem; color: #fff; font-size: 0.74rem;">
+              <span *ngIf="!isEditingRates()" class="font-mono" style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">
                 {{ pair.rate.toFixed(4) }}
               </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: Cloud & Backup -->
+    <div class="glass-card setting-box">
+      <div class="box-header">
+        <h3>☁ Cloud & Backup</h3>
+        <p class="subtitle">Google Drive & JSON snapshot.</p>
+      </div>
+
+      <div class="cloud-sync-box">
+        <div class="sync-status-row">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="-21 0 130 80" width="16" height="16" style="display: block;">
+              <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 3.15.85 6.1 2.6 8.85z" fill="#0066da"/>
+              <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.45h27.5z" fill="#00ac47"/>
+              <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.9 1.2-4.45h-27.5l5.85 11.5z" fill="#ea4335"/>
+              <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+              <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+              <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-3.15-.85-6.1-2.6-8.85z" fill="#ffba00"/>
+            </svg>
+            <strong style="font-size: 0.8rem;">Google Drive</strong>
+          </div>
+          <span *ngIf="service.isGoogleConnected()" style="color: var(--success); font-size: 0.72rem; font-weight: bold;">
+            ● Connected
+          </span>
+        </div>
+
+        <div class="auto-sync-toggle-row" style="margin-top: 0.35rem; padding-top: 0.35rem;">
+          <span style="font-size: 0.72rem; color: var(--text-muted);">Auto-sync changes</span>
+          <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.72rem;">
+            <input
+              type="checkbox"
+              [ngModel]="service.autoSyncGoogleDrive()"
+              (ngModelChange)="service.autoSyncGoogleDrive.set($event); service.saveToStorage()"
+              style="accent-color: var(--primary); cursor: pointer;">
+            <span>{{ service.autoSyncGoogleDrive() ? 'On' : 'Off' }}</span>
+          </label>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.35rem; margin-top: 0.4rem; padding-top: 0.35rem; border-top: 1px dashed rgba(255,255,255,0.06);">
+          <button class="btn btn-secondary btn-xs" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">
+            Pull
+          </button>
+          <button class="btn btn-primary btn-xs" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">
+            Push
+          </button>
+        </div>
+      </div>
+
+      <!-- Local JSON Backup & Restore -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.08); gap: 0.5rem;">
+        <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.3rem; font-size: 0.74rem;">
+          💾 Export Backup
+        </button>
+        <button class="btn btn-secondary btn-xs" (click)="backupFileInput.click()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.3rem; font-size: 0.74rem;">
+          📂 Restore Backup
+        </button>
+        <input #backupFileInput type="file" accept=".json" (change)="importPortfolioBackup($event)" style="display: none;">
+      </div>
     </div>
   </div>
 
-  <!-- SECTION 3: STOCK PRICE CATALOG (FULL WIDTH) -->
-  <div class="glass-card prices-card">
-    <div class="prices-header">
-      <div>
-        <h3 (click)="isPricesCollapsed.set(!isPricesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-          Current Stock Prices & Sectors
-          <span class="collapse-chevron" style="font-size: 0.95rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isPricesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
-        </h3>
-        <p class="subtitle" *ngIf="!isPricesCollapsed()">These rates are used to calculate current valuation and unrealized returns.</p>
-      </div>
-      <div class="catalog-actions" style="display: flex; gap: 0.5rem; align-items: center;" *ngIf="!isPricesCollapsed()">
-        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none; margin-right: 0.5rem;">
-          <input 
-            type="checkbox" 
-            [ngModel]="service.showNameColumn()" 
-            (ngModelChange)="service.showNameColumn.set($event); service.saveToStorage()" 
-            style="cursor: pointer; accent-color: var(--primary);">
-          Show Company Name
-        </label>
-        <input 
-          type="text" 
-          placeholder="Search ticker..." 
-          [ngModel]="filterTicker()" 
-          (ngModelChange)="filterTicker.set($event)" 
-          class="dashboard-search-input upper"
-          style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text-main); font-size: 0.8rem; width: 140px; outline: none; transition: border-color 0.2s;"
-          onfocus="this.style.borderColor='var(--primary)'"
-          onblur="this.style.borderColor='rgba(255, 255, 255, 0.08)'">
-      </div>
+  <!-- WIDE SECTION 1: Current Stock Prices & Asset Catalog (Full Width) -->
+  <div class="settings-section">
+    <div class="section-title">
+      <span class="section-icon">📊</span>
+      <span>Current Stock Prices & Asset Catalog</span>
     </div>
 
-    <div class="table-container prices-table" *ngIf="!isPricesCollapsed()">
-      <table>
-        <thead>
-          <tr>
-            <th (click)="setSort('name')" style="cursor: pointer; user-select: none;" *ngIf="service.showNameColumn()">
-              Company Name <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'name'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
-            </th>
-            <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
-              Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
-            </th>
-            <th class="num" (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none;">
-              Current Price <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; margin-top: 0.1rem; text-transform: none;">(as fetched / native currency)</span>
-              <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
-            </th>
-            <th (click)="setSort('sector')" style="cursor: pointer; user-select: none;">
-              Custom Sector <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
-            </th>
-            <th style="text-align: left; min-width: 140px;">
-              Yahoo Symbol <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; margin-top: 0.1rem; text-transform: none;">(override suffix e.g. SEC0.DE)</span>
-            </th>
-            <th>Split Date</th>
-            <th>Split Ratio</th>
-            <th>Auto Splits</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let t of filteredTickerConfigsList(); trackBy: trackByTicker">
-            <td class="text-sm text-muted" *ngIf="service.showNameColumn()">{{ t.name }}</td>
-            <td class="bold-ticker">
-              <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <img 
-                  [src]="service.getLogoData(t.ticker)" 
-                  (error)="service.onLogoError(t.ticker)"
-                  style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
-                  *ngIf="service.hasLogo(t.ticker) && !service.shouldShowPlaceholder(t.ticker)">
-                <div 
-                  *ngIf="service.hasLogo(t.ticker) && service.shouldShowPlaceholder(t.ticker)"
-                  [style.background]="service.getTickerColor(t.ticker)"
-                  style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
-                  {{ t.ticker.slice(0, 2) }}
+    <div class="glass-card prices-card">
+      <div class="prices-header">
+        <div>
+          <h3 (click)="isPricesCollapsed.set(!isPricesCollapsed())" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.05rem;">
+            Stock Price Catalog
+            <span style="font-size: 0.85rem; color: var(--text-muted); transition: transform 0.2s;" [style.transform]="isPricesCollapsed() ? 'rotate(-90deg)' : 'rotate(0deg)'">▼</span>
+          </h3>
+          <p class="subtitle" *ngIf="!isPricesCollapsed()" style="margin-top: 0.2rem;">Live rates and sector tags used to calculate portfolio valuation and unrealized gains.</p>
+        </div>
+
+        <div style="display: flex; gap: 0.6rem; align-items: center;" *ngIf="!isPricesCollapsed()">
+          <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+            <input 
+              type="checkbox" 
+              [ngModel]="service.showNameColumn()" 
+              (ngModelChange)="service.showNameColumn.set($event); service.saveToStorage()" 
+              style="cursor: pointer; accent-color: var(--primary);">
+            Show Company Name
+          </label>
+          <input 
+            type="text" 
+            placeholder="Search ticker..." 
+            [ngModel]="filterTicker()" 
+            (ngModelChange)="filterTicker.set($event)" 
+            class="person-input upper"
+            style="width: 140px; padding: 0.35rem 0.6rem; font-size: 0.78rem;">
+          <button class="btn btn-secondary btn-xs" (click)="service.loadMarketPricesApi(true)" [disabled]="service.isSyncing()">
+            {{ service.isSyncing() ? 'Fetching...' : '🔄 Live Fetch' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container prices-table" *ngIf="!isPricesCollapsed()" style="overflow-x: auto; max-height: 480px; overflow-y: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th (click)="setSort('name')" style="cursor: pointer; user-select: none;" *ngIf="service.showNameColumn()">
+                Company Name <span class="sort-icon" *ngIf="sortBy() === 'name'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
+              <th (click)="setSort('ticker')" style="cursor: pointer; user-select: none;">
+                Ticker <span class="sort-icon" *ngIf="sortBy() === 'ticker'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
+              <th class="num" (click)="setSort('currentPrice')" style="cursor: pointer; user-select: none;">
+                Current Price <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; text-transform: none;">(native currency)</span>
+                <span class="sort-icon" *ngIf="sortBy() === 'currentPrice'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
+              <th (click)="setSort('sector')" style="cursor: pointer; user-select: none;">
+                Custom Sector <span class="sort-icon" *ngIf="sortBy() === 'sector'">{{ sortDirection() === 'desc' ? '▼' : '▲' }}</span>
+              </th>
+              <th style="text-align: left; min-width: 140px;">
+                Yahoo Symbol <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; text-transform: none;">(override e.g. SEC0.DE)</span>
+              </th>
+              <th>Split Date</th>
+              <th>Split Ratio</th>
+              <th>Auto Splits</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of filteredTickerConfigsList(); trackBy: trackByTicker">
+              <td class="text-sm text-muted" *ngIf="service.showNameColumn()">{{ t.name }}</td>
+              <td class="bold-ticker">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <img 
+                    [src]="service.getLogoData(t.ticker)" 
+                    (error)="service.onLogoError(t.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                    *ngIf="service.hasLogo(t.ticker) && !service.shouldShowPlaceholder(t.ticker)">
+                  <div 
+                    *ngIf="service.hasLogo(t.ticker) && service.shouldShowPlaceholder(t.ticker)"
+                    [style.background]="service.getTickerColor(t.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                    {{ t.ticker.slice(0, 2) }}
+                  </div>
+                  <a href="https://www.google.com/search?q={{ t.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ t.ticker }}</a>
+                  <span *ngIf="service.tickerConfigs()[t.ticker]?.notFound" style="color: var(--danger); font-size: 0.68rem; padding: 0.15rem 0.35rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); font-weight: bold;" title="Ticker not found on Yahoo">
+                    ⚠️ Error
+                  </span>
                 </div>
-                <a href="https://www.google.com/search?q={{ t.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ t.ticker }}</a>
-                <span *ngIf="service.tickerConfigs()[t.ticker]?.notFound" style="color: var(--danger); font-size: 0.68rem; padding: 0.15rem 0.35rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); font-weight: bold; margin-left: 0.4rem; display: inline-flex; align-items: center; gap: 0.2rem;" title="Ticker not found on Yahoo. Click magnifying glass next to override to search/fix.">
-                  ⚠️ Error
-                </span>
-              </div>
-            </td>
-            <td class="num font-mono bold">
-              {{ formatTickerPrice(t.ticker, t.currentPrice) }}
-            </td>
-            <td>
-              <select
-                [ngModel]="t.customSector || t.sector"
-                (ngModelChange)="updateTickerSector(t.ticker, $event)"
-                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; color: var(--text-main); font-size: 0.75rem; padding: 0.2rem 1.6rem 0.2rem 0.6rem; outline: none; cursor: pointer; max-width: 170px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align-last: center; text-align: center;">
-                <option *ngFor="let s of service.customSectors()" [value]="s" style="background: #0d1117;">{{ s }}</option>
-                <option *ngIf="!service.customSectors().includes(t.sector)" [value]="t.sector" style="background: #0d1117;">{{ t.sector }}</option>
-              </select>
-            </td>
-            <td>
-              <div style="display: flex; gap: 0.2rem; align-items: center; justify-content: center;">
+              </td>
+              <td class="num font-mono" style="font-weight: 700;">
+                {{ formatTickerPrice(t.ticker, t.currentPrice) }}
+              </td>
+              <td>
+                <select
+                  [ngModel]="t.customSector || t.sector"
+                  (ngModelChange)="updateTickerSector(t.ticker, $event)"
+                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; color: var(--text-main); font-size: 0.75rem; padding: 0.2rem 1.4rem 0.2rem 0.6rem; outline: none; cursor: pointer; max-width: 170px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align-last: center; text-align: center;">
+                  <option *ngFor="let s of service.customSectors()" [value]="s" style="background: #0d1117;">{{ s }}</option>
+                  <option *ngIf="!service.customSectors().includes(t.sector)" [value]="t.sector" style="background: #0d1117;">{{ t.sector }}</option>
+                </select>
+              </td>
+              <td>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                  <input
+                    type="text"
+                    [ngModel]="t.yahooSymbol || ''"
+                    (blur)="updateTickerYahooSymbol(t.ticker, $any($event.target).value)"
+                    (keydown.enter)="updateTickerYahooSymbol(t.ticker, $any($event.target).value); $any($event.target).blur()"
+                    placeholder="{{ t.ticker }}"
+                    style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.25rem 0.5rem; outline: none; width: 85px; text-align: center;">
+                  <button 
+                    class="btn btn-secondary btn-xs" 
+                    style="padding: 0.25rem 0.4rem; line-height: 1; border-radius: 6px;"
+                    title="Search Yahoo Symbol"
+                    (click)="searchYahooSymbol(t.ticker)">
+                    🔍
+                  </button>
+                </div>
+              </td>
+              <td>
                 <input
-                  type="text"
-                  [ngModel]="t.yahooSymbol || ''"
-                  (blur)="updateTickerYahooSymbol(t.ticker, $any($event.target).value)"
-                  (keydown.enter)="updateTickerYahooSymbol(t.ticker, $any($event.target).value); $any($event.target).blur()"
-                  placeholder="e.g. {{ t.ticker }}.DE"
-                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 85px; transition: border-color 0.15s; text-align: center;"
-                  onfocus="this.style.borderColor='var(--primary)'"
-                  onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'">
-                <button 
-                  class="btn btn-secondary btn-xs" 
-                  style="padding: 0.3rem; line-height: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center;"
-                  title="Search Yahoo Symbol"
-                  (click)="searchYahooSymbol(t.ticker)">
-                  🔍
-                </button>
-              </div>
-            </td>
-            <td>
-              <input
-                type="date"
-                [ngModel]="t.splitDate || ''"
-                (ngModelChange)="updateTickerSplitDate(t.ticker, $event)"
-                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.75rem; padding: 0.2rem 0.4rem; outline: none; width: 110px; text-align: center;">
-            </td>
-            <td>
-              <input
-                type="number"
-                step="any"
-                [ngModel]="t.splitRatio || ''"
-                (blur)="updateTickerSplitRatio(t.ticker, $any($event.target).value)"
-                (keydown.enter)="updateTickerSplitRatio(t.ticker, $any($event.target).value); $any($event.target).blur()"
-                placeholder="e.g. 2"
-                style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.3rem 0.6rem; outline: none; width: 60px; text-align: center;">
-            </td>
-            <td>
-              <div *ngIf="t.splits && t.splits.length > 0" style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
-                <span *ngFor="let sp of t.splits" class="sector-badge" style="font-size: 0.68rem; padding: 0.15rem 0.4rem;" [title]="sp.ratio + ':1 on ' + sp.date">
-                  {{ sp.ratio }}:1 ({{ sp.date.slice(0,4) }})
-                </span>
-              </div>
-              <span *ngIf="!t.splits || t.splits.length === 0" style="color: var(--text-muted); font-size: 0.72rem;">—</span>
-            </td>
-          </tr>
-          <tr *ngIf="filteredTickerConfigsList().length === 0">
-            <td [attr.colspan]="service.showNameColumn() ? 8 : 7" class="empty-state">No ticker assets found. Paste some transaction sources or configure mock data!</td>
-          </tr>
-        </tbody>
-      </table>
+                  type="date"
+                  [ngModel]="t.splitDate || ''"
+                  (ngModelChange)="updateTickerSplitDate(t.ticker, $event)"
+                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.75rem; padding: 0.2rem 0.4rem; outline: none; width: 110px; text-align: center;">
+              </td>
+              <td>
+                <input
+                  type="number"
+                  step="any"
+                  [ngModel]="t.splitRatio || ''"
+                  (blur)="updateTickerSplitRatio(t.ticker, $any($event.target).value)"
+                  (keydown.enter)="updateTickerSplitRatio(t.ticker, $any($event.target).value); $any($event.target).blur()"
+                  placeholder="e.g. 2"
+                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.25rem 0.5rem; outline: none; width: 55px; text-align: center;">
+              </td>
+              <td>
+                <div *ngIf="t.splits && t.splits.length > 0" style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                  <span *ngFor="let sp of t.splits" class="sector-badge" style="font-size: 0.68rem; padding: 0.15rem 0.4rem;" [title]="sp.ratio + ':1 on ' + sp.date">
+                    {{ sp.ratio }}:1 ({{ sp.date.slice(0,4) }})
+                  </span>
+                </div>
+                <span *ngIf="!t.splits || t.splits.length === 0" style="color: var(--text-muted); font-size: 0.72rem;">—</span>
+              </td>
+            </tr>
+            <tr *ngIf="filteredTickerConfigsList().length === 0">
+              <td [attr.colspan]="service.showNameColumn() ? 8 : 7" style="text-align: center; color: var(--text-muted); padding: 1.5rem; font-size: 0.82rem;">
+                No ticker assets found.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIDE SECTION 2: Sectors, Accounts & Market Providers (3 Cards Grid) -->
+  <div class="settings-section">
+    <div class="section-title">
+      <span class="section-icon">🏷️</span>
+      <span>Classification & Market Data Providers</span>
+    </div>
+
+    <div class="settings-top-grid">
+      <!-- Card A: Custom Sectors -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3>🏷️ Custom Sectors</h3>
+          <p class="subtitle">Labels for stock asset allocation.</p>
+        </div>
+
+        <div class="currency-chips-wrap">
+          <span *ngFor="let s of service.customSectors(); let i = index" class="currency-chip">
+            {{ s }}
+            <button (click)="removeSector(i)" class="currency-chip-del" title="Remove sector">✕</button>
+          </span>
+        </div>
+
+        <div class="add-currency-bar">
+          <input
+            type="text"
+            [(ngModel)]="newSectorName"
+            placeholder="New sector..."
+            class="person-input"
+            (keydown.enter)="addSector()">
+          <button class="btn btn-primary btn-xs" (click)="addSector()" [disabled]="!newSectorName.trim()">
+            + Add
+          </button>
+        </div>
+      </div>
+
+      <!-- Card B: Split-Adjusted Accounts -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3>⚖️ Split-Adjusted Sources</h3>
+          <p class="subtitle">Accounts with auto-adjusted historical transactions.</p>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;" *ngIf="allSources().length > 0">
+          <label 
+            *ngFor="let src of allSources()" 
+            style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
+            <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
+            <span>{{ src }}</span>
+          </label>
+        </div>
+        <p *ngIf="allSources().length === 0" class="subtitle" style="font-size: 0.76rem;">No transaction sources detected yet.</p>
+      </div>
+
+      <!-- Card C: Finnhub API Key -->
+      <div class="glass-card setting-box">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="box-header">
+            <h3 style="margin: 0;">🔑 Finnhub Direct API</h3>
+            <p class="subtitle" style="margin: 0.1rem 0 0 0;">Optional backup provider.</p>
+          </div>
+          <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--primary); text-decoration: none;">Get Free Key ↗</a>
+        </div>
+
+        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Direct high-speed quotes without CORS proxies.</p>
+
+        <input
+          type="password"
+          [ngModel]="service.finnhubApiKey()"
+          (ngModelChange)="service.finnhubApiKey.set($event); service.saveToStorage()"
+          placeholder="Paste free Finnhub token..."
+          class="person-input"
+          style="width: 100%; box-sizing: border-box;">
+      </div>
+    </div>
+  </div>
+
+  <!-- WIDE SECTION 3: Danger Zone (Reset Data) -->
+  <div class="settings-section">
+    <div class="glass-card" style="padding: 1.25rem 1.5rem; border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.02);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h3 style="color: #ef4444; margin: 0 0 0.25rem 0; font-size: 1rem;">⚠️ Clear All Portfolio Data</h3>
+          <p class="subtitle" style="margin: 0;">Permanently wipe all transaction records, custom splits, and configurations from this browser.</p>
+        </div>
+        <button (click)="clearAllLedger()" class="btn btn-danger" style="padding: 0.5rem 1rem; font-size: 0.82rem; font-weight: 600; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; border-radius: 6px; cursor: pointer;">
+          🗑 Clear All Data
+        </button>
+      </div>
     </div>
   </div>
 </div>
