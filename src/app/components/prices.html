@@ -182,10 +182,11 @@
     <!-- Card 4: Cloud & Backup -->
     <div class="glass-card setting-box">
       <div class="box-header">
-        <h3>☁ Cloud & Backup</h3>
-        <p class="subtitle">Google Drive & JSON snapshot.</p>
+        <h3>☁️ Cloud & Local Backup</h3>
+        <p class="subtitle">Sync to Google Drive or save JSON locally.</p>
       </div>
 
+      <!-- Cloud Sync Section -->
       <div class="cloud-sync-box">
         <div class="sync-status-row">
           <div style="display: flex; align-items: center; gap: 0.4rem;">
@@ -197,15 +198,18 @@
               <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
               <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-3.15-.85-6.1-2.6-8.85z" fill="#ffba00"/>
             </svg>
-            <strong style="font-size: 0.8rem;">Google Drive</strong>
+            <strong style="font-size: 0.8rem; color: var(--primary);">Cloud (Google Drive)</strong>
           </div>
           <span *ngIf="service.isGoogleConnected()" style="color: var(--success); font-size: 0.72rem; font-weight: bold;">
             ● Connected
           </span>
+          <span *ngIf="!service.isGoogleConnected()" style="color: var(--text-muted); font-size: 0.72rem;">
+            Not connected
+          </span>
         </div>
 
         <div class="auto-sync-toggle-row" style="margin-top: 0.35rem; padding-top: 0.35rem;">
-          <span style="font-size: 0.72rem; color: var(--text-muted);">Auto-sync changes</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted);">Auto-sync cloud</span>
           <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; font-size: 0.72rem;">
             <input
               type="checkbox"
@@ -216,25 +220,30 @@
           </label>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 0.35rem; margin-top: 0.4rem; padding-top: 0.35rem; border-top: 1px dashed rgba(255,255,255,0.06);">
-          <button class="btn btn-secondary btn-xs" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()">
-            Pull
+        <div style="display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.45rem; padding-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.06);">
+          <button class="btn btn-secondary btn-xs" (click)="service.downloadFromGoogleDrive()" [disabled]="service.isGoogleSyncing()" title="Download backup from Google Drive cloud">
+            ☁️ Pull Cloud
           </button>
-          <button class="btn btn-primary btn-xs" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()">
-            Push
+          <button class="btn btn-primary btn-xs" (click)="service.uploadToGoogleDrive()" [disabled]="service.isGoogleSyncing()" title="Upload backup to Google Drive cloud">
+            ☁️ Push Cloud
           </button>
         </div>
       </div>
 
-      <!-- Local JSON Backup & Restore -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed rgba(255,255,255,0.08); gap: 0.5rem;">
-        <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.3rem; font-size: 0.74rem;">
-          💾 Export Backup
-        </button>
-        <button class="btn btn-secondary btn-xs" (click)="backupFileInput.click()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.3rem; font-size: 0.74rem;">
-          📂 Restore Backup
-        </button>
-        <input #backupFileInput type="file" accept=".json" (change)="importPortfolioBackup($event)" style="display: none;">
+      <!-- Local File Section -->
+      <div style="margin-top: 0.55rem; padding-top: 0.45rem; border-top: 1px dashed rgba(255,255,255,0.08);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+          <strong style="font-size: 0.75rem; color: var(--text-muted);">💻 Local File (Offline JSON)</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-xs" (click)="exportPortfolioBackup()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.3rem; font-size: 0.74rem;" title="Download JSON file to this computer">
+            💾 Export JSON
+          </button>
+          <button class="btn btn-secondary btn-xs" (click)="backupFileInput.click()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.3rem; font-size: 0.74rem;" title="Upload JSON file from this computer">
+            📂 Import JSON
+          </button>
+          <input #backupFileInput type="file" accept=".json" (change)="importPortfolioBackup($event)" style="display: none;">
+        </div>
       </div>
     </div>
   </div>
