@@ -111,8 +111,8 @@ export class PortfolioService {
   public numberFormat = signal<string>('1,234.56');
   public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
   public marketProxyUrl = signal<string>(PortfolioService.DEFAULT_MARKET_PROXY);
-  public taxRate = signal<number>(25);
-  public taxExemptionLimit = signal<number>(1000);
+  public taxRate = signal<number | null>(null);
+  public taxExemptionLimit = signal<number | null>(null);
   public lastRefreshTime = signal<number | null>(null);
   public lastRatesRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
@@ -739,10 +739,12 @@ export class PortfolioService {
       if (mpUrl !== null) this.marketProxyUrl.set(mpUrl || PortfolioService.DEFAULT_MARKET_PROXY);
 
       const tr = localStorage.getItem('pt_tax_rate');
-      if (tr) this.taxRate.set(parseFloat(tr));
+      if (tr !== null && tr !== '') this.taxRate.set(parseFloat(tr));
+      else this.taxRate.set(null);
 
       const tel = localStorage.getItem('pt_tax_exemption_limit');
-      if (tel) this.taxExemptionLimit.set(parseFloat(tel));
+      if (tel !== null && tel !== '') this.taxExemptionLimit.set(parseFloat(tel));
+      else this.taxExemptionLimit.set(null);
 
       const sims = localStorage.getItem('pt_simulated_transactions');
       if (sims) this.simulatedTransactions.set(JSON.parse(sims));
@@ -807,8 +809,16 @@ export class PortfolioService {
     localStorage.setItem('pt_default_currency', this.defaultCurrency());
     localStorage.setItem('pt_display_currency', this.displayCurrency());
     localStorage.setItem('pt_market_proxy_url', this.marketProxyUrl());
-    localStorage.setItem('pt_tax_rate', this.taxRate().toString());
-    localStorage.setItem('pt_tax_exemption_limit', this.taxExemptionLimit().toString());
+    if (this.taxRate() !== null) {
+      localStorage.setItem('pt_tax_rate', this.taxRate()!.toString());
+    } else {
+      localStorage.removeItem('pt_tax_rate');
+    }
+    if (this.taxExemptionLimit() !== null) {
+      localStorage.setItem('pt_tax_exemption_limit', this.taxExemptionLimit()!.toString());
+    } else {
+      localStorage.removeItem('pt_tax_exemption_limit');
+    }
 
     localStorage.setItem('pt_split_adjusted_sources', JSON.stringify(this.splitAdjustedSources()));
     localStorage.setItem('pt_cost_basis_method', this.costBasisMethod());

@@ -317,7 +317,7 @@
               min="0"
               max="100"
               [ngModel]="service.taxRate()"
-              (ngModelChange)="service.taxRate.set($event); service.saveToStorage()"
+              (ngModelChange)="service.taxRate.set($event !== null && $event !== '' ? +$event : null); service.saveToStorage()"
               placeholder="e.g. 25"
               class="person-input"
               style="width: 100%; box-sizing: border-box;">
@@ -329,7 +329,7 @@
               step="50"
               min="0"
               [ngModel]="service.taxExemptionLimit()"
-              (ngModelChange)="service.taxExemptionLimit.set($event); service.saveToStorage()"
+              (ngModelChange)="service.taxExemptionLimit.set($event !== null && $event !== '' ? +$event : null); service.saveToStorage()"
               placeholder="e.g. 1000"
               class="person-input"
               style="width: 100%; box-sizing: border-box;">
