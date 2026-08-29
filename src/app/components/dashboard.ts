@@ -1728,6 +1728,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   private loadHistoryTimeout: any = null;
+  private lastHistoricalFetchTime = 0;
+  private lastFetchedRange = '';
 
   private loadHistoryForChart() {
     this.chartLoadSession++;
@@ -1789,7 +1791,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const tickers = Array.from(new Set(txs.map(t => t.ticker.toUpperCase().trim()).filter(Boolean)));
       tickers.push('USDINR=X');
       tickers.push('USDEUR=X');
-      if (tickers.length > 0) {
+      
+      const now = Date.now();
+      const needsNetworkFetch = (now - this.lastHistoricalFetchTime > 10 * 60 * 1000) || (this.lastFetchedRange !== range);
+      if (tickers.length > 0 && needsNetworkFetch) {
+        this.lastHistoricalFetchTime = now;
+        this.lastFetchedRange = range;
         await this.service.fetchHistoricalPricesForTickers(tickers, range);
       }
 

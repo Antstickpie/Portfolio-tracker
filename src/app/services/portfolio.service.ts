@@ -2111,16 +2111,22 @@ export class PortfolioService {
         }
       };
 
-      // Fetch symbols with early abort on circuit breaker
-      await this.runConcurrent(
-        Array.from(symbolMap.entries()),
-        ([resolved, original]) => fetchViaChart(resolved, original),
-        2,
-        150,
-        () => circuitBreakerTripped
+      // Fetch symbols with early abort on circuit breaker (only for symbols not updated by bulk batch)
+      const remainingEntries = Array.from(symbolMap.entries()).filter(
+        ([_, original]) => !bulkUpdatedSet.has(original)
       );
 
-      if (circuitBreakerTripped) {
+      if (remainingEntries.length > 0) {
+        await this.runConcurrent(
+          remainingEntries,
+          ([resolved, original]) => fetchViaChart(resolved, original),
+          2,
+          150,
+          () => circuitBreakerTripped
+        );
+      }
+
+      if (circuitBreakerTripped && updatedCount === 0) {
         if (!silent) this.showToast('Market proxy unavailable. Keeping existing prices.', 'info');
         return updatedCount;
       }
