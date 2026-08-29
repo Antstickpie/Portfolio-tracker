@@ -93,24 +93,14 @@
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
-          <div>
-            <label class="input-label">Date Format</label>
-            <select [ngModel]="service.dateFormat()" (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()" class="settings-select">
-              <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
-              <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
-              <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
-              <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="input-label">Profit Method</label>
-            <select [ngModel]="service.costBasisMethod()" (ngModelChange)="setCostBasisMethod($event)" class="settings-select">
-              <option value="fifo" style="background: #0d1117;">FIFO (First In)</option>
-              <option value="avg" style="background: #0d1117;">Average Cost</option>
-            </select>
-          </div>
+        <div>
+          <label class="input-label">Date Format</label>
+          <select [ngModel]="service.dateFormat()" (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()" class="settings-select">
+            <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
+            <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
+            <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
+            <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
+          </select>
         </div>
       </div>
     </div>
@@ -485,8 +475,8 @@
       <!-- Card E: Capital Gains Tax & Exemption -->
       <div class="glass-card setting-box">
         <div class="box-header">
-          <h3 style="margin: 0;">🏛️ Capital Gains Tax</h3>
-          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Exemption limit & average rate.</p>
+          <h3 style="margin: 0;">🏛️ Capital Gains Tax & Method</h3>
+          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Exemption, tax rate & profit method.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.2rem;">
@@ -516,7 +506,16 @@
               style="width: 100%; box-sizing: border-box;">
           </div>
         </div>
-        <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+
+        <div style="margin-top: 0.45rem;">
+          <label class="input-label" style="font-size: 0.72rem;">Profit Calculation Method</label>
+          <select [ngModel]="service.costBasisMethod()" (ngModelChange)="setCostBasisMethod($event)" class="settings-select">
+            <option value="fifo" style="background: #0d1117;">FIFO (First In, First Out)</option>
+            <option value="avg" style="background: #0d1117;">Average Cost</option>
+          </select>
+        </div>
+
+        <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0.3rem 0 0 0;">
           Calculates estimated net return after tax on profits exceeding annual exemption.
         </p>
       </div>
