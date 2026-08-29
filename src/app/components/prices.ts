@@ -179,6 +179,56 @@ export class PricesComponent {
     this.service.showToast('Settings saved successfully!', 'success');
   }
 
+  public getTaxRateDisplay(): string {
+    const r = this.service.taxRate();
+    if (r === null || r === undefined) return '';
+    const fmt = this.service.numberFormat();
+    const str = r.toString();
+    if (fmt === '1.234,56' || fmt === '1 234,56') {
+      return str.replace('.', ',');
+    }
+    return str.replace(',', '.');
+  }
+
+  public onTaxRateInput(val: string) {
+    const parsed = this.parseInputNumber(val);
+    this.service.taxRate.set(parsed);
+    this.service.saveToStorage();
+  }
+
+  public getTaxExemptionDisplay(): string {
+    const l = this.service.taxExemptionLimit();
+    if (l === null || l === undefined) return '';
+    const fmt = this.service.numberFormat();
+    const str = l.toString();
+    if (fmt === '1.234,56' || fmt === '1 234,56') {
+      return str.replace('.', ',');
+    }
+    return str.replace(',', '.');
+  }
+
+  public onTaxExemptionInput(val: string) {
+    const parsed = this.parseInputNumber(val);
+    this.service.taxExemptionLimit.set(parsed);
+    this.service.saveToStorage();
+  }
+
+  public parseInputNumber(input: string): number | null {
+    if (!input || !input.trim()) return null;
+    let s = input.trim();
+    if (s.includes(',') && !s.includes('.')) {
+      s = s.replace(',', '.');
+    } else if (s.includes(',') && s.includes('.')) {
+      if (s.indexOf('.') < s.indexOf(',')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    }
+    const val = parseFloat(s);
+    return isNaN(val) ? null : val;
+  }
+
   public async clearAllLedger() {
     const ok = await this.service.showConfirm(
       'Clear All Ledger Data',

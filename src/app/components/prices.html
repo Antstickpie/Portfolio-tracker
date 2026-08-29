@@ -312,13 +312,10 @@
           <div>
             <label class="input-label" style="font-size: 0.72rem;">Tax Rate (%)</label>
             <input
-              type="number"
-              step="0.1"
-              min="0"
-              max="100"
-              [ngModel]="service.taxRate()"
-              (ngModelChange)="service.taxRate.set($event !== null && $event !== '' ? +$event : null); service.saveToStorage()"
-              placeholder="e.g. 25"
+              type="text"
+              [ngModel]="getTaxRateDisplay()"
+              (ngModelChange)="onTaxRateInput($event)"
+              placeholder="e.g. 26.375"
               class="person-input"
               style="width: 100%; box-sizing: border-box;">
           </div>
@@ -333,11 +330,9 @@
               </select>
             </div>
             <input
-              type="number"
-              step="50"
-              min="0"
-              [ngModel]="service.taxExemptionLimit()"
-              (ngModelChange)="service.taxExemptionLimit.set($event !== null && $event !== '' ? +$event : null); service.saveToStorage()"
+              type="text"
+              [ngModel]="getTaxExemptionDisplay()"
+              (ngModelChange)="onTaxExemptionInput($event)"
               placeholder="e.g. 1000"
               class="person-input"
               style="width: 100%; box-sizing: border-box; margin-top: 0.2rem;">
