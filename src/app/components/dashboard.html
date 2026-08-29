@@ -177,19 +177,21 @@
         {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
       </div>
       <!-- Sub-value with Tax -->
-      <div class="sub-value" *ngIf="(service.taxRate() || 0) > 0 && estimatedTax() > 0" style="flex-direction: column; gap: 0.25rem; align-items: flex-start;">
-        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+      <div class="sub-value" *ngIf="(service.taxRate() || 0) > 0 && estimatedTax() > 0" style="flex-direction: column; gap: 0.3rem; align-items: flex-start;">
+        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem;">
           <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">
             {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%
           </span>
           <span style="font-size: 0.72rem; color: var(--text-muted);">
-            Net: <strong [ngClass]="totalReturnAfterTax() >= 0 ? 'text-success' : 'text-danger'">{{ totalReturnAfterTax() >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnAfterTaxPercentage()) | number:'1.2-2' }}%</strong>
+            Tax: <strong style="color: #f43f5e;">-{{ formatVal(estimatedTax(), 'USD', 2) }}</strong>
           </span>
         </div>
-        <div style="font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-          <span>Tax: <strong style="color: #f43f5e;">-{{ formatVal(estimatedTax(), 'USD', 2) }}</strong></span>
-          <span>&bull;</span>
-          <span>After-Tax: <strong [ngClass]="totalReturnAfterTax() >= 0 ? 'text-success' : 'text-danger'">{{ formatVal(totalReturnAfterTax(), 'USD', 2, undefined, true) }}</strong></span>
+        <div style="font-size: 0.73rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+          <span>After-Tax:</span>
+          <strong [ngClass]="totalReturnAfterTax() >= 0 ? 'text-success' : 'text-danger'">{{ formatVal(totalReturnAfterTax(), 'USD', 2, undefined, true) }}</strong>
+          <span class="badge" [ngClass]="totalReturnAfterTax() >= 0 ? 'badge-success' : 'badge-danger'" style="padding: 0.1rem 0.35rem; font-size: 0.68rem;">
+            {{ totalReturnAfterTax() >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnAfterTaxPercentage()) | number:'1.2-2' }}%
+          </span>
         </div>
       </div>
 
