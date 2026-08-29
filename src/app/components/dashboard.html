@@ -171,7 +171,7 @@
          [class.glow-secondary]="summary().totalReturn >= 0"
          [class.card-danger]="summary().totalReturn < 0"
          [class.card-success]="summary().totalReturn >= 0"
-         (click)="scrollToTable()" title="Total profit (Unrealized + Realized) relative to active cost basis">
+         (click)="scrollToTable()" title="View holdings table">
       <div class="label">Total Return</div>
       <div class="value" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
         {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
