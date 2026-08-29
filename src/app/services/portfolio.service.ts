@@ -3002,10 +3002,15 @@ export class PortfolioService {
         const remoteData = await this.downloadDriveFile(fileDetails.id);
         if (!remoteData) return;
         this.applyRemoteData(remoteData);
+        const syncTs = remoteTs > 0 ? remoteTs : Date.now();
+        this.lastUpdated.set(syncTs);
+        localStorage.setItem('pt_last_updated', syncTs.toString());
         const now = Date.now();
         this.lastGoogleSyncTime.set(now);
         localStorage.setItem('pt_last_google_sync', now.toString());
-        this.showToast('Synced automatically from Google Drive', 'info');
+        if (force) {
+          this.showToast('Synced from Google Drive', 'info');
+        }
       } else if (localTs > remoteTs) {
         // Local is newer — push to Drive
         this.uploadToGoogleDriveSilent();
