@@ -1956,9 +1956,9 @@ export class PortfolioService {
                     current.logoData,
                     current.yahooSymbol
                   );
-                  bulkUpdatedSet.add(originalTicker);
                   updatedCount++;
                 }
+                bulkUpdatedSet.add(originalTicker);
               });
             }
           }
@@ -2903,8 +2903,13 @@ export class PortfolioService {
     return null;
   }
 
+  private lastUploadErrorTime = 0;
+
   public async uploadToGoogleDriveSilent() {
     if (!this.autoSyncGoogleDrive() || !this.isGoogleConnected() || this.isUploading) return;
+    const now = Date.now();
+    if (this.lastUploadErrorTime && (now - this.lastUploadErrorTime < 5 * 60 * 1000)) return;
+
     const token = await this.ensureFreshToken();
     if (!token) return;
 
@@ -2937,11 +2942,17 @@ export class PortfolioService {
       if (success) {
         this.lastSyncedJsonHash = currentHash;
         this.lastUpdated.set(localData['lastUpdated']);
-        const now = Date.now();
-        this.lastGoogleSyncTime.set(now);
-        localStorage.setItem('pt_last_google_sync', now.toString());
+        const successTime = Date.now();
+        this.lastGoogleSyncTime.set(successTime);
+        localStorage.setItem('pt_last_google_sync', successTime.toString());
+        this.lastUploadErrorTime = 0;
+      } else {
+        this.lastUploadErrorTime = Date.now();
+        this.lastSyncedJsonHash = currentHash;
       }
     } catch (e) {
+      this.lastUploadErrorTime = Date.now();
+      this.lastSyncedJsonHash = currentHash;
       console.warn('Silent Google Drive upload failed', e);
     } finally {
       this.isUploading = false;
