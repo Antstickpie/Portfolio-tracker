@@ -44,6 +44,16 @@ export class PricesComponent {
     }));
   });
 
+  public getGoogleCurrencyUrl(pairKey: string): string {
+    const parts = pairKey.split('/');
+    if (parts.length === 2) {
+      const from = parts[0].trim().toUpperCase();
+      const to = parts[1].trim().toUpperCase();
+      return `https://www.google.com/finance/quote/${from}-${to}`;
+    }
+    return `https://www.google.com/search?q=${encodeURIComponent(pairKey + ' exchange rate')}`;
+  }
+
   public updateExchangeRate(key: string, rate: number) {
     if (!isNaN(rate) && rate > 0) {
       this.service.exchangeRates.update((prev) => {

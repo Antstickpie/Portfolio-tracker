@@ -149,9 +149,16 @@
         <!-- Scrollable Rows Body -->
         <div style="max-height: 140px; overflow-y: auto;">
           <div *ngFor="let pair of exchangeRatePairs()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.75rem; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
-            <span class="bold-ticker font-mono" style="font-size: 0.78rem;">
-              {{ pair.name }}
-            </span>
+            <a 
+              [href]="getGoogleCurrencyUrl(pair.key)"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="bold-ticker font-mono currency-pair-link"
+              style="font-size: 0.78rem; text-decoration: none; color: var(--text-main); display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;"
+              title="View live {{ pair.name }} on Google Finance ↗">
+              <span>{{ pair.name }}</span>
+              <span style="font-size: 0.65rem; color: var(--primary); opacity: 0.85;">↗</span>
+            </a>
             <div>
               <input 
                 *ngIf="isEditingRates()"

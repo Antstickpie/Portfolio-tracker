@@ -296,3 +296,11 @@
   border-radius: 12px;
   color: var(--text-main);
 }
+
+.currency-pair-link:hover {
+  color: var(--primary) !important;
+}
+
+.currency-pair-link:hover span:first-child {
+  text-decoration: underline;
+}
