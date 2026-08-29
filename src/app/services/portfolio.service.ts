@@ -2803,7 +2803,7 @@ export class PortfolioService {
         `--${boundary}--`;
 
       const resp = await this.fetchDriveApi(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&keepRevisionForever=true`,
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -2871,7 +2871,8 @@ export class PortfolioService {
 
   public getLocalDataHash(): string {
     const data = this.buildLocalData();
-    const { lastUpdated, ...content } = data;
+    // Exclude volatile market prices and FX rates from upload trigger hash so price refreshes don't spam Drive
+    const { lastUpdated, tickerConfigs, exchangeRates, historicalPrices, ...content } = data;
     return this.computeStringHash(JSON.stringify(content));
   }
 
