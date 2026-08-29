@@ -3477,15 +3477,16 @@ export class PortfolioService {
     });
   }
 
-  private lastSyncAttemptTime = 0;
-
   public async refreshMarketData(force: boolean = false) {
     if (this.isSyncing()) return;
     const now = Date.now();
-    if (!force && this.lastSyncAttemptTime && (now - this.lastSyncAttemptTime < 60000)) return; // 60s cooldown
+    const last = this.lastRefreshTime();
+    const THREE_MINUTES = 3 * 60 * 1000;
+    
+    // Strict 3-minute cooldown across page refreshes unless force clicked
+    if (!force && last && (now - last < THREE_MINUTES)) return;
 
     this.isSyncing.set(true);
-    this.lastSyncAttemptTime = now;
 
     try {
       const stockUpdated = await this.loadMarketPricesApi(force, true);
