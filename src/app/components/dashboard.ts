@@ -872,6 +872,29 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     return (s.totalReturn / costBasis) * 100;
   });
 
+  public estimatedTax = computed(() => {
+    const s = this.summary();
+    const totalProfit = s.totalReturn;
+    if (totalProfit <= 0) return 0;
+    const rate = this.service.taxRate();
+    if (rate <= 0) return 0;
+    const exemption = this.service.taxExemptionLimit();
+    const taxableProfit = Math.max(0, totalProfit - exemption);
+    return taxableProfit * (rate / 100);
+  });
+
+  public totalReturnAfterTax = computed(() => {
+    const s = this.summary();
+    return s.totalReturn - this.estimatedTax();
+  });
+
+  public totalReturnAfterTaxPercentage = computed(() => {
+    const s = this.summary();
+    const costBasis = s.totalCostBasis;
+    if (costBasis <= 0) return 0;
+    return (this.totalReturnAfterTax() / costBasis) * 100;
+  });
+
   // Color schemes for charts
   private colors = [
     '#00E5FF', // primary cyan
