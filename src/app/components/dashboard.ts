@@ -1388,11 +1388,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     
     const isNegative = converted < 0;
     const absVal = Math.abs(converted);
-    const locale = this.getLocaleForCurrency(targetCurr);
-    const formatted = absVal.toLocaleString(locale, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    });
+    const formatted = this.service.formatNumber(absVal, decimals);
     
     if (forceSign) {
       const arrow = isNegative ? '▼ ' : '▲ ';

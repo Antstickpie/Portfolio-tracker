@@ -93,14 +93,26 @@
           </div>
         </div>
 
-        <div>
-          <label class="input-label">Date Format</label>
-          <select [ngModel]="service.dateFormat()" (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()" class="settings-select">
-            <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
-            <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
-            <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
-            <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
-          </select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+          <div>
+            <label class="input-label">Date Format</label>
+            <select [ngModel]="service.dateFormat()" (ngModelChange)="service.dateFormat.set($event); service.saveToStorage()" class="settings-select">
+              <option value="MMMM d, yyyy" style="background: #0d1117;">June 2, 2026</option>
+              <option value="yyyy-MM-dd" style="background: #0d1117;">2026-06-02</option>
+              <option value="dd/MM/yyyy" style="background: #0d1117;">02/06/2026</option>
+              <option value="MM/dd/yyyy" style="background: #0d1117;">06/02/2026</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="input-label">Number Format</label>
+            <select [ngModel]="service.numberFormat()" (ngModelChange)="service.numberFormat.set($event); service.saveToStorage()" class="settings-select">
+              <option value="1,234.56" style="background: #0d1117;">1,234.56</option>
+              <option value="1.234,56" style="background: #0d1117;">1.234,56</option>
+              <option value="1 234.56" style="background: #0d1117;">1 234.56</option>
+              <option value="1 234,56" style="background: #0d1117;">1 234,56</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>

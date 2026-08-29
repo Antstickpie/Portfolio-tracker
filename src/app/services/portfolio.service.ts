@@ -108,6 +108,7 @@ export class PortfolioService {
   public disabledSources = signal<string[]>([]);
   public defaultCurrency = signal<string>('EUR');
   public displayCurrency = signal<string>('native');
+  public numberFormat = signal<string>('1,234.56');
   public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
   public marketProxyUrl = signal<string>(PortfolioService.DEFAULT_MARKET_PROXY);
   public taxRate = signal<number>(25);
@@ -619,6 +620,9 @@ export class PortfolioService {
       const df = localStorage.getItem('pt_date_format');
       if (df) this.dateFormat.set(df);
 
+      const numFmt = localStorage.getItem('pt_number_format');
+      if (numFmt) this.numberFormat.set(numFmt);
+
       const snc = localStorage.getItem('pt_show_name_column');
       if (snc) this.showNameColumn.set(snc === 'true');
 
@@ -765,6 +769,7 @@ export class PortfolioService {
 
     localStorage.setItem('pt_persons', JSON.stringify(this.persons()));
     localStorage.setItem('pt_date_format', this.dateFormat());
+    localStorage.setItem('pt_number_format', this.numberFormat());
 
     // Persist fetch maps
     const ldfmObj: Record<string, string> = {};
@@ -3033,6 +3038,7 @@ export class PortfolioService {
       if (p.length > 0) this.persons.set(p);
     }
     if (remoteData.dateFormat) this.dateFormat.set(remoteData.dateFormat);
+    if (remoteData.numberFormat) this.numberFormat.set(remoteData.numberFormat);
     if (remoteData.yearBasis) this.yearBasis.set(remoteData.yearBasis);
     if (remoteData.financialYearStartMonth !== undefined) this.financialYearStartMonth.set(Number(remoteData.financialYearStartMonth));
     if (remoteData.financialYearStartDay !== undefined) this.financialYearStartDay.set(Number(remoteData.financialYearStartDay));
@@ -3063,6 +3069,36 @@ export class PortfolioService {
     this.lastSyncedJsonHash = this.getLocalDataHash();
   }
 
+  public formatNumber(val: number, decimals: number = 2): string {
+    const isNegative = val < 0;
+    const absVal = Math.abs(val);
+    const fixed = absVal.toFixed(decimals);
+    const parts = fixed.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts[1];
+
+    const fmt = this.numberFormat();
+    let thousandSep = ',';
+    let decimalSep = '.';
+
+    if (fmt === '1.234,56') {
+      thousandSep = '.';
+      decimalSep = ',';
+    } else if (fmt === '1 234.56') {
+      thousandSep = ' ';
+      decimalSep = '.';
+    } else if (fmt === '1 234,56') {
+      thousandSep = ' ';
+      decimalSep = ',';
+    }
+
+    if (thousandSep) {
+      integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousandSep);
+    }
+
+    return (isNegative ? '-' : '') + (decimals > 0 ? (integerPart + decimalSep + decimalPart) : integerPart);
+  }
+
   public buildLocalData() {
     const cachedSplits = typeof localStorage !== 'undefined' ? localStorage.getItem('pt_splits_cache') : null;
     const payload: Record<string, any> = {
@@ -3075,6 +3111,7 @@ export class PortfolioService {
       visibleCurrencies: this.visibleCurrencies(),
       persons: this.persons(),
       dateFormat: this.dateFormat(),
+      numberFormat: this.numberFormat(),
       yearBasis: this.yearBasis(),
       financialYearStartMonth: this.financialYearStartMonth(),
       financialYearStartDay: this.financialYearStartDay(),
