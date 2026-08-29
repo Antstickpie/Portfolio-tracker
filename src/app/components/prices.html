@@ -227,11 +227,11 @@
     </div>
   </div>
 
-  <!-- WIDE SECTION 1: Classification & Market Data Providers (Cards Grid) -->
+  <!-- WIDE SECTION 1: Classification, Accounts & Tax Settings -->
   <div class="settings-section">
     <div class="section-title">
       <span class="section-icon">🏷️</span>
-      <span>Classification & Market Data Providers</span>
+      <span>Classification, Accounts & Tax Settings</span>
     </div>
 
     <div class="settings-top-grid">
@@ -280,46 +280,7 @@
         <p *ngIf="allSources().length === 0" class="subtitle" style="font-size: 0.76rem;">No transaction sources detected yet.</p>
       </div>
 
-      <!-- Card C: Finnhub API Key -->
-      <div class="glass-card setting-box">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div class="box-header">
-            <h3 style="margin: 0;">🔑 Finnhub Direct API</h3>
-            <p class="subtitle" style="margin: 0.1rem 0 0 0;">Free direct quotes.</p>
-          </div>
-          <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--primary); text-decoration: none;">Get Free Key ↗</a>
-        </div>
-
-        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Direct quotes from Finnhub.</p>
-
-        <input
-          type="password"
-          [ngModel]="service.finnhubApiKey()"
-          (ngModelChange)="service.finnhubApiKey.set($event); service.saveToStorage()"
-          placeholder="Paste free Finnhub token..."
-          class="person-input"
-          style="width: 100%; box-sizing: border-box;">
-      </div>
-
-      <!-- Card D: Google Apps Script / Cloudflare Proxy -->
-      <div class="glass-card setting-box">
-        <div class="box-header">
-          <h3 style="margin: 0;">🌐 Google Script Proxy URL</h3>
-          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Unlimited global quotes.</p>
-        </div>
-
-        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Paste deployed Google Apps Script Web App URL.</p>
-
-        <input
-          type="text"
-          [ngModel]="service.marketProxyUrl()"
-          (ngModelChange)="service.marketProxyUrl.set($event); service.saveToStorage()"
-          placeholder="https://script.google.com/macros/s/.../exec"
-          class="person-input"
-          style="width: 100%; box-sizing: border-box;">
-      </div>
-
-      <!-- Card E: Capital Gains Tax & Exemption -->
+      <!-- Card C: Capital Gains Tax & Exemption -->
       <div class="glass-card setting-box">
         <div class="box-header">
           <h3 style="margin: 0;">🏛️ Capital Gains Tax & Method</h3>

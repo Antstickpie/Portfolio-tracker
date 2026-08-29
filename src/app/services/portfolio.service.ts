@@ -108,7 +108,6 @@ export class PortfolioService {
   public disabledSources = signal<string[]>([]);
   public defaultCurrency = signal<string>('EUR');
   public displayCurrency = signal<string>('native');
-  public finnhubApiKey = signal<string>('');
   public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
   public marketProxyUrl = signal<string>(PortfolioService.DEFAULT_MARKET_PROXY);
   public taxRate = signal<number>(25);
@@ -732,9 +731,6 @@ export class PortfolioService {
       const lu = localStorage.getItem('pt_last_updated');
       if (lu) this.lastUpdated.set(parseInt(lu, 10));
 
-      const fkey = localStorage.getItem('pt_finnhub_api_key');
-      if (fkey) this.finnhubApiKey.set(fkey);
-
       const mpUrl = localStorage.getItem('pt_market_proxy_url');
       if (mpUrl !== null) this.marketProxyUrl.set(mpUrl || PortfolioService.DEFAULT_MARKET_PROXY);
 
@@ -805,7 +801,6 @@ export class PortfolioService {
 
     localStorage.setItem('pt_default_currency', this.defaultCurrency());
     localStorage.setItem('pt_display_currency', this.displayCurrency());
-    localStorage.setItem('pt_finnhub_api_key', this.finnhubApiKey());
     localStorage.setItem('pt_market_proxy_url', this.marketProxyUrl());
     localStorage.setItem('pt_tax_rate', this.taxRate().toString());
     localStorage.setItem('pt_tax_exemption_limit', this.taxExemptionLimit().toString());
@@ -2011,34 +2006,6 @@ export class PortfolioService {
               }
             } catch (e) {
               // fallback
-            }
-          }
-          // 1. Try Finnhub direct quote if API key is provided (No proxy needed, open CORS)
-          const finnhubKey = this.finnhubApiKey().trim();
-          if (finnhubKey) {
-            try {
-              const finnSymbol = originalTicker.replace(/\..*$/, '').toUpperCase().trim();
-              const finnResp = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(finnSymbol)}&token=${encodeURIComponent(finnhubKey)}`, { signal: AbortSignal.timeout(3000) });
-              if (finnResp.ok) {
-                const finnData = await finnResp.json();
-                if (finnData && typeof finnData.c === 'number' && finnData.c > 0) {
-                  const current = meta[originalTicker] || {};
-                  this.updateTickerConfig(
-                    originalTicker,
-                    finnData.c,
-                    current.sector || 'Other',
-                    current.name || originalTicker,
-                    current.priceCurrency || 'USD',
-                    current.logoData
-                  );
-                  bulkUpdatedSet.add(originalTicker);
-                  updatedCount++;
-                  consecutiveErrors = 0;
-                  return;
-                }
-              }
-            } catch (e) {
-              // fallback to Yahoo
             }
           }
 
