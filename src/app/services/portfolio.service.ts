@@ -1867,7 +1867,7 @@ export class PortfolioService {
   }
 
   // Query a free API to update current stock prices
-  public async loadMarketPricesApi(force: boolean = false, silent: boolean = false) {
+  public async loadMarketPricesApi(force: boolean = false, silent: boolean = false): Promise<number> {
     if (force) {
       this.failedTickers.clear();
       this.lastFetchTimeMap.clear();
@@ -1878,7 +1878,7 @@ export class PortfolioService {
     const tickers = this.allTickers();
     if (tickers.length === 0) {
       if (!silent) this.showToast('No tickers in transactions to fetch prices for.', 'info');
-      return;
+      return 0;
     }
 
     if (!silent) this.showToast('Fetching real-time market rates...', 'info');
@@ -2290,8 +2290,9 @@ export class PortfolioService {
     }
   }
 
-  public async loadExchangeRatesApi(force: boolean = false, silent: boolean = false) {
+  public async loadExchangeRatesApi(force: boolean = false, silent: boolean = false): Promise<number> {
     const pairs = this.getExchangeRatePairs();
+    if (pairs.length === 0) return 0;
 
     if (!silent) this.showToast('Fetching current exchange rates...', 'info');
 
