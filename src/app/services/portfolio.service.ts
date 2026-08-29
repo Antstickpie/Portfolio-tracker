@@ -2583,12 +2583,12 @@ export class PortfolioService {
     }
   }
 
-  public connectGoogleDrive() {
+  public connectGoogleDrive(action: 'connect' | 'upload' | 'download' = 'connect') {
     if (!this.googleClientId().trim()) {
       this.showToast('Please enter your Google Client ID first.', 'error');
       return;
     }
-    this.pendingGoogleDriveAction = 'connect';
+    this.pendingGoogleDriveAction = action;
     if (!this.tokenClient) {
       this.initializeGoogleDriveSDK();
     }
@@ -3017,8 +3017,7 @@ export class PortfolioService {
     let token = this.getValidAccessToken();
     if (!token) token = await this.ensureFreshToken();
     if (!token) {
-      this.pendingGoogleDriveAction = 'upload';
-      this.connectGoogleDrive();
+      this.connectGoogleDrive('upload');
       return;
     }
 
@@ -3060,8 +3059,7 @@ export class PortfolioService {
     let token = this.getValidAccessToken();
     if (!token) token = await this.ensureFreshToken();
     if (!token) {
-      this.pendingGoogleDriveAction = 'download';
-      this.connectGoogleDrive();
+      this.connectGoogleDrive('download');
       return;
     }
 
