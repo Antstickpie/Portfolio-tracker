@@ -598,7 +598,8 @@ export class PortfolioService {
         try {
           const parsed = JSON.parse(storedPersons);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            this.persons.set(parsed);
+            const normalized = parsed.map((p: any) => typeof p === 'string' ? p : (p?.name || 'Person'));
+            this.persons.set(normalized);
           }
         } catch (e) {}
       } else {
