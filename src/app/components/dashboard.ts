@@ -867,12 +867,9 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   public totalReturnPercentage = computed(() => {
     const s = this.summary();
-    // Use all-time cost basis (no date filter) so % is always meaningful
-    const allTimeA = this.service.portfolioA();
-    const allTimeB = this.service.portfolioB();
-    const allTimeCostBasis = allTimeA.totalCostBasis + allTimeB.totalCostBasis;
-    if (allTimeCostBasis === 0) return 0;
-    return (s.totalReturn / allTimeCostBasis) * 100;
+    const costBasis = s.totalCostBasis;
+    if (costBasis <= 0) return 0;
+    return (s.totalReturn / costBasis) * 100;
   });
 
   // Color schemes for charts
