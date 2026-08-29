@@ -2294,6 +2294,18 @@ export class PortfolioService {
     const pairs = this.getExchangeRatePairs();
     if (pairs.length === 0) return 0;
 
+    // Cache FX rates for 2 hours (FX rates change slowly compared to stocks)
+    const lastTimeStr = localStorage.getItem('pt_last_rates_refresh_time');
+    const now = Date.now();
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const hasAllPairs = pairs.every(p => this.exchangeRates()[p] !== undefined);
+    if (!force && lastTimeStr && hasAllPairs) {
+      const lastTime = parseInt(lastTimeStr, 10);
+      if (now - lastTime < TWO_HOURS_MS) {
+        return 0; // Use cached rates
+      }
+    }
+
     if (!silent) this.showToast('Fetching current exchange rates...', 'info');
 
     try {
