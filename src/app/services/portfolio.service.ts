@@ -579,6 +579,13 @@ export class PortfolioService {
             migrated = true;
           }
         });
+        // Clean any accidental forex symbols (e.g. USDEUR=X) from tickerConfigs
+        Object.keys(updatedCfg).forEach(key => {
+          if (key.includes('=X') || /^[A-Z]{3}\/[A-Z]{3}$/.test(key)) {
+            delete updatedCfg[key];
+            migrated = true;
+          }
+        });
         if (migrated) {
           this.tickerConfigs.set(updatedCfg);
         }

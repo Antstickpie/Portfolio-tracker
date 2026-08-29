@@ -95,8 +95,12 @@ export class PricesComponent {
     const meta = this.service.tickerConfigs();
     const allUnique = this.service.allTickers();
     
-    // Ensure all unique tickers present in transactions are displayed in the list
-    const combinedTickers = Array.from(new Set([...allUnique, ...Object.keys(meta)]));
+    // Filter out internal forex symbols (e.g. USDEUR=X, EUR/USD)
+    const isForexSymbol = (t: string) => t.includes('=X') || /^[A-Z]{3}\/[A-Z]{3}$/.test(t);
+
+    // Ensure all unique stock tickers present in transactions are displayed in the list
+    const combinedTickers = Array.from(new Set([...allUnique, ...Object.keys(meta)]))
+      .filter(t => !isForexSymbol(t.toUpperCase().trim()));
     
     return combinedTickers.map((ticker) => {
       const tUpper = ticker.toUpperCase();
