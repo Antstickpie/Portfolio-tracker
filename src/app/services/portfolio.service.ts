@@ -109,6 +109,7 @@ export class PortfolioService {
   public defaultCurrency = signal<string>('EUR');
   public displayCurrency = signal<string>('native');
   public finnhubApiKey = signal<string>('');
+  public marketProxyUrl = signal<string>('');
   public lastRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
@@ -726,6 +727,9 @@ export class PortfolioService {
       const fkey = localStorage.getItem('pt_finnhub_api_key');
       if (fkey) this.finnhubApiKey.set(fkey);
 
+      const mpUrl = localStorage.getItem('pt_market_proxy_url');
+      if (mpUrl) this.marketProxyUrl.set(mpUrl);
+
       const sims = localStorage.getItem('pt_simulated_transactions');
       if (sims) this.simulatedTransactions.set(JSON.parse(sims));
 
@@ -788,6 +792,7 @@ export class PortfolioService {
     localStorage.setItem('pt_default_currency', this.defaultCurrency());
     localStorage.setItem('pt_display_currency', this.displayCurrency());
     localStorage.setItem('pt_finnhub_api_key', this.finnhubApiKey());
+    localStorage.setItem('pt_market_proxy_url', this.marketProxyUrl());
 
     localStorage.setItem('pt_split_adjusted_sources', JSON.stringify(this.splitAdjustedSources()));
     localStorage.setItem('pt_cost_basis_method', this.costBasisMethod());
@@ -1925,9 +1930,73 @@ export class PortfolioService {
       let consecutiveErrors = 0;
       let circuitBreakerTripped = false;
 
-      const fetchViaChart = async (resolvedSymbol: string, originalTicker: string) => {
-        if (circuitBreakerTripped) return;
+      // 0. Try Custom Google Apps Script / Cloudflare Proxy if configured (Fast bulk batch fetch)
+      const proxyUrl = this.marketProxyUrl().trim();
+      if (proxyUrl && symbolsToFetch.length > 0) {
         try {
+          const sep = proxyUrl.includes('?') ? '&' : '?';
+          const bulkReqUrl = `${proxyUrl}${sep}tickers=${encodeURIComponent(symbolsToFetch.join(','))}`;
+          const resp = await fetch(bulkReqUrl, { signal: AbortSignal.timeout(8000) });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && typeof data === 'object') {
+              symbolsToFetch.forEach(sym => {
+                const item = data[sym] || data[sym.toUpperCase()];
+                const originalTicker = symbolMap.get(sym) || sym;
+                if (item && typeof item.price === 'number' && item.price > 0) {
+                  const current = meta[originalTicker] || {};
+                  this.updateTickerConfig(
+                    originalTicker,
+                    item.price,
+                    current.sector || 'Other',
+                    item.name || current.name || originalTicker,
+                    item.currency || current.priceCurrency || 'USD',
+                    current.logoData,
+                    current.yahooSymbol
+                  );
+                  bulkUpdatedSet.add(originalTicker);
+                  updatedCount++;
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Custom market proxy bulk fetch failed:', e);
+        }
+      }
+
+      const fetchViaChart = async (resolvedSymbol: string, originalTicker: string) => {
+        if (circuitBreakerTripped || bulkUpdatedSet.has(originalTicker)) return;
+        try {
+          // 0. Try custom proxy for single ticker if not covered in bulk
+          if (proxyUrl) {
+            try {
+              const sep = proxyUrl.includes('?') ? '&' : '?';
+              const reqUrl = `${proxyUrl}${sep}ticker=${encodeURIComponent(resolvedSymbol)}`;
+              const resp = await fetch(reqUrl, { signal: AbortSignal.timeout(4000) });
+              if (resp.ok) {
+                const data = await resp.json();
+                const item = data[resolvedSymbol] || data[originalTicker] || data;
+                if (item && typeof item.price === 'number' && item.price > 0) {
+                  const current = meta[originalTicker] || {};
+                  this.updateTickerConfig(
+                    originalTicker,
+                    item.price,
+                    current.sector || 'Other',
+                    item.name || current.name || originalTicker,
+                    item.currency || current.priceCurrency || 'USD',
+                    current.logoData
+                  );
+                  bulkUpdatedSet.add(originalTicker);
+                  updatedCount++;
+                  consecutiveErrors = 0;
+                  return;
+                }
+              }
+            } catch (e) {
+              // fallback
+            }
+          }
           // 1. Try Finnhub direct quote if API key is provided (No proxy needed, open CORS)
           const finnhubKey = this.finnhubApiKey().trim();
           if (finnhubKey) {
