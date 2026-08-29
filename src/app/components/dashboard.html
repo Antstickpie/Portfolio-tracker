@@ -171,14 +171,13 @@
          [class.glow-secondary]="summary().totalReturn >= 0"
          [class.card-danger]="summary().totalReturn < 0"
          [class.card-success]="summary().totalReturn >= 0"
-         (click)="scrollToTable()" title="View holdings table">
+         (click)="scrollToTable()" title="Total profit (Unrealized + Realized) relative to active cost basis">
       <div class="label">Total Return</div>
       <div class="value" [ngClass]="summary().totalReturn >= 0 ? 'text-success' : 'text-danger'">
         {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
       </div>
-      <div class="sub-value" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-        <span>{{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span></span>
-        <span style="font-size: 0.72rem; color: var(--text-muted);">Cost: {{ formatVal(summary().totalCostBasis, 'USD') }}</span>
+      <div class="sub-value">
+        {{ isAllTimeActive() ? 'All-time' : 'Period' }}: <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">{{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%</span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
     </div>
