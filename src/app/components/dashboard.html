@@ -136,7 +136,7 @@
       </div>
       <div class="sub-value">
         <span class="badge" [ngClass]="summary().totalUnrealized >= 0 ? 'badge-success' : 'badge-danger'">
-          {{ summary().totalUnrealized >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(unrealizedPercentage()) | number:'1.2-2' }}%
+          {{ summary().totalUnrealized >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(unrealizedPercentage(), 2) }}%
         </span>
       </div>
       <div class="metric-hint">▼ Holdings Analysis</div>
@@ -180,7 +180,7 @@
       <div class="sub-value" *ngIf="(service.taxRate() || 0) > 0 && estimatedTax() > 0" style="flex-direction: column; gap: 0.3rem; align-items: flex-start;">
         <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem;">
           <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">
-            {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%
+            {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(totalReturnPercentage(), 2) }}%
           </span>
           <span style="font-size: 0.72rem; color: var(--text-muted);">
             Tax: <strong style="color: #f43f5e;">-{{ formatVal(estimatedTax(), 'USD', 2) }}</strong>
@@ -190,7 +190,7 @@
           <span>After-Tax:</span>
           <strong [ngClass]="totalReturnAfterTax() >= 0 ? 'text-success' : 'text-danger'">{{ formatVal(totalReturnAfterTax(), 'USD', 2, undefined, true) }}</strong>
           <span class="badge" [ngClass]="totalReturnAfterTax() >= 0 ? 'badge-success' : 'badge-danger'" style="padding: 0.1rem 0.35rem; font-size: 0.68rem;">
-            {{ totalReturnAfterTax() >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnAfterTaxPercentage()) | number:'1.2-2' }}%
+            {{ totalReturnAfterTax() >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(totalReturnAfterTaxPercentage(), 2) }}%
           </span>
         </div>
       </div>
@@ -198,7 +198,7 @@
       <!-- Sub-value without Tax (Clean default) -->
       <div class="sub-value" *ngIf="!(service.taxRate() || 0) || estimatedTax() <= 0">
         <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">
-          {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(totalReturnPercentage()) | number:'1.2-2' }}%
+          {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(totalReturnPercentage(), 2) }}%
         </span>
       </div>
       <div class="metric-hint">▼ Holdings</div>
@@ -637,36 +637,36 @@
             </td>
             <td class="num font-mono">
               {{ formatVal(pos.currentPrice, 'USD', 2, pos.currency) }}
-              <div [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-top: 2px; font-weight: 500;">{{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%</div>
+              <div [ngClass]="(pos.unrealizedReturnPct || 0) >= 0 ? 'text-success' : 'text-danger'" style="font-size: 0.72rem; margin-top: 2px; font-weight: 500;">{{ (pos.unrealizedReturnPct || 0) >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(pos.unrealizedReturnPct || 0, 1) }}%</div>
             </td>
             <td class="num font-mono">
               {{ formatVal(pos.averageCost, 'USD', 2, pos.currency) }}
             </td>
             <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
-              {{ pos.currency !== displayCurrency() ? (getRowFxRate(pos.currency) | number:'1.4-4') : '—' }}
+              {{ pos.currency !== displayCurrency() ? (service.formatNumber(getRowFxRate(pos.currency), 4)) : '—' }}
             </td>
-            <td class="num font-mono">{{ pos.totalShares | number:'1.0-6' }}</td>
+            <td class="num font-mono">{{ service.formatNumber(pos.totalShares, 4) }}</td>
             <td style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pos.sector }}"><span class="sector-badge" style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ pos.sector }}</span></td>
             <td class="num font-mono" title="% of total portfolio cost">
               {{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}
-              <div style="font-size:0.72rem; margin-top:2px; color: var(--text-muted);">{{ getAbs((pos.totalCost / tableTotals().cost) * 100) | number:'1.1-1' }}% of cost</div>
+              <div style="font-size:0.72rem; margin-top:2px; color: var(--text-muted);">{{ formatPct((pos.totalCost / tableTotals().cost) * 100, 1) }}% of cost</div>
             </td>
             <td class="num bold font-mono" title="% of total portfolio value">
               {{ formatVal(pos.currentValue, 'USD', 2, pos.currency) }}
-              <div style="font-size:0.72rem; margin-top:2px; color: var(--text-muted);">{{ getAbs((pos.currentValue / tableTotals().value) * 100) | number:'1.1-1' }}% of value</div>
+              <div style="font-size:0.72rem; margin-top:2px; color: var(--text-muted);">{{ formatPct((pos.currentValue / tableTotals().value) * 100, 1) }}% of value</div>
             </td>
             <td class="num text-accent font-mono">{{ formatVal(pos.dividends, 'USD', 2, pos.currency) }}</td>
             <td class="num font-mono" [ngClass]="pos.unrealizedProfit >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
               <div>{{ formatVal(pos.unrealizedProfit, 'USD', 2, pos.currency, true) }}</div>
-              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;">{{ pos.unrealizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.unrealizedReturnPct || 0) | number:'1.1-1' }}%</div>
+              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;">{{ pos.unrealizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(pos.unrealizedReturnPct || 0, 1) }}%</div>
             </td>
             <td class="num font-mono" [ngClass]="pos.realizedProfit >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
               <div>{{ formatVal(pos.realizedProfit, 'USD', 2, pos.currency, true) }}</div>
-              <div style="font-size: 0.72rem; margin-top: 2px;">{{ pos.realizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.realizedReturnPct || 0) | number:'1.1-1' }}%</div>
+              <div style="font-size: 0.72rem; margin-top: 2px;">{{ pos.realizedProfit >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(pos.realizedReturnPct || 0, 1) }}%</div>
             </td>
             <td class="num font-mono bold" [ngClass]="pos.totalReturn >= 0 ? 'text-success' : 'text-danger'" style="white-space: nowrap;">
               <div>{{ formatVal(pos.totalReturn, 'USD', 2, pos.currency, true) }}</div>
-              <div style="font-size: 0.72rem; margin-top: 2px;">{{ pos.totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ getAbs(pos.totalReturnPct || 0) | number:'1.1-1' }}%</div>
+              <div style="font-size: 0.72rem; margin-top: 2px;">{{ pos.totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(pos.totalReturnPct || 0, 1) }}%</div>
             </td>
           </tr>
           <!-- Totals row -->
@@ -678,14 +678,14 @@
             <td class="num text-accent font-mono">{{ formatVal(tableTotals().dividends, 'USD') }}</td>
             <td class="num font-mono" [ngClass]="tableTotals().unrealized >= 0 ? 'text-success' : 'text-danger'">
               {{ formatVal(tableTotals().unrealized, 'USD', 2, undefined, true) }}
-              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;" *ngIf="tableTotals().cost > 0">{{tableTotals().unrealized >= 0 ? '▲ ' : '▼ '}}{{getAbs((tableTotals().unrealized / tableTotals().cost) * 100) | number:'1.1-1'}}%</div>
+              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;" *ngIf="tableTotals().cost > 0">{{tableTotals().unrealized >= 0 ? '▲ ' : '▼ '}}{{formatPct((tableTotals().unrealized / tableTotals().cost) * 100, 1)}}%</div>
             </td>
             <td class="num font-mono" [ngClass]="tableTotals().realized >= 0 ? 'text-success' : 'text-danger'">
               {{ formatVal(tableTotals().realized, 'USD', 2, undefined, true) }}
             </td>
             <td class="num font-mono bold" [ngClass]="tableTotals().totalReturn >= 0 ? 'text-success' : 'text-danger'">
               {{ formatVal(tableTotals().totalReturn, 'USD', 2, undefined, true) }}
-              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;" *ngIf="tableTotals().cost > 0">{{tableTotals().totalReturn >= 0 ? '▲ ' : '▼ '}}{{getAbs((tableTotals().totalReturn / tableTotals().cost) * 100) | number:'1.1-1'}}%</div>
+              <div style="font-size: 0.72rem; margin-top: 2px; color: inherit;" *ngIf="tableTotals().cost > 0">{{tableTotals().totalReturn >= 0 ? '▲ ' : '▼ '}}{{formatPct((tableTotals().totalReturn / tableTotals().cost) * 100, 1)}}%</div>
             </td>
           </tr>
           <tr *ngIf="summary().positions.length === 0">

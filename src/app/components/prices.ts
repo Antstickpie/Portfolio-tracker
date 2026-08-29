@@ -143,8 +143,8 @@ export class PricesComponent {
 
   public formatTickerPrice(ticker: string, price: number): string {
     const currency = this.service.getTickerCurrency(ticker);
-    const symbol = currency === 'USD' ? '$' : (currency === 'EUR' ? '€' : '£');
-    return symbol + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const symbol = this.service.getCurrencySymbol(currency);
+    return symbol + this.service.formatNumber(price, 2);
   }
 
   public filteredTickerConfigsList = computed(() => {

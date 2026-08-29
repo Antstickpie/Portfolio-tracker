@@ -1405,6 +1405,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     return Math.abs(val);
   }
 
+  public formatPct(val: number, decimals: number = 2): string {
+    return this.service.formatNumber(Math.abs(val), decimals);
+  }
+
   public getRowFxRate(fromCurrency: string, date?: string): number {
     const displayCurr = this.service.displayCurrency();
     const targetCurr = displayCurr === 'native' ? fromCurrency : displayCurr;
