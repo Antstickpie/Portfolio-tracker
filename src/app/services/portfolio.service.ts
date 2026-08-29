@@ -109,7 +109,8 @@ export class PortfolioService {
   public defaultCurrency = signal<string>('EUR');
   public displayCurrency = signal<string>('native');
   public finnhubApiKey = signal<string>('');
-  public marketProxyUrl = signal<string>('');
+  public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
+  public marketProxyUrl = signal<string>(PortfolioService.DEFAULT_MARKET_PROXY);
   public lastRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
@@ -728,7 +729,7 @@ export class PortfolioService {
       if (fkey) this.finnhubApiKey.set(fkey);
 
       const mpUrl = localStorage.getItem('pt_market_proxy_url');
-      if (mpUrl) this.marketProxyUrl.set(mpUrl);
+      if (mpUrl !== null) this.marketProxyUrl.set(mpUrl || PortfolioService.DEFAULT_MARKET_PROXY);
 
       const sims = localStorage.getItem('pt_simulated_transactions');
       if (sims) this.simulatedTransactions.set(JSON.parse(sims));
