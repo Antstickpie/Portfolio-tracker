@@ -2044,7 +2044,7 @@ export class PortfolioService {
 
       if (circuitBreakerTripped) {
         if (!silent) this.showToast('Market proxy unavailable. Keeping existing prices.', 'info');
-        return;
+        return updatedCount;
       }
 
       // Autocomplete discovery helper for remaining un-updated tickers (silently in background)
@@ -2141,23 +2141,28 @@ export class PortfolioService {
                 }
               }
 
-              const logoData = meta[cleanTicker]?.logoData;
-              return { ticker: cleanTicker, price, priceCurrency: currency, sector, name, logoData, yahooSymbol: resolvedSymbol };
+              return {
+                ticker: cleanTicker,
+                price,
+                priceCurrency: currency,
+                sector,
+                name,
+                yahooSymbol: resolvedSymbol !== cleanTicker ? resolvedSymbol : undefined
+              };
             }
           }
         } catch (e) {
-          console.warn(`Failed to self-discover price/info for ${ticker}:`, e);
+          // ignore
         }
         return null;
       };
 
       const remainingTickers = tickers.filter(t => {
-        const clean = t.toUpperCase().trim();
-        const config = meta[clean];
+        const config = meta[t];
         const isNotFound = !force && config && config.notFound && (!config.notFoundTime || (Date.now() - config.notFoundTime < 7 * 24 * 60 * 60 * 1000));
         return !isNotFound && !bulkUpdatedSet.has(t);
       });
-      if (remainingTickers.length > 0) {
+      if (remainingTickers.length > 0 && !circuitBreakerTripped) {
         await this.runConcurrent(
           remainingTickers,
           async (ticker) => {
@@ -2185,25 +2190,27 @@ export class PortfolioService {
               updatedCount++;
             }
           },
-          3,
-          100
+          2,
+          150
         );
       }
 
       if (updatedCount === 0 && !silent) {
         this.showToast('Could not reach market data API right now. Keeping existing prices.', 'info');
-        return;
+        return 0;
       }
 
       // Save successful refresh timestamp
       localStorage.setItem('pt_last_refresh_time', Date.now().toString());
       if (!silent) this.showToast(`Successfully fetched real-time prices for ${updatedCount} tickers!`, 'success');
+      return updatedCount;
 
     } catch (err) {
       console.warn('Real-time fetch failed:', err);
       if (!silent) {
         this.showToast('Market prices refresh postponed (network/rate limit). Keeping saved prices.', 'info');
       }
+      return 0;
     }
   }
 
@@ -2403,9 +2410,11 @@ export class PortfolioService {
         localStorage.setItem('pt_last_rates_refresh_time', Date.now().toString());
         if (!silent) this.showToast(`Successfully refreshed ${updatedCount} exchange rates!`, 'success');
       }
+      return updatedCount;
     } catch (e) {
       console.warn('Exchange rates fetch failed:', e);
       if (!silent) this.showToast('Failed to fetch exchange rates.', 'error');
+      return 0;
     }
   }
 
@@ -3358,21 +3367,35 @@ export class PortfolioService {
     });
   }
 
+  private lastSyncAttemptTime = 0;
+
   public async refreshMarketData(force: boolean = false) {
     if (this.isSyncing()) return;
     const now = Date.now();
-    const last = this.lastRefreshTime();
-    if (!force && last && (now - last < 60000)) return; // 60s cooldown minimum
+    if (!force && this.lastSyncAttemptTime && (now - this.lastSyncAttemptTime < 60000)) return; // 60s cooldown
 
     this.isSyncing.set(true);
-    this.lastRefreshTime.set(now);
-    localStorage.setItem('pt_last_refresh_time', now.toString());
+    this.lastSyncAttemptTime = now;
 
     try {
-      await this.loadMarketPricesApi(force, true);
-      await this.loadExchangeRatesApi(force, true);
-      if (force) {
-        this.showToast('All prices and exchange rates up to date!', 'success');
+      const stockUpdated = await this.loadMarketPricesApi(force, true);
+      const fxUpdated = await this.loadExchangeRatesApi(force, true);
+
+      if (stockUpdated > 0 || fxUpdated > 0) {
+        const successTime = Date.now();
+        this.lastRefreshTime.set(successTime);
+        localStorage.setItem('pt_last_refresh_time', successTime.toString());
+        if (force) {
+          if (stockUpdated > 0) {
+            this.showToast(`Successfully updated prices and exchange rates!`, 'success');
+          } else {
+            this.showToast(`Exchange rates updated. Stock market proxies unavailable (using cached stock prices).`, 'info');
+          }
+        }
+      } else {
+        if (force) {
+          this.showToast('Could not reach market data proxies. Keeping existing prices.', 'error');
+        }
       }
     } catch (e) {
       if (force) {
