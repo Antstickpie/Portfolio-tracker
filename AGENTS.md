@@ -1,6 +1,8 @@
 # Standing Instructions for All Agents
 
 ## Build and Compilation Verification (MANDATORY)
-- Always verify that the Angular build, TypeScript compilation, and development server bundle generation succeed with ZERO errors before declaring any task complete.
-- Every agent must run `npm run build` and `npx tsc --noEmit` before concluding work.
-- NEVER say you are done unless compilation and build succeed with exit code 0 and 0 errors.
+- Always verify that TypeScript compilation and Angular development build succeed with ZERO errors before declaring any task complete.
+- Every agent must run:
+  1. `npm run typecheck` (`npx tsc -p tsconfig.app.json --noEmit`)
+  2. `npm run build`
+- NEVER say you are done unless both `npm run typecheck` and `npm run build` exit with code 0 and 0 errors.
