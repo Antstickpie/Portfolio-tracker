@@ -112,6 +112,7 @@ export class PortfolioService {
   public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
   public marketProxyUrl = signal<string>(PortfolioService.DEFAULT_MARKET_PROXY);
   public lastRefreshTime = signal<number | null>(null);
+  public lastRatesRefreshTime = signal<number | null>(null);
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
   public nextSyncCountdown = signal<string>('3m 00s');
@@ -722,6 +723,9 @@ export class PortfolioService {
 
       const lrt = localStorage.getItem('pt_last_refresh_time');
       if (lrt) this.lastRefreshTime.set(parseInt(lrt, 10));
+
+      const lrrt = localStorage.getItem('pt_last_rates_refresh_time');
+      if (lrrt) this.lastRatesRefreshTime.set(parseInt(lrrt, 10));
 
       const lu = localStorage.getItem('pt_last_updated');
       if (lu) this.lastUpdated.set(parseInt(lu, 10));
@@ -2504,7 +2508,9 @@ export class PortfolioService {
       if (updatedCount > 0) {
         this.exchangeRates.set(updatedRates);
         this.saveToStorage();
-        localStorage.setItem('pt_last_rates_refresh_time', Date.now().toString());
+        const now = Date.now();
+        this.lastRatesRefreshTime.set(now);
+        localStorage.setItem('pt_last_rates_refresh_time', now.toString());
         if (!silent) this.showToast(`Successfully refreshed ${updatedCount} exchange rates!`, 'success');
       }
       return updatedCount;

@@ -120,7 +120,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.3rem;">
         <div class="box-header">
           <h3 style="margin: 0;">💱 Currency Rates</h3>
-          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Live rates for cash.</p>
+          <p class="subtitle" style="margin: 0.1rem 0 0 0;">{{ service.lastRatesRefreshTime() ? 'Updated ' + formatSyncTime(service.lastRatesRefreshTime()!) : 'Live rates for cash.' }}</p>
         </div>
         <div style="display: flex; gap: 0.3rem;">
           <button 
