@@ -3402,9 +3402,24 @@ export class PortfolioService {
       return controller.signal;
     };
 
+    // 0. Try custom Google Apps Script / Cloudflare Proxy first
+    const customProxy = this.marketProxyUrl().trim();
+    if (customProxy) {
+      try {
+        const sep = customProxy.includes('?') ? '&' : '?';
+        const proxyTarget = `${customProxy}${sep}url=${encodeURIComponent(urlWithTs)}`;
+        const resp = await fetch(proxyTarget, { signal: abortTimeout(6000) });
+        if (resp.ok || resp.status === 404) {
+          return resp;
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+
     const options: RequestInit = {
       ...(cacheNoStore ? { cache: 'no-store' } : {}),
-      signal: abortTimeout(2500)
+      signal: abortTimeout(3500)
     };
 
     const proxyList = [
