@@ -227,7 +227,149 @@
     </div>
   </div>
 
-  <!-- WIDE SECTION 1: Current Stock Prices & Asset Catalog (Full Width) -->
+  <!-- WIDE SECTION 1: Classification & Market Data Providers (Cards Grid) -->
+  <div class="settings-section">
+    <div class="section-title">
+      <span class="section-icon">🏷️</span>
+      <span>Classification & Market Data Providers</span>
+    </div>
+
+    <div class="settings-top-grid">
+      <!-- Card A: Custom Sectors -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3>🏷️ Custom Sectors</h3>
+          <p class="subtitle">Labels for stock asset allocation.</p>
+        </div>
+
+        <div class="currency-chips-wrap">
+          <span *ngFor="let s of service.customSectors(); let i = index" class="currency-chip">
+            {{ s }}
+            <button (click)="removeSector(i)" class="currency-chip-del" title="Remove sector">✕</button>
+          </span>
+        </div>
+
+        <div class="add-currency-bar">
+          <input
+            type="text"
+            [(ngModel)]="newSectorName"
+            placeholder="New sector..."
+            class="person-input"
+            (keydown.enter)="addSector()">
+          <button class="btn btn-primary btn-xs" (click)="addSector()" [disabled]="!newSectorName.trim()">
+            + Add
+          </button>
+        </div>
+      </div>
+
+      <!-- Card B: Split-Adjusted Accounts -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3>⚖️ Split-Adjusted Sources</h3>
+          <p class="subtitle">Accounts with auto-adjusted historical transactions.</p>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;" *ngIf="allSources().length > 0">
+          <label 
+            *ngFor="let src of allSources()" 
+            style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
+            <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
+            <span>{{ src }}</span>
+          </label>
+        </div>
+        <p *ngIf="allSources().length === 0" class="subtitle" style="font-size: 0.76rem;">No transaction sources detected yet.</p>
+      </div>
+
+      <!-- Card C: Finnhub API Key -->
+      <div class="glass-card setting-box">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="box-header">
+            <h3 style="margin: 0;">🔑 Finnhub Direct API</h3>
+            <p class="subtitle" style="margin: 0.1rem 0 0 0;">Free direct quotes.</p>
+          </div>
+          <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--primary); text-decoration: none;">Get Free Key ↗</a>
+        </div>
+
+        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Direct quotes from Finnhub.</p>
+
+        <input
+          type="password"
+          [ngModel]="service.finnhubApiKey()"
+          (ngModelChange)="service.finnhubApiKey.set($event); service.saveToStorage()"
+          placeholder="Paste free Finnhub token..."
+          class="person-input"
+          style="width: 100%; box-sizing: border-box;">
+      </div>
+
+      <!-- Card D: Google Apps Script / Cloudflare Proxy -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3 style="margin: 0;">🌐 Google Script Proxy URL</h3>
+          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Unlimited global quotes.</p>
+        </div>
+
+        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Paste deployed Google Apps Script Web App URL.</p>
+
+        <input
+          type="text"
+          [ngModel]="service.marketProxyUrl()"
+          (ngModelChange)="service.marketProxyUrl.set($event); service.saveToStorage()"
+          placeholder="https://script.google.com/macros/s/.../exec"
+          class="person-input"
+          style="width: 100%; box-sizing: border-box;">
+      </div>
+
+      <!-- Card E: Capital Gains Tax & Exemption -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3 style="margin: 0;">🏛️ Capital Gains Tax & Method</h3>
+          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Exemption, tax rate & profit method.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.2rem;">
+          <div>
+            <label class="input-label" style="font-size: 0.72rem;">Tax Rate (%)</label>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              [ngModel]="service.taxRate()"
+              (ngModelChange)="service.taxRate.set($event); service.saveToStorage()"
+              placeholder="e.g. 25"
+              class="person-input"
+              style="width: 100%; box-sizing: border-box;">
+          </div>
+          <div>
+            <label class="input-label" style="font-size: 0.72rem;">Annual Exemption ({{ service.defaultCurrency() }})</label>
+            <input
+              type="number"
+              step="50"
+              min="0"
+              [ngModel]="service.taxExemptionLimit()"
+              (ngModelChange)="service.taxExemptionLimit.set($event); service.saveToStorage()"
+              placeholder="e.g. 1000"
+              class="person-input"
+              style="width: 100%; box-sizing: border-box;">
+          </div>
+        </div>
+
+        <div style="margin-top: 0.45rem;">
+          <label class="input-label" style="font-size: 0.72rem;">Profit Calculation Method</label>
+          <select [ngModel]="service.costBasisMethod()" (ngModelChange)="setCostBasisMethod($event)" class="settings-select">
+            <option value="fifo" style="background: #0d1117;">FIFO (First In, First Out)</option>
+            <option value="avg" style="background: #0d1117;">Average Cost</option>
+          </select>
+        </div>
+
+        <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0.3rem 0 0 0;">
+          Calculates estimated net return after tax on profits exceeding annual exemption.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIDE SECTION 2: Current Stock Prices & Asset Catalog (Full Width) -->
   <div class="settings-section">
     <div class="section-title">
       <span class="section-icon">📊</span>
@@ -376,148 +518,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- WIDE SECTION 2: Sectors, Accounts & Market Providers (3 Cards Grid) -->
-  <div class="settings-section">
-    <div class="section-title">
-      <span class="section-icon">🏷️</span>
-      <span>Classification & Market Data Providers</span>
-    </div>
-
-    <div class="settings-top-grid">
-      <!-- Card A: Custom Sectors -->
-      <div class="glass-card setting-box">
-        <div class="box-header">
-          <h3>🏷️ Custom Sectors</h3>
-          <p class="subtitle">Labels for stock asset allocation.</p>
-        </div>
-
-        <div class="currency-chips-wrap">
-          <span *ngFor="let s of service.customSectors(); let i = index" class="currency-chip">
-            {{ s }}
-            <button (click)="removeSector(i)" class="currency-chip-del" title="Remove sector">✕</button>
-          </span>
-        </div>
-
-        <div class="add-currency-bar">
-          <input
-            type="text"
-            [(ngModel)]="newSectorName"
-            placeholder="New sector..."
-            class="person-input"
-            (keydown.enter)="addSector()">
-          <button class="btn btn-primary btn-xs" (click)="addSector()" [disabled]="!newSectorName.trim()">
-            + Add
-          </button>
-        </div>
-      </div>
-
-      <!-- Card B: Split-Adjusted Accounts -->
-      <div class="glass-card setting-box">
-        <div class="box-header">
-          <h3>⚖️ Split-Adjusted Sources</h3>
-          <p class="subtitle">Accounts with auto-adjusted historical transactions.</p>
-        </div>
-
-        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;" *ngIf="allSources().length > 0">
-          <label 
-            *ngFor="let src of allSources()" 
-            style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem;">
-            <input type="checkbox" [checked]="isSplitAdjusted(src)" (change)="toggleSplitAdjusted(src)" style="accent-color: var(--primary);">
-            <span>{{ src }}</span>
-          </label>
-        </div>
-        <p *ngIf="allSources().length === 0" class="subtitle" style="font-size: 0.76rem;">No transaction sources detected yet.</p>
-      </div>
-
-      <!-- Card C: Finnhub API Key -->
-      <div class="glass-card setting-box">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div class="box-header">
-            <h3 style="margin: 0;">🔑 Finnhub Direct API</h3>
-            <p class="subtitle" style="margin: 0.1rem 0 0 0;">Free direct quotes.</p>
-          </div>
-          <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--primary); text-decoration: none;">Get Free Key ↗</a>
-        </div>
-
-        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Direct quotes from Finnhub.</p>
-
-        <input
-          type="password"
-          [ngModel]="service.finnhubApiKey()"
-          (ngModelChange)="service.finnhubApiKey.set($event); service.saveToStorage()"
-          placeholder="Paste free Finnhub token..."
-          class="person-input"
-          style="width: 100%; box-sizing: border-box;">
-      </div>
-
-      <!-- Card D: Google Apps Script / Cloudflare Proxy -->
-      <div class="glass-card setting-box">
-        <div class="box-header">
-          <h3 style="margin: 0;">🌐 Google Script Proxy URL</h3>
-          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Unlimited global quotes.</p>
-        </div>
-
-        <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0;">Paste deployed Google Apps Script Web App URL.</p>
-
-        <input
-          type="text"
-          [ngModel]="service.marketProxyUrl()"
-          (ngModelChange)="service.marketProxyUrl.set($event); service.saveToStorage()"
-          placeholder="https://script.google.com/macros/s/.../exec"
-          class="person-input"
-          style="width: 100%; box-sizing: border-box;">
-      </div>
-
-      <!-- Card E: Capital Gains Tax & Exemption -->
-      <div class="glass-card setting-box">
-        <div class="box-header">
-          <h3 style="margin: 0;">🏛️ Capital Gains Tax & Method</h3>
-          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Exemption, tax rate & profit method.</p>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.2rem;">
-          <div>
-            <label class="input-label" style="font-size: 0.72rem;">Tax Rate (%)</label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              max="100"
-              [ngModel]="service.taxRate()"
-              (ngModelChange)="service.taxRate.set($event); service.saveToStorage()"
-              placeholder="e.g. 25"
-              class="person-input"
-              style="width: 100%; box-sizing: border-box;">
-          </div>
-          <div>
-            <label class="input-label" style="font-size: 0.72rem;">Annual Exemption ({{ service.defaultCurrency() }})</label>
-            <input
-              type="number"
-              step="50"
-              min="0"
-              [ngModel]="service.taxExemptionLimit()"
-              (ngModelChange)="service.taxExemptionLimit.set($event); service.saveToStorage()"
-              placeholder="e.g. 1000"
-              class="person-input"
-              style="width: 100%; box-sizing: border-box;">
-          </div>
-        </div>
-
-        <div style="margin-top: 0.45rem;">
-          <label class="input-label" style="font-size: 0.72rem;">Profit Calculation Method</label>
-          <select [ngModel]="service.costBasisMethod()" (ngModelChange)="setCostBasisMethod($event)" class="settings-select">
-            <option value="fifo" style="background: #0d1117;">FIFO (First In, First Out)</option>
-            <option value="avg" style="background: #0d1117;">Average Cost</option>
-          </select>
-        </div>
-
-        <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0.3rem 0 0 0;">
-          Calculates estimated net return after tax on profits exceeding annual exemption.
-        </p>
       </div>
     </div>
   </div>
