@@ -376,9 +376,9 @@ export class PortfolioService {
         this.checkForCloudUpdatesSilent();
         const last = this.lastRefreshTime();
         const now = Date.now();
-        if (!last || (now - last > 2 * 60 * 1000)) {
+        if (!last || (now - last > 3 * 60 * 1000)) {
           if (typeof navigator !== 'undefined' && navigator.onLine) {
-            this.loadMarketPricesApi(false, true);
+            this.refreshMarketData(false);
           }
         }
       };
@@ -388,9 +388,6 @@ export class PortfolioService {
           if (document.visibilityState === 'visible') handleReturnToApp();
         });
       }
-      window.addEventListener('pageshow', handleReturnToApp);
-      window.addEventListener('focus', handleReturnToApp);
-      window.addEventListener('online', handleReturnToApp);
 
       // Check for cloud updates 1 second after app startup
       setTimeout(() => {
@@ -2117,166 +2114,13 @@ export class PortfolioService {
         ([_, original]) => !bulkUpdatedSet.has(original)
       );
 
-      if (remainingEntries.length > 0) {
+      if (remainingEntries.length > 0 && !circuitBreakerTripped) {
         await this.runConcurrent(
           remainingEntries,
           ([resolved, original]) => fetchViaChart(resolved, original),
           2,
           150,
           () => circuitBreakerTripped
-        );
-      }
-
-      if (circuitBreakerTripped && updatedCount === 0) {
-        if (!silent) this.showToast('Market proxy unavailable. Keeping existing prices.', 'info');
-        return updatedCount;
-      }
-
-      // Autocomplete discovery helper for remaining un-updated tickers (silently in background)
-      const fetchWithSelfDiscovery = async (ticker: string): Promise<{ ticker: string, price: number, priceCurrency: string, sector?: string, name?: string, logoData?: string, yahooSymbol?: string } | null> => {
-        try {
-          const cleanTicker = ticker.toUpperCase().trim();
-          let resolvedSymbol = cleanTicker;
-          let sector = 'Other';
-          let name = cleanTicker;
-          
-          const config = meta[cleanTicker];
-          if (config && config.yahooSymbol) {
-            const symbolOverride = config.yahooSymbol.toUpperCase().trim();
-            if (symbolOverride.startsWith('.')) {
-              resolvedSymbol = cleanTicker + symbolOverride;
-            } else if (!symbolOverride.includes('.') && symbolOverride.length <= 4 && symbolOverride !== cleanTicker) {
-              resolvedSymbol = cleanTicker + '.' + symbolOverride;
-            } else {
-              resolvedSymbol = symbolOverride;
-            }
-            name = config.name || cleanTicker;
-            sector = config.sector || 'Other';
-          } else {
-            // Silently resolve via search endpoint
-            const searchTarget = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(cleanTicker)}`;
-            const searchResponse = await this.fetchWithProxy(searchTarget, true);
-            if (searchResponse.ok) {
-              const searchData = await searchResponse.json();
-              const quotes = searchData?.quotes || [];
-              let quote = quotes.find((q: any) => q.symbol?.toUpperCase() === cleanTicker);
-              if (!quote && quotes.length > 0) {
-                quote = quotes[0];
-              }
-              if (quote) {
-                resolvedSymbol = quote.symbol.toUpperCase();
-                name = quote.longname || quote.shortname || cleanTicker;
-                sector = quote.sector || 'Other';
-              }
-            }
-          }
-
-          const cleanResolved = encodeURIComponent(resolvedSymbol);
-          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${cleanResolved}?includePrePost=true&events=split`;
-          
-          const chartResponse = await this.fetchWithProxy(chartTarget, true);
-          if (!chartResponse.ok) return null;
-          
-          const data = await chartResponse.json();
-          const result = data?.chart?.result?.[0];
-          const chartMeta = result?.meta;
-          if (chartMeta) {
-            let price: number | null = null;
-            const closes = result.indicators?.quote?.[0]?.close || [];
-            for (let i = closes.length - 1; i >= 0; i--) {
-              if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                price = parseFloat(closes[i]);
-                break;
-              }
-            }
-            if (price === null || isNaN(price) || price <= 0) {
-              price = parseFloat(chartMeta.regularMarketPrice);
-            }
-            if (price === null || isNaN(price) || price <= 0) {
-              price = parseFloat(chartMeta.chartPreviousClose);
-            }
-
-            let currency: string = (chartMeta.currency || 'USD').toUpperCase();
-            if (!isNaN(price) && price > 0) {
-              if (currency === 'GBP' || chartMeta.currency === 'GBp') {
-                if (chartMeta.currency === 'GBp') price = price / 100;
-                currency = 'GBP';
-              }
-
-              // Extract splits from Yahoo chart response
-              const events = result?.events;
-              if (events?.splits) {
-                const splitsArr: { date: string; ratio: number }[] = [];
-                Object.values(events.splits).forEach((s: any) => {
-                  if (s.numerator && s.denominator) {
-                    const d = new Date(s.date * 1000);
-                    const dateStr = d.toISOString().slice(0, 10);
-                    splitsArr.push({ date: dateStr, ratio: s.numerator / s.denominator });
-                  }
-                });
-                if (splitsArr.length > 0) {
-                  splitsArr.sort((a, b) => a.date.localeCompare(b.date));
-                  const existingCfg = this.tickerConfigs()[cleanTicker];
-                  if (!existingCfg?.splits || JSON.stringify(existingCfg.splits) !== JSON.stringify(splitsArr)) {
-                    this.tickerConfigs.update(p => ({
-                      ...p,
-                      [cleanTicker]: { ...(p[cleanTicker] || {}), splits: splitsArr }
-                    }));
-                  }
-                }
-              }
-
-              return {
-                ticker: cleanTicker,
-                price,
-                priceCurrency: currency,
-                sector,
-                name,
-                yahooSymbol: resolvedSymbol !== cleanTicker ? resolvedSymbol : undefined
-              };
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
-        return null;
-      };
-
-      const remainingTickers = tickers.filter(t => {
-        const config = meta[t];
-        const isNotFound = !force && config && config.notFound && (!config.notFoundTime || (Date.now() - config.notFoundTime < 7 * 24 * 60 * 60 * 1000));
-        return !isNotFound && !bulkUpdatedSet.has(t);
-      });
-      if (remainingTickers.length > 0 && !circuitBreakerTripped) {
-        await this.runConcurrent(
-          remainingTickers,
-          async (ticker) => {
-            const res = await fetchWithSelfDiscovery(ticker);
-            if (res) {
-              const price = res.price;
-              const current = meta[ticker] || {
-                ticker,
-                currentPrice: price,
-                priceCurrency: res.priceCurrency || 'USD',
-                sector: res.sector || 'Other',
-                name: res.name || ticker,
-                logoData: res.logoData
-              };
-              
-              const finalSector = res.sector || current.sector || 'Other';
-              const finalName = res.name || current.name || ticker;
-              const finalLogo = res.logoData || current.logoData;
-              
-              if (res.yahooSymbol && res.yahooSymbol !== ticker && current.yahooSymbol !== res.yahooSymbol) {
-                this.showToast(`Auto-resolved ticker "${ticker}" to Yahoo symbol "${res.yahooSymbol}".`, 'info', 6000);
-              }
-              
-              this.updateTickerConfig(ticker, price, finalSector, finalName, res.priceCurrency, finalLogo, res.yahooSymbol);
-              updatedCount++;
-            }
-          },
-          2,
-          150
         );
       }
 
