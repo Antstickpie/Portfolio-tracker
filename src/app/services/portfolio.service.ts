@@ -3545,6 +3545,9 @@ export class PortfolioService {
     if (!force && last && (now - last < THREE_MINUTES)) return;
 
     this.isSyncing.set(true);
+    // Mark refresh timestamp immediately to prevent rapid retry storms on failure/idle
+    this.lastRefreshTime.set(now);
+    localStorage.setItem('pt_last_refresh_time', now.toString());
 
     try {
       const stockUpdated = await this.loadMarketPricesApi(force, true);
