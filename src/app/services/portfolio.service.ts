@@ -1971,11 +1971,17 @@ export class PortfolioService {
               symbolsToFetch.forEach(sym => {
                 const item = data[sym] || data[sym.toUpperCase()];
                 const originalTicker = symbolMap.get(sym) || sym;
-                if (item && typeof item.price === 'number' && item.price > 0) {
+                let activePrice = item?.price;
+                if (item?.postMarketPrice && typeof item.postMarketPrice === 'number' && item.postMarketPrice > 0) {
+                  activePrice = item.postMarketPrice;
+                } else if (item?.preMarketPrice && typeof item.preMarketPrice === 'number' && item.preMarketPrice > 0) {
+                  activePrice = item.preMarketPrice;
+                }
+                if (item && typeof activePrice === 'number' && activePrice > 0) {
                   const current = meta[originalTicker] || {};
                   this.updateTickerConfig(
                     originalTicker,
-                    item.price,
+                    activePrice,
                     current.sector || 'Other',
                     item.name || current.name || originalTicker,
                     item.currency || current.priceCurrency || 'USD',
@@ -2005,11 +2011,17 @@ export class PortfolioService {
               if (resp.ok) {
                 const data = await resp.json();
                 const item = data[resolvedSymbol] || data[originalTicker] || data;
-                if (item && typeof item.price === 'number' && item.price > 0) {
+                let activePrice = item?.price;
+                if (item?.postMarketPrice && typeof item.postMarketPrice === 'number' && item.postMarketPrice > 0) {
+                  activePrice = item.postMarketPrice;
+                } else if (item?.preMarketPrice && typeof item.preMarketPrice === 'number' && item.preMarketPrice > 0) {
+                  activePrice = item.preMarketPrice;
+                }
+                if (item && typeof activePrice === 'number' && activePrice > 0) {
                   const current = meta[originalTicker] || {};
                   this.updateTickerConfig(
                     originalTicker,
-                    item.price,
+                    activePrice,
                     current.sector || 'Other',
                     item.name || current.name || originalTicker,
                     item.currency || current.priceCurrency || 'USD',
@@ -2026,7 +2038,7 @@ export class PortfolioService {
             }
           }
 
-          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?includePrePost=true&events=split`;
+          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=1d&interval=1m&includePrePost=true&events=split`;
           const chartResponse = await this.fetchWithProxy(chartTarget, true);
           if (chartResponse.status === 404) {
             this.markTickerNotFound(originalTicker);
@@ -2040,29 +2052,23 @@ export class PortfolioService {
             if (chartMeta) {
               let price: number | null = null;
 
-              // 1. Post-market / after-hours price (if available and newer than regular market close)
-              if (chartMeta.postMarketPrice && typeof chartMeta.postMarketPrice === 'number' && chartMeta.postMarketPrice > 0) {
-                if (!chartMeta.regularMarketTime || !chartMeta.postMarketTime || chartMeta.postMarketTime >= chartMeta.regularMarketTime) {
-                  price = parseFloat(chartMeta.postMarketPrice);
+              // 1. Check last available 1m close from extended trading hours (pre-market or after-hours)
+              const closes = result.indicators?.quote?.[0]?.close || [];
+              for (let i = closes.length - 1; i >= 0; i--) {
+                if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+                  price = parseFloat(closes[i]);
+                  break;
                 }
               }
 
-              // 2. Pre-market price (if available and newer than regular market close)
+              // 2. Post-market / after-hours price (if available)
+              if (!price && chartMeta.postMarketPrice && typeof chartMeta.postMarketPrice === 'number' && chartMeta.postMarketPrice > 0) {
+                price = parseFloat(chartMeta.postMarketPrice);
+              }
+
+              // 3. Pre-market price (if available)
               if (!price && chartMeta.preMarketPrice && typeof chartMeta.preMarketPrice === 'number' && chartMeta.preMarketPrice > 0) {
-                if (!chartMeta.regularMarketTime || !chartMeta.preMarketTime || chartMeta.preMarketTime >= chartMeta.regularMarketTime) {
-                  price = parseFloat(chartMeta.preMarketPrice);
-                }
-              }
-
-              // 3. Fallback to latest close in indicators (which includes pre/post timestamps)
-              if (!price) {
-                const closes = result.indicators?.quote?.[0]?.close || [];
-                for (let i = closes.length - 1; i >= 0; i--) {
-                  if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                    price = parseFloat(closes[i]);
-                    break;
-                  }
-                }
+                price = parseFloat(chartMeta.preMarketPrice);
               }
 
               // 4. Regular market price or previous close
