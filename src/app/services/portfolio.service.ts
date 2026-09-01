@@ -2039,13 +2039,33 @@ export class PortfolioService {
             const chartMeta = result?.meta;
             if (chartMeta) {
               let price: number | null = null;
-              const closes = result.indicators?.quote?.[0]?.close || [];
-              for (let i = closes.length - 1; i >= 0; i--) {
-                if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                  price = parseFloat(closes[i]);
-                  break;
+
+              // 1. Post-market / after-hours price (if available and newer than regular market close)
+              if (chartMeta.postMarketPrice && typeof chartMeta.postMarketPrice === 'number' && chartMeta.postMarketPrice > 0) {
+                if (!chartMeta.regularMarketTime || !chartMeta.postMarketTime || chartMeta.postMarketTime >= chartMeta.regularMarketTime) {
+                  price = parseFloat(chartMeta.postMarketPrice);
                 }
               }
+
+              // 2. Pre-market price (if available and newer than regular market close)
+              if (!price && chartMeta.preMarketPrice && typeof chartMeta.preMarketPrice === 'number' && chartMeta.preMarketPrice > 0) {
+                if (!chartMeta.regularMarketTime || !chartMeta.preMarketTime || chartMeta.preMarketTime >= chartMeta.regularMarketTime) {
+                  price = parseFloat(chartMeta.preMarketPrice);
+                }
+              }
+
+              // 3. Fallback to latest close in indicators (which includes pre/post timestamps)
+              if (!price) {
+                const closes = result.indicators?.quote?.[0]?.close || [];
+                for (let i = closes.length - 1; i >= 0; i--) {
+                  if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
+                    price = parseFloat(closes[i]);
+                    break;
+                  }
+                }
+              }
+
+              // 4. Regular market price or previous close
               if (price === null || isNaN(price) || price <= 0) {
                 price = parseFloat(chartMeta.regularMarketPrice);
               }
@@ -2223,14 +2243,14 @@ export class PortfolioService {
     const pairs = this.getExchangeRatePairs();
     if (pairs.length === 0) return 0;
 
-    // Cache FX rates for 2 hours (FX rates change slowly compared to stocks)
+    // Cache FX rates for 5 minutes
     const lastTimeStr = localStorage.getItem('pt_last_rates_refresh_time');
     const now = Date.now();
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
     const hasAllPairs = pairs.every(p => this.exchangeRates()[p] !== undefined);
     if (!force && lastTimeStr && hasAllPairs) {
       const lastTime = parseInt(lastTimeStr, 10);
-      if (now - lastTime < TWO_HOURS_MS) {
+      if (now - lastTime < FIVE_MINUTES_MS) {
         return 0; // Use cached rates
       }
     }
