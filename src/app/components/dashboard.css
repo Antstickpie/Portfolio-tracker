@@ -212,16 +212,23 @@
 .text-danger { color: var(--danger); }
 .text-accent { color: var(--primary); }
 
-/* Charts Layout (Flexible responsive grid for Asset, Sector, and P/E valuation) */
+/* Charts Layout (Side-by-side or responsive 3-column grid) */
 .charts-row {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 0.75rem !important;
   width: 100% !important;
   margin-bottom: 0;
 }
 
-@media (max-width: 870px) {
+@media (max-width: 1100px) {
+  .charts-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem !important;
+  }
+}
+
+@media (max-width: 768px) {
   .charts-row {
     grid-template-columns: 1fr !important;
     gap: 1rem !important;
