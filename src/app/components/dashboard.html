@@ -529,8 +529,8 @@
       </div>
 
       <!-- P/E Ratio Valuation Breakdown Card -->
-      <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none; display: flex; flex-direction: column; min-height: 400px; box-sizing: border-box;">
-        <div class="chart-card-header">
+      <div class="glass-card chart-card pe-valuation-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none; display: flex; flex-direction: column; height: 390px; min-height: 390px; box-sizing: border-box; overflow: hidden;">
+        <div class="chart-card-header" style="flex-shrink: 0; margin-bottom: 0.6rem;">
           <h3>P/E Valuation Allocation</h3>
           <span style="font-size: 0.72rem; font-weight: 600; color: var(--primary); background: rgba(99,102,241,0.12); padding: 0.2rem 0.55rem; border-radius: 20px; border: 1px solid rgba(99,102,241,0.25);">
             {{ peDistributionData().length }} {{ peDistributionData().length === 1 ? 'Tier' : 'Tiers' }}
@@ -575,9 +575,9 @@
           </div>
         </div>
 
-        <div style="padding: 0.2rem 0; display: flex; flex-direction: column; gap: 0.75rem; flex: 1; min-height: 0;">
+        <div style="padding: 0 0.2rem; display: flex; flex-direction: column; gap: 0.75rem; flex: 1; min-height: 0; overflow: hidden;">
           <!-- Segmented multi-colored bar -->
-          <div style="width: 100%; height: 18px; border-radius: 9px; overflow: hidden; display: flex; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
+          <div style="width: 100%; height: 20px; border-radius: 10px; overflow: hidden; display: flex; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
             <div 
               *ngFor="let tier of peDistributionData(); let idx = index" 
               [style.width.%]="tier.pct"
@@ -591,12 +591,12 @@
           </div>
 
           <!-- List of tiers with stats -->
-          <div style="display: flex; flex-direction: column; gap: 0.4rem; overflow-y: auto; flex: 1; max-height: 290px; padding-right: 4px;">
+          <div style="display: flex; flex-direction: column; gap: 0.45rem; overflow-y: auto; flex: 1; min-height: 0; padding-right: 4px; padding-bottom: 0.5rem;">
             <div 
               *ngFor="let tier of peDistributionData(); let idx = index"
               (mouseenter)="hoveredPeIndex.set(idx)"
               (mouseleave)="hoveredPeIndex.set(-1)"
-              style="display: flex; align-items: center; justify-content: space-between; padding: 0.45rem 0.65rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s;"
+              style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.7rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s; flex-shrink: 0;"
               [style.background]="hoveredPeIndex() === idx ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'"
               [style.borderColor]="hoveredPeIndex() === idx ? tier.color : 'rgba(255,255,255,0.04)'">
               
