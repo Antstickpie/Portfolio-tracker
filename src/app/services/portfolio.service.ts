@@ -2267,85 +2267,57 @@ export class PortfolioService {
       const updatedRates: Record<string, number> = {};
       let updatedCount = 0;
 
-      // 1. Live Yahoo Finance FX ticker (Real-time 24/5 streaming ticks including extended hours)
-      const fetchRate = async (pair: string): Promise<{ pair: string, price: number } | null> => {
-        try {
-          const parts = pair.split('/');
-          const ticker = `${parts[0]}${parts[1]}=X`;
-          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=1m&includePrePost=true`;
-          
-          const response = await this.fetchWithProxy(chartTarget, true);
-          if (response.ok) {
-            const data = await response.json();
-            const result = data?.chart?.result?.[0];
-            const chartMeta = result?.meta;
-            if (chartMeta) {
-              let price: number | null = null;
-              const closes = result.indicators?.quote?.[0]?.close || [];
-              for (let i = closes.length - 1; i >= 0; i--) {
-                const c = closes[i];
-                if (c !== null && typeof c === 'number' && !isNaN(c) && c > 0) {
-                  price = c;
-                  break;
-                }
-              }
-              if (!price && typeof chartMeta.regularMarketPrice === 'number' && chartMeta.regularMarketPrice > 0) {
-                price = chartMeta.regularMarketPrice;
-              }
-              if (!price && typeof chartMeta.chartPreviousClose === 'number' && chartMeta.chartPreviousClose > 0) {
-                price = chartMeta.chartPreviousClose;
-              }
-              if (price && price > 0) {
-                return { pair, price };
+      // 1. Try Open Exchange Rate API first (Direct open API)
+      try {
+        const resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(3500) });
+        if (resp.ok) {
+          const data = await resp.json();
+          const rates: Record<string, number> = data?.rates || {};
+          rates['USD'] = 1.0;
+
+          pairs.forEach(pair => {
+            const [base, quote] = pair.split('/');
+            const baseRate = rates[base];
+            const quoteRate = rates[quote];
+            if (baseRate && quoteRate) {
+              const calc = quoteRate / baseRate;
+              if (calc > 0) {
+                updatedRates[pair] = parseFloat(calc.toFixed(6));
+                updatedCount++;
               }
             }
-          }
-        } catch (e) {
-          // fallback
+          });
         }
-        return null;
-      };
+      } catch (e) {
+        // Open ER fallback
+      }
 
-      const fxResults = await this.runConcurrent(
-        pairs,
-        pair => fetchRate(pair),
-        3,
-        80
-      );
-
-      pairs.forEach((pair, idx) => {
-        const res = fxResults[idx];
-        if (res) {
-          updatedRates[res.pair] = parseFloat(res.price.toFixed(6));
-          updatedCount++;
-        }
-      });
-
-      // 2. Fallback to Open Exchange Rates API for any pairs not resolved
-      const remainingPairs = pairs.filter(p => updatedRates[p] === undefined);
-      if (remainingPairs.length > 0) {
+      // 2. Try Frankfurter API as secondary provider
+      if (updatedCount < pairs.length) {
         try {
-          const resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(3500) });
+          const resp = await fetch('https://api.frankfurter.dev/v1/latest?from=USD', { signal: AbortSignal.timeout(3500) });
           if (resp.ok) {
             const data = await resp.json();
             const rates: Record<string, number> = data?.rates || {};
             rates['USD'] = 1.0;
 
-            remainingPairs.forEach(pair => {
-              const [base, quote] = pair.split('/');
-              const baseRate = rates[base];
-              const quoteRate = rates[quote];
-              if (baseRate && quoteRate) {
-                const calc = quoteRate / baseRate;
-                if (calc > 0) {
-                  updatedRates[pair] = parseFloat(calc.toFixed(6));
-                  updatedCount++;
+            pairs.forEach(pair => {
+              if (updatedRates[pair] === undefined) {
+                const [base, quote] = pair.split('/');
+                const baseRate = rates[base];
+                const quoteRate = rates[quote];
+                if (baseRate && quoteRate) {
+                  const calc = quoteRate / baseRate;
+                  if (calc > 0) {
+                    updatedRates[pair] = parseFloat(calc.toFixed(6));
+                    updatedCount++;
+                  }
                 }
               }
             });
           }
         } catch (e) {
-          // fallback
+          // ignore
         }
       }
 
@@ -3322,69 +3294,25 @@ export class PortfolioService {
       return controller.signal;
     };
 
-    // 0. Try custom Google Apps Script / Cloudflare Proxy first
     const customProxy = this.marketProxyUrl().trim();
     if (customProxy) {
       try {
         const sep = customProxy.includes('?') ? '&' : '?';
         const proxyTarget = `${customProxy}${sep}url=${encodeURIComponent(urlWithTs)}`;
-        const resp = await fetch(proxyTarget, { signal: abortTimeout(6000) });
+        const resp = await fetch(proxyTarget, {
+          signal: abortTimeout(8000),
+          ...(cacheNoStore ? { cache: 'no-store' } : {})
+        });
         if (resp.ok || resp.status === 404) {
           return resp;
         }
       } catch (e) {
-        // fallback
+        // Google proxy error
       }
-    }
-
-    const options: RequestInit = {
-      ...(cacheNoStore ? { cache: 'no-store' } : {}),
-      signal: abortTimeout(3500)
-    };
-
-    const proxyList = [
-      // 1. allorigins raw
-      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      // 2. CodeTabs
-      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
-    ];
-
-    // Load balance starting proxy across requests to prevent 429 rate limiting on any single proxy
-    const startIdx = (this.proxyRoundRobinIdx++) % proxyList.length;
-    for (let i = 0; i < proxyList.length; i++) {
-      const proxyFn = proxyList[(startIdx + i) % proxyList.length];
-      try {
-        const proxyUrl = proxyFn(urlWithTs);
-        const resp = await fetch(proxyUrl, options);
-        // Valid status: 200-299 OK or 404 from target
-        if (resp.ok || resp.status === 404) {
-          return resp;
-        }
-        // If 401, 403, 429, 500+ -> proxy blocked/rate limited, try next
-      } catch (e) {
-        // network error or timeout -> try next
-      }
-    }
-
-    // Fallback: allorigins JSON envelope
-    try {
-      const getUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(urlWithTs)}`;
-      const getResp = await fetch(getUrl, options);
-      if (getResp.ok) {
-        const data = await getResp.json();
-        if (data && typeof data.contents === 'string') {
-          return new Response(data.contents, {
-            status: data.status?.http_code || 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-      }
-    } catch (e) {
-      // ignore
     }
 
     // Return safe synthetic response without attempting direct unproxied browser fetch (which triggers red CORS errors)
-    return new Response(JSON.stringify({ error: 'Proxy unavailable' }), {
+    return new Response(JSON.stringify({ error: 'Google proxy unavailable' }), {
       status: 503,
       statusText: 'Service Unavailable',
       headers: { 'Content-Type': 'application/json' }
