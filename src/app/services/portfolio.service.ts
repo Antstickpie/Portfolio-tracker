@@ -2261,63 +2261,39 @@ export class PortfolioService {
       }
     }
 
-    if (!silent) this.showToast('Fetching current exchange rates...', 'info');
+    const proxyUrl = this.marketProxyUrl().trim();
+    if (!proxyUrl) return 0;
 
     try {
       const updatedRates: Record<string, number> = {};
       let updatedCount = 0;
 
-      // 1. Try Open Exchange Rate API first (Direct open API)
-      try {
-        const resp = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(3500) });
-        if (resp.ok) {
-          const data = await resp.json();
-          const rates: Record<string, number> = data?.rates || {};
-          rates['USD'] = 1.0;
+      // Query exchange rates purely via Google Apps Script proxy
+      const fxTickers: string[] = [];
+      pairs.forEach(p => {
+        const [base, quote] = p.split('/');
+        fxTickers.push(`${base}${quote}`);
+        fxTickers.push(`CURRENCY:${base}${quote}`);
+        fxTickers.push(p);
+      });
 
+      const sep = proxyUrl.includes('?') ? '&' : '?';
+      const reqUrl = `${proxyUrl}${sep}tickers=${encodeURIComponent(fxTickers.join(','))}`;
+      const resp = await fetch(reqUrl, { signal: AbortSignal.timeout(8000) });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && typeof data === 'object') {
           pairs.forEach(pair => {
             const [base, quote] = pair.split('/');
-            const baseRate = rates[base];
-            const quoteRate = rates[quote];
-            if (baseRate && quoteRate) {
-              const calc = quoteRate / baseRate;
-              if (calc > 0) {
-                updatedRates[pair] = parseFloat(calc.toFixed(6));
-                updatedCount++;
-              }
+            const sym1 = `${base}${quote}`;
+            const sym2 = `CURRENCY:${base}${quote}`;
+            const item = data[pair] || data[sym1] || data[sym2] || data[sym1.toUpperCase()] || data[sym2.toUpperCase()];
+            const rate = typeof item?.price === 'number' ? item.price : (typeof item === 'number' ? item : null);
+            if (rate && rate > 0) {
+              updatedRates[pair] = parseFloat(rate.toFixed(6));
+              updatedCount++;
             }
           });
-        }
-      } catch (e) {
-        // Open ER fallback
-      }
-
-      // 2. Try Frankfurter API as secondary provider
-      if (updatedCount < pairs.length) {
-        try {
-          const resp = await fetch('https://api.frankfurter.dev/v1/latest?from=USD', { signal: AbortSignal.timeout(3500) });
-          if (resp.ok) {
-            const data = await resp.json();
-            const rates: Record<string, number> = data?.rates || {};
-            rates['USD'] = 1.0;
-
-            pairs.forEach(pair => {
-              if (updatedRates[pair] === undefined) {
-                const [base, quote] = pair.split('/');
-                const baseRate = rates[base];
-                const quoteRate = rates[quote];
-                if (baseRate && quoteRate) {
-                  const calc = quoteRate / baseRate;
-                  if (calc > 0) {
-                    updatedRates[pair] = parseFloat(calc.toFixed(6));
-                    updatedCount++;
-                  }
-                }
-              }
-            });
-          }
-        } catch (e) {
-          // ignore
         }
       }
 
