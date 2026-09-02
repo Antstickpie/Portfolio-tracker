@@ -1958,13 +1958,13 @@ export class PortfolioService {
       let consecutiveErrors = 0;
       let circuitBreakerTripped = false;
 
-      // 0. Try Custom Google Apps Script / Cloudflare Proxy if configured (Fast bulk batch fetch)
+      // 0. Single bulk batch fetch via Google Apps Script Proxy (1 single request for all tickers)
       const proxyUrl = this.marketProxyUrl().trim();
       if (proxyUrl && symbolsToFetch.length > 0) {
         try {
           const sep = proxyUrl.includes('?') ? '&' : '?';
           const bulkReqUrl = `${proxyUrl}${sep}tickers=${encodeURIComponent(symbolsToFetch.join(','))}`;
-          const resp = await fetch(bulkReqUrl, { signal: AbortSignal.timeout(8000) });
+          const resp = await fetch(bulkReqUrl, { signal: AbortSignal.timeout(10000) });
           if (resp.ok) {
             const data = await resp.json();
             if (data && typeof data === 'object') {
@@ -1982,7 +1982,7 @@ export class PortfolioService {
                   this.updateTickerConfig(
                     originalTicker,
                     activePrice,
-                    current.sector || 'Other',
+                    current.sector || item.sector || 'Other',
                     item.name || current.name || originalTicker,
                     item.currency || current.priceCurrency || 'USD',
                     current.logoData,
@@ -1990,164 +1990,12 @@ export class PortfolioService {
                   );
                   updatedCount++;
                 }
-                bulkUpdatedSet.add(originalTicker);
               });
             }
           }
         } catch (e) {
-          console.warn('Custom market proxy bulk fetch failed:', e);
+          console.warn('Google market proxy bulk fetch failed:', e);
         }
-      }
-
-      const fetchViaChart = async (resolvedSymbol: string, originalTicker: string) => {
-        if (circuitBreakerTripped || bulkUpdatedSet.has(originalTicker)) return;
-        try {
-          // 0. Try custom proxy for single ticker if not covered in bulk
-          if (proxyUrl) {
-            try {
-              const sep = proxyUrl.includes('?') ? '&' : '?';
-              const reqUrl = `${proxyUrl}${sep}ticker=${encodeURIComponent(resolvedSymbol)}`;
-              const resp = await fetch(reqUrl, { signal: AbortSignal.timeout(4000) });
-              if (resp.ok) {
-                const data = await resp.json();
-                const item = data[resolvedSymbol] || data[originalTicker] || data;
-                let activePrice = item?.price;
-                if (item?.postMarketPrice && typeof item.postMarketPrice === 'number' && item.postMarketPrice > 0) {
-                  activePrice = item.postMarketPrice;
-                } else if (item?.preMarketPrice && typeof item.preMarketPrice === 'number' && item.preMarketPrice > 0) {
-                  activePrice = item.preMarketPrice;
-                }
-                if (item && typeof activePrice === 'number' && activePrice > 0) {
-                  const current = meta[originalTicker] || {};
-                  this.updateTickerConfig(
-                    originalTicker,
-                    activePrice,
-                    current.sector || 'Other',
-                    item.name || current.name || originalTicker,
-                    item.currency || current.priceCurrency || 'USD',
-                    current.logoData
-                  );
-                  bulkUpdatedSet.add(originalTicker);
-                  updatedCount++;
-                  consecutiveErrors = 0;
-                  return;
-                }
-              }
-            } catch (e) {
-              // fallback
-            }
-          }
-
-          const chartTarget = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=1d&interval=1m&includePrePost=true&events=split`;
-          const chartResponse = await this.fetchWithProxy(chartTarget, true);
-          if (chartResponse.status === 404) {
-            this.markTickerNotFound(originalTicker);
-            return;
-          }
-
-          if (chartResponse.ok) {
-            const data = await chartResponse.json();
-            const result = data?.chart?.result?.[0];
-            const chartMeta = result?.meta;
-            if (chartMeta) {
-              let price: number | null = null;
-
-              // 1. Check last available 1m close from extended trading hours (pre-market or after-hours)
-              const closes = result.indicators?.quote?.[0]?.close || [];
-              for (let i = closes.length - 1; i >= 0; i--) {
-                if (closes[i] !== null && !isNaN(closes[i]) && closes[i] > 0) {
-                  price = parseFloat(closes[i]);
-                  break;
-                }
-              }
-
-              // 2. Post-market / after-hours price (if available)
-              if (!price && chartMeta.postMarketPrice && typeof chartMeta.postMarketPrice === 'number' && chartMeta.postMarketPrice > 0) {
-                price = parseFloat(chartMeta.postMarketPrice);
-              }
-
-              // 3. Pre-market price (if available)
-              if (!price && chartMeta.preMarketPrice && typeof chartMeta.preMarketPrice === 'number' && chartMeta.preMarketPrice > 0) {
-                price = parseFloat(chartMeta.preMarketPrice);
-              }
-
-              // 4. Regular market price or previous close
-              if (price === null || isNaN(price) || price <= 0) {
-                price = parseFloat(chartMeta.regularMarketPrice);
-              }
-              if (price === null || isNaN(price) || price <= 0) {
-                price = parseFloat(chartMeta.chartPreviousClose);
-              }
-
-              let currency: string = (chartMeta.currency || 'USD').toUpperCase();
-              if (!isNaN(price) && price > 0) {
-                if (currency === 'GBP' || chartMeta.currency === 'GBp') {
-                  if (chartMeta.currency === 'GBp') price = price / 100;
-                  currency = 'GBP';
-                }
-
-                // Extract splits
-                const events = result?.events;
-                if (events?.splits) {
-                  const splitsArr: { date: string; ratio: number }[] = [];
-                  Object.values(events.splits).forEach((s: any) => {
-                    if (s.numerator && s.denominator) {
-                      const d = new Date(s.date * 1000);
-                      const dateStr = d.toISOString().slice(0, 10);
-                      splitsArr.push({ date: dateStr, ratio: s.numerator / s.denominator });
-                    }
-                  });
-                  if (splitsArr.length > 0) {
-                    splitsArr.sort((a, b) => a.date.localeCompare(b.date));
-                    const existingCfg = this.tickerConfigs()[originalTicker];
-                    if (!existingCfg?.splits || JSON.stringify(existingCfg.splits) !== JSON.stringify(splitsArr)) {
-                      this.tickerConfigs.update(p => ({
-                        ...p,
-                        [originalTicker]: { ...(p[originalTicker] || {}), splits: splitsArr }
-                      }));
-                    }
-                  }
-                }
-
-                const current = meta[originalTicker] || {};
-                const finalSector = current.sector || 'Other';
-                const finalName = chartMeta.longName || chartMeta.shortName || current.name || originalTicker;
-                const finalLogo = current.logoData;
-                this.updateTickerConfig(originalTicker, price, finalSector, finalName, currency, finalLogo);
-                bulkUpdatedSet.add(originalTicker);
-                updatedCount++;
-                consecutiveErrors = 0;
-                return;
-              }
-            }
-          }
-
-          // If proxy failed / returned error, register consecutive error
-          consecutiveErrors++;
-          if (consecutiveErrors >= 2) {
-            circuitBreakerTripped = true;
-          }
-        } catch (e) {
-          consecutiveErrors++;
-          if (consecutiveErrors >= 2) {
-            circuitBreakerTripped = true;
-          }
-        }
-      };
-
-      // Fetch symbols with early abort on circuit breaker (only for symbols not updated by bulk batch)
-      const remainingEntries = Array.from(symbolMap.entries()).filter(
-        ([_, original]) => !bulkUpdatedSet.has(original)
-      );
-
-      if (remainingEntries.length > 0 && !circuitBreakerTripped) {
-        await this.runConcurrent(
-          remainingEntries,
-          ([resolved, original]) => fetchViaChart(resolved, original),
-          2,
-          150,
-          () => circuitBreakerTripped
-        );
       }
 
       if (updatedCount === 0 && !silent) {
