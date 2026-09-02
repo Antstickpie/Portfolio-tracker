@@ -529,7 +529,7 @@
       </div>
 
       <!-- P/E Ratio Valuation Breakdown Card -->
-      <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
+      <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none; display: flex; flex-direction: column; min-height: 400px; box-sizing: border-box;">
         <div class="chart-card-header">
           <h3>P/E Valuation Allocation</h3>
           <span style="font-size: 0.72rem; font-weight: 600; color: var(--primary); background: rgba(99,102,241,0.12); padding: 0.2rem 0.55rem; border-radius: 20px; border: 1px solid rgba(99,102,241,0.25);">
@@ -575,9 +575,9 @@
           </div>
         </div>
 
-        <div style="padding: 0.25rem 0.5rem; display: flex; flex-direction: column; gap: 0.75rem; height: 100%; justify-content: space-between;">
+        <div style="padding: 0.2rem 0; display: flex; flex-direction: column; gap: 0.75rem; flex: 1; min-height: 0;">
           <!-- Segmented multi-colored bar -->
-          <div style="width: 100%; height: 16px; border-radius: 8px; overflow: hidden; display: flex; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+          <div style="width: 100%; height: 18px; border-radius: 9px; overflow: hidden; display: flex; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
             <div 
               *ngFor="let tier of peDistributionData(); let idx = index" 
               [style.width.%]="tier.pct"
@@ -591,24 +591,24 @@
           </div>
 
           <!-- List of tiers with stats -->
-          <div style="display: flex; flex-direction: column; gap: 0.4rem; overflow-y: auto; max-height: 250px; padding-right: 2px;">
+          <div style="display: flex; flex-direction: column; gap: 0.4rem; overflow-y: auto; flex: 1; max-height: 290px; padding-right: 4px;">
             <div 
               *ngFor="let tier of peDistributionData(); let idx = index"
               (mouseenter)="hoveredPeIndex.set(idx)"
               (mouseleave)="hoveredPeIndex.set(-1)"
-              style="display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s;"
+              style="display: flex; align-items: center; justify-content: space-between; padding: 0.45rem 0.65rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s;"
               [style.background]="hoveredPeIndex() === idx ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'"
               [style.borderColor]="hoveredPeIndex() === idx ? tier.color : 'rgba(255,255,255,0.04)'">
               
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;" [style.background-color]="tier.color"></span>
-                <div style="display: flex; flex-direction: column;">
-                  <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">{{ tier.label }}</span>
-                  <span style="font-size: 0.68rem; color: var(--text-muted);">{{ tier.desc }}</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;" [style.background-color]="tier.color"></span>
+                <div style="display: flex; flex-direction: column; min-width: 0;">
+                  <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ tier.label }}</span>
+                  <span style="font-size: 0.68rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ tier.desc }}</span>
                 </div>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 0.75rem; text-align: right;">
+              <div style="display: flex; align-items: center; gap: 0.6rem; text-align: right; flex-shrink: 0;">
                 <span style="font-size: 0.72rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">{{ tier.stockCount }} {{ tier.stockCount === 1 ? 'stock' : 'stocks' }}</span>
                 <div style="display: flex; flex-direction: column; align-items: flex-end; min-width: 65px;">
                   <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); font-family: monospace;">{{ tier.pct | number:'1.1-1' }}%</span>
