@@ -555,6 +555,48 @@ export class PricesComponent {
     }
   }
 
+  public getPeStops(): number[] {
+    const stops = this.service.peThresholds();
+    return stops && stops.length > 0 ? stops : [15, 25, 40];
+  }
+
+  public onPeStopChange(index: number, val: number) {
+    const stops = [...this.getPeStops()];
+    const num = Number(val);
+    if (!isNaN(num) && num > 0) {
+      stops[index] = num;
+      stops.sort((a, b) => a - b);
+      this.service.peThresholds.set(stops);
+      this.service.saveToStorage();
+    }
+  }
+
+  public addPeStop() {
+    const stops = [...this.getPeStops()];
+    if (stops.length >= 6) return;
+    const last = stops[stops.length - 1] || 40;
+    stops.push(last + 15);
+    stops.sort((a, b) => a - b);
+    this.service.peThresholds.set(stops);
+    this.service.saveToStorage();
+    this.service.showToast('Added P/E valuation stop', 'success');
+  }
+
+  public removePeStop(index: number) {
+    const stops = [...this.getPeStops()];
+    if (stops.length <= 2) return;
+    stops.splice(index, 1);
+    this.service.peThresholds.set(stops);
+    this.service.saveToStorage();
+    this.service.showToast('Removed P/E valuation stop', 'info');
+  }
+
+  public resetPeStopsToDefault() {
+    this.service.peThresholds.set([15, 25, 40]);
+    this.service.saveToStorage();
+    this.service.showToast('Reset P/E stops to general defaults (15, 25, 40)', 'info');
+  }
+
 
   public formatSyncTime(timestamp: number): string {
     const diff = Date.now() - timestamp;

@@ -1019,7 +1019,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   public hoveredPeIndex = signal<number>(-1);
 
-  // Pre-calculate P/E Ratio distribution breakdown across general investing brackets
+  // Pre-calculate P/E Ratio distribution breakdown across custom / general investing brackets
   public peDistributionData = computed(() => {
     const s = this.summary();
     const isCost = this.allocationBasis() === 'cost';
@@ -1031,14 +1031,66 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const rate = this.service.getExchangeRate('USD', targetCurr);
     const symbol = this.service.getCurrencySymbol(targetCurr);
 
-    const brackets = [
-      { id: 'deep_value', label: 'Value (0 – 15x)', shortLabel: '0–15x', color: '#10b981', desc: 'Low P/E value & mature stocks' },
-      { id: 'fair_value', label: 'Fair Value (15 – 25x)', shortLabel: '15–25x', color: '#3b82f6', desc: 'Broad market average & steady compounders' },
-      { id: 'growth', label: 'Growth (25 – 40x)', shortLabel: '25–40x', color: '#f59e0b', desc: 'Premium & quality growth leaders' },
-      { id: 'high_growth', label: 'High Growth (> 40x)', shortLabel: '>40x', color: '#a855f7', desc: 'Hyper-growth & high multiples' },
-      { id: 'negative', label: 'Loss-Making (≤ 0x)', shortLabel: '≤0x', color: '#f43f5e', desc: 'Negative earnings & turnarounds' },
-      { id: 'unclassified', label: 'No P/E / ETF / N/A', shortLabel: 'N/A', color: '#64748b', desc: 'ETFs, funds, or unassigned' }
-    ];
+    const rawStops = this.service.peThresholds();
+    const stops = (rawStops && rawStops.length > 0 ? rawStops : [15, 25, 40])
+      .map(Number)
+      .filter(n => !isNaN(n) && n > 0)
+      .sort((a, b) => a - b);
+
+    // Color palette for dynamic tiers
+    const palette = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+    const brackets: { id: string; label: string; shortLabel: string; color: string; desc: string; min: number | null; max: number | null }[] = [];
+
+    // Negative / Loss-making
+    brackets.push({
+      id: 'negative',
+      label: 'Loss-Making (≤ 0x)',
+      shortLabel: '≤0x',
+      color: '#f43f5e',
+      desc: 'Negative earnings & turnarounds',
+      min: -Infinity,
+      max: 0
+    });
+
+    // Dynamic positive tiers from stops
+    let prev = 0;
+    stops.forEach((stop, i) => {
+      const color = palette[i % palette.length];
+      brackets.push({
+        id: `tier_${i}`,
+        label: `${prev} – ${stop}x`,
+        shortLabel: `${prev}–${stop}x`,
+        color,
+        desc: i === 0 ? 'Low P/E Value stocks' : (i === stops.length - 1 ? 'Premium / Growth stocks' : 'Moderate valuation'),
+        min: prev,
+        max: stop
+      });
+      prev = stop;
+    });
+
+    // Final > highest stop tier
+    const lastColor = palette[stops.length % palette.length] || '#a855f7';
+    brackets.push({
+      id: `tier_high`,
+      label: `> ${prev}x`,
+      shortLabel: `>${prev}x`,
+      color: lastColor,
+      desc: 'High growth & high multiples',
+      min: prev,
+      max: Infinity
+    });
+
+    // Unclassified / ETF / No PE
+    brackets.push({
+      id: 'unclassified',
+      label: 'No P/E / ETF / N/A',
+      shortLabel: 'N/A',
+      color: '#64748b',
+      desc: 'ETFs, funds, or unassigned',
+      min: null,
+      max: null
+    });
 
     const bracketMap = new Map<string, {
       id: string;
@@ -1046,6 +1098,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       shortLabel: string;
       color: string;
       desc: string;
+      min: number | null;
+      max: number | null;
       value: number;
       stockCount: number;
       stocks: { ticker: string; pe: number | null; peFormatted: string; value: number; valueFormatted: string; pct: number; isGain: boolean; returnPct: number }[];
@@ -1053,11 +1107,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     brackets.forEach(b => {
       bracketMap.set(b.id, {
-        id: b.id,
-        label: b.label,
-        shortLabel: b.shortLabel,
-        color: b.color,
-        desc: b.desc,
+        ...b,
         value: 0,
         stockCount: 0,
         stocks: []
@@ -1073,18 +1123,22 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (pe !== null && typeof pe === 'number' && !isNaN(pe)) {
         if (pe <= 0) {
           targetBracketId = 'negative';
-        } else if (pe <= 15) {
-          targetBracketId = 'deep_value';
-        } else if (pe <= 25) {
-          targetBracketId = 'fair_value';
-        } else if (pe <= 40) {
-          targetBracketId = 'growth';
         } else {
-          targetBracketId = 'high_growth';
+          for (let i = 0; i < stops.length; i++) {
+            const low = i === 0 ? 0 : stops[i - 1];
+            const high = stops[i];
+            if (pe > low && pe <= high) {
+              targetBracketId = `tier_${i}`;
+              break;
+            }
+          }
+          if (targetBracketId === 'unclassified' && pe > stops[stops.length - 1]) {
+            targetBracketId = 'tier_high';
+          }
         }
       }
 
-      const b = bracketMap.get(targetBracketId)!;
+      const b = bracketMap.get(targetBracketId) || bracketMap.get('unclassified')!;
       b.value += val;
       b.stockCount += 1;
       const posReturnPct = pos.unrealizedReturnPct || 0;

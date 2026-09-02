@@ -357,6 +357,7 @@ export class PortfolioService {
   public showNameRealized = signal<boolean>(false);
   public showNameTransactions = signal<boolean>(false);
   public showPeRatio = signal<boolean>(true);
+  public peThresholds = signal<number[]>([15, 25, 40]);
 
   constructor() {
     this.loadFromStorage();
@@ -641,6 +642,16 @@ export class PortfolioService {
         this.showPeRatio.set(true);
       }
 
+      const savedPeStops = localStorage.getItem('pt_pe_thresholds');
+      if (savedPeStops) {
+        try {
+          const parsed = JSON.parse(savedPeStops);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.peThresholds.set(parsed.map(Number).filter(n => !isNaN(n) && n > 0).sort((a, b) => a - b));
+          }
+        } catch (e) {}
+      }
+
       const savedRates = localStorage.getItem('pt_exchange_rates');
       if (savedRates) {
         this.exchangeRates.set(JSON.parse(savedRates));
@@ -803,6 +814,7 @@ export class PortfolioService {
     localStorage.setItem('pt_show_name_realized', this.showNameRealized().toString());
     localStorage.setItem('pt_show_name_transactions', this.showNameTransactions().toString());
     localStorage.setItem('pt_show_pe_ratio', this.showPeRatio().toString());
+    localStorage.setItem('pt_pe_thresholds', JSON.stringify(this.peThresholds()));
     localStorage.setItem('pt_db_version', '2.0');
 
     localStorage.setItem('pt_google_client_id', this.googleClientId());
@@ -2754,6 +2766,7 @@ export class PortfolioService {
     if (remoteData.showNameRealized !== undefined) this.showNameRealized.set(remoteData.showNameRealized);
     if (remoteData.showNameTransactions !== undefined) this.showNameTransactions.set(remoteData.showNameTransactions);
     if (remoteData.showPeRatio !== undefined) this.showPeRatio.set(remoteData.showPeRatio);
+    if (remoteData.peThresholds && Array.isArray(remoteData.peThresholds)) this.peThresholds.set(remoteData.peThresholds);
     if (remoteData.exchangeRates) this.exchangeRates.set(remoteData.exchangeRates);
     if (remoteData.useProperSectors !== undefined) this.useProperSectors.set(remoteData.useProperSectors);
     if (remoteData.historicalPrices) {
@@ -2830,6 +2843,7 @@ export class PortfolioService {
       showNameRealized: this.showNameRealized(),
       showNameTransactions: this.showNameTransactions(),
       showPeRatio: this.showPeRatio(),
+      peThresholds: this.peThresholds(),
       exchangeRates: this.exchangeRates(),
       historicalPrices: this.historicalPrices(),
       simulatedTransactions: this.simulatedTransactions(),

@@ -356,6 +356,50 @@
           Calculates estimated net return after tax on profits exceeding annual exemption.
         </p>
       </div>
+
+      <!-- Card D: Custom P/E Valuation Stops -->
+      <div class="glass-card setting-box">
+        <div class="box-header">
+          <h3 style="margin: 0;">📊 P/E Valuation Thresholds</h3>
+          <p class="subtitle" style="margin: 0.1rem 0 0 0;">Custom stops for P/E ratio tiers.</p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.2rem;">
+          <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+            <div *ngFor="let stop of getPeStops(); let i = index" style="display: flex; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.2rem 0.4rem; gap: 0.25rem;">
+              <span style="font-size: 0.7rem; color: var(--text-muted);">S{{ i + 1 }}:</span>
+              <input
+                type="number"
+                step="1"
+                [ngModel]="stop"
+                (ngModelChange)="onPeStopChange(i, $event)"
+                style="width: 38px; background: transparent; border: none; color: var(--primary); font-weight: bold; font-size: 0.8rem; text-align: center; outline: none;">
+              <span style="font-size: 0.68rem; color: var(--text-muted);">x</span>
+              <button 
+                *ngIf="getPeStops().length > 2"
+                (click)="removePeStop(i)" 
+                style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.75rem; padding: 0 0.1rem;" 
+                title="Remove stop">✕</button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: auto; padding-top: 0.3rem;">
+            <button 
+              class="btn btn-secondary btn-xs" 
+              (click)="addPeStop()" 
+              [disabled]="getPeStops().length >= 6"
+              title="Add another threshold stop">
+              + Add Stop
+            </button>
+            <button 
+              class="btn btn-secondary btn-xs" 
+              (click)="resetPeStopsToDefault()" 
+              title="Reset stops to general investing defaults (15, 25, 40)">
+              ↺ Reset (15, 25, 40)
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
