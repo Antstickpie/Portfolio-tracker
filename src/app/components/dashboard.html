@@ -528,13 +528,10 @@
         </div>
       </div>
 
-      <!-- P/E Ratio Valuation Breakdown Card -->
-      <div class="glass-card chart-card pe-valuation-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none; display: flex; flex-direction: column; min-height: 420px; box-sizing: border-box; padding-bottom: 1.25rem !important;">
-        <div class="chart-card-header" style="flex-shrink: 0; margin-bottom: 0.6rem;">
+      <!-- P/E Ratio Valuation Breakdown Donut Pie Chart -->
+      <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
+        <div class="chart-card-header">
           <h3>P/E Valuation Allocation</h3>
-          <span style="font-size: 0.72rem; font-weight: 600; color: var(--primary); background: rgba(99,102,241,0.12); padding: 0.2rem 0.55rem; border-radius: 20px; border: 1px solid rgba(99,102,241,0.25);">
-            {{ peDistributionData().length }} {{ peDistributionData().length === 1 ? 'Tier' : 'Tiers' }}
-          </span>
         </div>
 
         <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
@@ -544,7 +541,7 @@
           </div>
         </div>
 
-        <!-- Hover overlay for stocks in hovered P/E range -->
+        <!-- Beautiful glassmorphic overlay for P/E stocks breakdown on hover -->
         <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredPeIndex() !== -1 && hoveredPeStocks().length > 0">
           <div class="overlay-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <div style="display: flex; align-items: center; gap: 0.4rem;">
@@ -554,14 +551,14 @@
             <div style="font-weight: 600; font-size: 0.82rem; color: var(--text-main); white-space: nowrap; margin-left: 0.5rem;">
               {{ peDistributionData()[hoveredPeIndex()].totalFormatted }}
               <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 0.2rem;">
-                ({{ peDistributionData()[hoveredPeIndex()].pct | number:'1.0-1' }}% of portfolio)
+                ({{ peDistributionData()[hoveredPeIndex()].pct | number:'1.0-1' }}%)
               </span>
             </div>
           </div>
           <div class="overlay-item" *ngFor="let stock of hoveredPeStocks()" style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; padding: 0.2rem 0;">
-            <div style="display: flex; align-items: center; gap: 0.3rem; min-width: 100px;">
+            <div style="display: flex; align-items: center; gap: 0.3rem; min-width: 90px;">
               <span class="stock-symbol" style="width: auto; font-weight: 700;">{{ stock.ticker }}</span>
-              <span style="font-size: 0.68rem; font-weight: 600; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px; font-family: monospace;">
+              <span style="font-size: 0.68rem; font-weight: 600;" [ngClass]="stock.isGain ? 'text-success' : 'text-danger'">
                 {{ stock.peFormatted }}
               </span>
             </div>
@@ -575,47 +572,9 @@
           </div>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 0.6rem; flex: 1; min-height: 0;">
-          <!-- Segmented multi-colored bar -->
-          <div style="width: 100%; height: 18px; border-radius: 9px; overflow: hidden; display: flex; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
-            <div 
-              *ngFor="let tier of peDistributionData(); let idx = index" 
-              [style.width.%]="tier.pct"
-              [style.background-color]="tier.color"
-              [title]="tier.label + ': ' + tier.pct + '% (' + tier.totalFormatted + ')'"
-              (mouseenter)="hoveredPeIndex.set(idx)"
-              (mouseleave)="hoveredPeIndex.set(-1)"
-              style="height: 100%; transition: opacity 0.2s; cursor: pointer;"
-              [style.opacity]="hoveredPeIndex() === -1 || hoveredPeIndex() === idx ? 1 : 0.35">
-            </div>
-          </div>
-
-          <!-- List of tiers with stats -->
-          <div style="display: flex; flex-direction: column; gap: 0.35rem; overflow-y: auto; flex: 1; min-height: 0; padding-right: 4px; padding-bottom: 0.8rem;">
-            <div 
-              *ngFor="let tier of peDistributionData(); let idx = index"
-              (mouseenter)="hoveredPeIndex.set(idx)"
-              (mouseleave)="hoveredPeIndex.set(-1)"
-              style="display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s; flex-shrink: 0;"
-              [style.background]="hoveredPeIndex() === idx ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'"
-              [style.borderColor]="hoveredPeIndex() === idx ? tier.color : 'rgba(255,255,255,0.04)'">
-              
-              <div style="display: flex; align-items: center; gap: 0.45rem; min-width: 0;">
-                <span style="width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0;" [style.background-color]="tier.color"></span>
-                <div style="display: flex; flex-direction: column; min-width: 0;">
-                  <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ tier.label }}</span>
-                  <span style="font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ tier.desc }}</span>
-                </div>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 0.5rem; text-align: right; flex-shrink: 0;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 4px;">{{ tier.stockCount }} {{ tier.stockCount === 1 ? 'stock' : 'stocks' }}</span>
-                <div style="display: flex; flex-direction: column; align-items: flex-end; min-width: 60px;">
-                  <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); font-family: monospace;">{{ tier.pct | number:'1.1-1' }}%</span>
-                  <span style="font-size: 0.65rem; color: var(--text-muted); font-family: monospace;">{{ tier.totalFormatted }}</span>
-                </div>
-              </div>
-            </div>
+        <div class="chart-content">
+          <div class="canvas-wrapper">
+            <canvas #peCanvas width="460" height="320"></canvas>
           </div>
         </div>
       </div>

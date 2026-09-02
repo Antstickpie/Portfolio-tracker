@@ -24,7 +24,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   onResize() {
     const assetData = this.assetChartData();
     const sectorData = this.sectorChartData();
-    this.drawCharts(assetData, sectorData);
+    const peData = this.peDistributionData();
+    this.drawCharts(assetData, sectorData, peData);
   }
 
   public service = inject(PortfolioService);
@@ -34,6 +35,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chartSvg') chartSvg!: ElementRef<SVGElement>;
   @ViewChild('assetCanvas') assetCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('sectorCanvas') sectorCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('peCanvas') peCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('tableCard') tableCard!: ElementRef<HTMLElement>;
   @ViewChild('realizedTableCard') realizedTableCard!: ElementRef<HTMLElement>;
 
@@ -1349,6 +1351,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       const assetData = this.assetChartData();
       const sectorData = this.sectorChartData();
+      const peData = this.peDistributionData();
       
       this.service.dateFrom(); // Re-draw when date filter changes
       this.service.dateTo();
@@ -1360,7 +1363,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       
       // Wait a tick for DOM updates
       setTimeout(() => {
-        this.drawCharts(assetData, sectorData);
+        this.drawCharts(assetData, sectorData, peData);
         this.updateHistoryChartData();
       }, 50);
     });
@@ -1504,7 +1507,16 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       attachHoverListener(this.sectorCanvas, () => this.sectorChartData(), (idx) => {
         if (this.hoveredSectorIndex() !== idx) {
           this.hoveredSectorIndex.set(idx);
-          this.drawCharts(this.assetChartData(), this.sectorChartData());
+          this.drawCharts(this.assetChartData(), this.sectorChartData(), this.peDistributionData());
+        }
+      });
+    }
+
+    if (this.peCanvas) {
+      attachHoverListener(this.peCanvas, () => this.peDistributionData(), (idx) => {
+        if (this.hoveredPeIndex() !== idx) {
+          this.hoveredPeIndex.set(idx);
+          this.drawCharts(this.assetChartData(), this.sectorChartData(), this.peDistributionData());
         }
       });
     }
@@ -1658,7 +1670,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   // Pure canvas chart painting
   private drawCharts(
     assets: { label: string; value: number; pct: number }[],
-    sectors: { label: string; value: number; pct: number }[]
+    sectors: { label: string; value: number; pct: number }[],
+    peTiers: any[] = this.peDistributionData()
   ) {
     const isBoth = this.allocationBasis() === 'both';
     const baselineAssets = isBoth ? this.investedAssetChartData() : [];
@@ -1666,6 +1679,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     this.drawDonutChart(this.assetCanvas, assets, baselineAssets, 'Assets');
     this.drawDonutChart(this.sectorCanvas, sectors, baselineSectors, 'Sectors');
+    this.drawDonutChart(this.peCanvas, peTiers, [], 'P/E Tiers');
   }
 
   private drawDonutChart(
@@ -1719,7 +1733,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const hoveredIdx = centerText === 'Assets' ? this.hoveredAssetIndex() : this.hoveredSectorIndex();
+    const hoveredIdx = centerText === 'Assets' ? this.hoveredAssetIndex() : (centerText === 'Sectors' ? this.hoveredSectorIndex() : this.hoveredPeIndex());
     const usedYRight: number[] = [];
     const usedYLeft: number[] = [];
     const isLight = this.service.theme() === 'light';
@@ -1739,7 +1753,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, (innerOuterR + innerInnerR) / 2, startAngleBase, endAngle);
-        ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
+        ctx.strokeStyle = (item as any).color || this.getColor(centerText === 'Assets' ? index : index + 5);
         ctx.globalAlpha = isHovered ? 0.75 : 0.35;
         ctx.lineWidth = strokeWidthBase;
         ctx.stroke();
@@ -1764,7 +1778,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       ctx.save();
       ctx.beginPath();
       ctx.arc(cx, cy, (outerR + outerInnerR) / 2, startAngle, endAngle);
-      ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
+      ctx.strokeStyle = (item as any).color || this.getColor(centerText === 'Assets' ? index : (centerText === 'Sectors' ? index + 5 : index + 10));
       ctx.lineWidth = isHovered ? strokeWidthOuter + 4 : strokeWidthOuter;
       ctx.lineCap = 'butt';
       ctx.stroke();
