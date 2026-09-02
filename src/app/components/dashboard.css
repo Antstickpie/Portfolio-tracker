@@ -212,10 +212,10 @@
 .text-danger { color: var(--danger); }
 .text-accent { color: var(--primary); }
 
-/* Charts Layout (Side-by-side on desktop > 800px, 1 pie per row on <= 800px) */
+/* Charts Layout (Flexible responsive grid for Asset, Sector, and P/E valuation) */
 .charts-row {
   display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
   gap: 0.75rem !important;
   width: 100% !important;
   margin-bottom: 0;

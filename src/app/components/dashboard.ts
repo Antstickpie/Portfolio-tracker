@@ -1017,6 +1017,115 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     return sectors.sort((a, b) => b.value - a.value);
   });
 
+  public hoveredPeIndex = signal<number>(-1);
+
+  // Pre-calculate P/E Ratio distribution breakdown across general investing brackets
+  public peDistributionData = computed(() => {
+    const s = this.summary();
+    const isCost = this.allocationBasis() === 'cost';
+    const total = isCost ? s.totalCostBasis : s.totalValue;
+    if (total === 0) return [];
+
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const rate = this.service.getExchangeRate('USD', targetCurr);
+    const symbol = this.service.getCurrencySymbol(targetCurr);
+
+    const brackets = [
+      { id: 'deep_value', label: 'Value (0 – 15x)', shortLabel: '0–15x', color: '#10b981', desc: 'Low P/E value & mature stocks' },
+      { id: 'fair_value', label: 'Fair Value (15 – 25x)', shortLabel: '15–25x', color: '#3b82f6', desc: 'Broad market average & steady compounders' },
+      { id: 'growth', label: 'Growth (25 – 40x)', shortLabel: '25–40x', color: '#f59e0b', desc: 'Premium & quality growth leaders' },
+      { id: 'high_growth', label: 'High Growth (> 40x)', shortLabel: '>40x', color: '#a855f7', desc: 'Hyper-growth & high multiples' },
+      { id: 'negative', label: 'Loss-Making (≤ 0x)', shortLabel: '≤0x', color: '#f43f5e', desc: 'Negative earnings & turnarounds' },
+      { id: 'unclassified', label: 'No P/E / ETF / N/A', shortLabel: 'N/A', color: '#64748b', desc: 'ETFs, funds, or unassigned' }
+    ];
+
+    const bracketMap = new Map<string, {
+      id: string;
+      label: string;
+      shortLabel: string;
+      color: string;
+      desc: string;
+      value: number;
+      stockCount: number;
+      stocks: { ticker: string; pe: number | null; peFormatted: string; value: number; valueFormatted: string; pct: number; isGain: boolean; returnPct: number }[];
+    }>();
+
+    brackets.forEach(b => {
+      bracketMap.set(b.id, {
+        id: b.id,
+        label: b.label,
+        shortLabel: b.shortLabel,
+        color: b.color,
+        desc: b.desc,
+        value: 0,
+        stockCount: 0,
+        stocks: []
+      });
+    });
+
+    s.positions.forEach((pos: PortfolioPosition) => {
+      const val = isCost ? pos.totalCost : pos.currentValue;
+      if (val <= 0) return;
+      const pe = this.service.getTickerPe(pos.ticker);
+
+      let targetBracketId = 'unclassified';
+      if (pe !== null && typeof pe === 'number' && !isNaN(pe)) {
+        if (pe <= 0) {
+          targetBracketId = 'negative';
+        } else if (pe <= 15) {
+          targetBracketId = 'deep_value';
+        } else if (pe <= 25) {
+          targetBracketId = 'fair_value';
+        } else if (pe <= 40) {
+          targetBracketId = 'growth';
+        } else {
+          targetBracketId = 'high_growth';
+        }
+      }
+
+      const b = bracketMap.get(targetBracketId)!;
+      b.value += val;
+      b.stockCount += 1;
+      const posReturnPct = pos.unrealizedReturnPct || 0;
+      b.stocks.push({
+        ticker: pos.ticker,
+        pe: pe,
+        peFormatted: pe !== null ? `${this.service.formatNumber(pe, 1)}x` : 'N/A',
+        value: val,
+        valueFormatted: symbol + Math.round(val * rate).toLocaleString(),
+        pct: 0,
+        isGain: posReturnPct >= 0,
+        returnPct: Math.abs(posReturnPct)
+      });
+    });
+
+    const result: any[] = [];
+    bracketMap.forEach(b => {
+      if (b.value > 0 || b.stockCount > 0) {
+        const pct = (b.value / total) * 100;
+        b.stocks.forEach(st => {
+          st.pct = b.value > 0 ? (st.value / b.value) * 100 : 0;
+        });
+        b.stocks.sort((a, b) => b.value - a.value);
+        result.push({
+          ...b,
+          pct: parseFloat(pct.toFixed(1)),
+          totalFormatted: symbol + Math.round(b.value * rate).toLocaleString()
+        });
+      }
+    });
+
+    return result;
+  });
+
+  public hoveredPeStocks = computed(() => {
+    const idx = this.hoveredPeIndex();
+    const data = this.peDistributionData();
+    if (idx === -1 || !data[idx]) return [];
+    return data[idx].stocks || [];
+  });
+
   // Compute details of the hovered asset stock
   public hoveredAssetDetail = computed(() => {
     const idx = this.hoveredAssetIndex();

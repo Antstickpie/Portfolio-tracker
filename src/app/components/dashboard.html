@@ -527,6 +527,98 @@
           </div>
         </div>
       </div>
+
+      <!-- P/E Ratio Valuation Breakdown Card -->
+      <div class="glass-card chart-card" style="position: relative; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); box-shadow: none;">
+        <div class="chart-card-header">
+          <h3>P/E Valuation Allocation</h3>
+          <span style="font-size: 0.72rem; font-weight: 600; color: var(--primary); background: rgba(99,102,241,0.12); padding: 0.2rem 0.55rem; border-radius: 20px; border: 1px solid rgba(99,102,241,0.25);">
+            {{ peDistributionData().length }} {{ peDistributionData().length === 1 ? 'Tier' : 'Tiers' }}
+          </span>
+        </div>
+
+        <div *ngIf="service.isPastPeriodActive()" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+          <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.4rem;">Not Applicable</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 250px; padding: 0 1rem; line-height: 1.4;">
+            P/E analysis is only applicable for active periods.
+          </div>
+        </div>
+
+        <!-- Hover overlay for stocks in hovered P/E range -->
+        <div class="sector-hover-overlay animate-fade-in" *ngIf="hoveredPeIndex() !== -1 && hoveredPeStocks().length > 0">
+          <div class="overlay-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span class="overlay-dot" [style.background-color]="peDistributionData()[hoveredPeIndex()].color"></span>
+              <span class="overlay-title">{{ peDistributionData()[hoveredPeIndex()].label }}</span>
+            </div>
+            <div style="font-weight: 600; font-size: 0.82rem; color: var(--text-main); white-space: nowrap; margin-left: 0.5rem;">
+              {{ peDistributionData()[hoveredPeIndex()].totalFormatted }}
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 0.2rem;">
+                ({{ peDistributionData()[hoveredPeIndex()].pct | number:'1.0-1' }}% of portfolio)
+              </span>
+            </div>
+          </div>
+          <div class="overlay-item" *ngFor="let stock of hoveredPeStocks()" style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; padding: 0.2rem 0;">
+            <div style="display: flex; align-items: center; gap: 0.3rem; min-width: 100px;">
+              <span class="stock-symbol" style="width: auto; font-weight: 700;">{{ stock.ticker }}</span>
+              <span style="font-size: 0.68rem; font-weight: 600; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px; font-family: monospace;">
+                {{ stock.peFormatted }}
+              </span>
+            </div>
+            <div class="progress-track" style="flex: 1; min-width: 25px;">
+              <span class="progress-fill" [style.width.%]="stock.pct" [style.background-color]="peDistributionData()[hoveredPeIndex()].color"></span>
+            </div>
+            <span class="stock-pct" style="width: auto; font-size: 0.7rem;">{{ stock.pct | number:'1.0-0' }}%</span>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; font-family: 'Consolas', monospace; font-size: 0.72rem; line-height: 1.25; text-align: right; margin-left: 0.2rem;">
+              <span style="color: var(--text-main); font-weight: 600;">{{ stock.valueFormatted }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding: 0.25rem 0.5rem; display: flex; flex-direction: column; gap: 0.75rem; height: 100%; justify-content: space-between;">
+          <!-- Segmented multi-colored bar -->
+          <div style="width: 100%; height: 16px; border-radius: 8px; overflow: hidden; display: flex; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+            <div 
+              *ngFor="let tier of peDistributionData(); let idx = index" 
+              [style.width.%]="tier.pct"
+              [style.background-color]="tier.color"
+              [title]="tier.label + ': ' + tier.pct + '% (' + tier.totalFormatted + ')'"
+              (mouseenter)="hoveredPeIndex.set(idx)"
+              (mouseleave)="hoveredPeIndex.set(-1)"
+              style="height: 100%; transition: opacity 0.2s; cursor: pointer;"
+              [style.opacity]="hoveredPeIndex() === -1 || hoveredPeIndex() === idx ? 1 : 0.35">
+            </div>
+          </div>
+
+          <!-- List of tiers with stats -->
+          <div style="display: flex; flex-direction: column; gap: 0.4rem; overflow-y: auto; max-height: 250px; padding-right: 2px;">
+            <div 
+              *ngFor="let tier of peDistributionData(); let idx = index"
+              (mouseenter)="hoveredPeIndex.set(idx)"
+              (mouseleave)="hoveredPeIndex.set(-1)"
+              style="display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s;"
+              [style.background]="hoveredPeIndex() === idx ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'"
+              [style.borderColor]="hoveredPeIndex() === idx ? tier.color : 'rgba(255,255,255,0.04)'">
+              
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;" [style.background-color]="tier.color"></span>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">{{ tier.label }}</span>
+                  <span style="font-size: 0.68rem; color: var(--text-muted);">{{ tier.desc }}</span>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.75rem; text-align: right;">
+                <span style="font-size: 0.72rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">{{ tier.stockCount }} {{ tier.stockCount === 1 ? 'stock' : 'stocks' }}</span>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; min-width: 65px;">
+                  <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); font-family: monospace;">{{ tier.pct | number:'1.1-1' }}%</span>
+                  <span style="font-size: 0.68rem; color: var(--text-muted); font-family: monospace;">{{ tier.totalFormatted }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -546,6 +638,14 @@
             (ngModelChange)="service.showNameHoldings.set($event); service.saveToStorage()" 
             style="cursor: pointer; accent-color: var(--primary);">
           Show Company Name
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+          <input 
+            type="checkbox" 
+            [ngModel]="service.showPeRatio()" 
+            (ngModelChange)="service.showPeRatio.set($event); service.saveToStorage()" 
+            style="cursor: pointer; accent-color: var(--primary);">
+          Show P/E Ratio
         </label>
         <input 
           type="text" 
@@ -621,16 +721,21 @@
             <td class="text-muted text-sm truncate-cell" *ngIf="service.showNameHoldings()">{{ pos.name }}</td>
             <td class="bold-ticker">
               <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <img 
-                  [src]="service.getLogoData(pos.ticker)" 
-                  (error)="service.onLogoError(pos.ticker)"
-                  style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
-                  *ngIf="service.hasLogo(pos.ticker) && !service.shouldShowPlaceholder(pos.ticker)">
-                <div 
-                  *ngIf="service.hasLogo(pos.ticker) && service.shouldShowPlaceholder(pos.ticker)"
-                  [style.background]="service.getTickerColor(pos.ticker)"
-                  style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
-                  {{ pos.ticker.slice(0, 2) }}
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 24px; gap: 1px;">
+                  <img 
+                    [src]="service.getLogoData(pos.ticker)" 
+                    (error)="service.onLogoError(pos.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                    *ngIf="service.hasLogo(pos.ticker) && !service.shouldShowPlaceholder(pos.ticker)">
+                  <div 
+                    *ngIf="service.hasLogo(pos.ticker) && service.shouldShowPlaceholder(pos.ticker)"
+                    [style.background]="service.getTickerColor(pos.ticker)"
+                    style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                    {{ pos.ticker.slice(0, 2) }}
+                  </div>
+                  <span *ngIf="service.showPeRatio()" class="pe-ratio-badge" style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600; line-height: 1; font-family: 'Consolas', monospace; margin-top: 2px;" [title]="'P/E Ratio: ' + (service.getTickerPe(pos.ticker) ? (service.formatNumber(service.getTickerPe(pos.ticker), 1) + 'x') : 'N/A')">
+                    {{ service.getTickerPe(pos.ticker) ? (service.formatNumber(service.getTickerPe(pos.ticker), 1) + 'x') : '—' }}
+                  </span>
                 </div>
                 <a href="https://www.google.com/search?q={{ pos.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google">{{ pos.ticker }}</a>
               </div>

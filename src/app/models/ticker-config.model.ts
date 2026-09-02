@@ -4,6 +4,7 @@ export interface TickerConfig {
   priceCurrency: string; // currency the currentPrice is stored in (e.g. 'USD' for SNDK, 'EUR' for SECO)
   sector: string;
   name: string;
+  pe?: number;
   logoData?: string;
   yahooSymbol?: string;
   customSector?: string;

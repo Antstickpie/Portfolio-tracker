@@ -522,6 +522,32 @@ export class PricesComponent {
     this.service.showToast(`Updated Yahoo Symbol to ${finalSymbol || 'default'} for ${ticker.toUpperCase()}`, 'success');
   }
 
+  public updateTickerPe(ticker: string, value: string) {
+    const current = this.service.tickerConfigs()[ticker.toUpperCase()] || {
+      ticker: ticker.toUpperCase(),
+      currentPrice: 0,
+      name: ticker.toUpperCase(),
+      priceCurrency: 'USD',
+      sector: 'Other'
+    };
+    const parsed = parseFloat(value);
+    const pe = !isNaN(parsed) ? parsed : undefined;
+    this.service.updateTickerConfig(
+      ticker,
+      current.currentPrice,
+      current.sector,
+      current.name,
+      current.priceCurrency,
+      current.logoData,
+      current.yahooSymbol,
+      current.customSector,
+      current.splitRatio,
+      current.splitDate,
+      pe
+    );
+    this.service.showToast(`Updated P/E ratio for ${ticker.toUpperCase()}`, 'success');
+  }
+
   public async searchYahooSymbol(ticker: string) {
     const selectedSymbol = await this.service.selectYahooSymbol(ticker);
     if (selectedSymbol) {

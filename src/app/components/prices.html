@@ -418,6 +418,7 @@
               <th style="text-align: left; min-width: 140px;">
                 Yahoo Symbol <span style="font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: normal; text-transform: none;">(override e.g. SEC0.DE)</span>
               </th>
+              <th>P/E Ratio</th>
               <th>Split Date</th>
               <th>Split Ratio</th>
               <th>Auto Splits</th>
@@ -477,6 +478,16 @@
               </td>
               <td>
                 <input
+                  type="number"
+                  step="0.1"
+                  [ngModel]="t.pe !== undefined && t.pe !== null ? t.pe : ''"
+                  (blur)="updateTickerPe(t.ticker, $any($event.target).value)"
+                  (keydown.enter)="updateTickerPe(t.ticker, $any($event.target).value); $any($event.target).blur()"
+                  placeholder="e.g. 24.5"
+                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: var(--text-main); font-size: 0.78rem; padding: 0.25rem 0.5rem; outline: none; width: 65px; text-align: center;">
+              </td>
+              <td>
+                <input
                   type="date"
                   [ngModel]="t.splitDate || ''"
                   (ngModelChange)="updateTickerSplitDate(t.ticker, $event)"
@@ -502,7 +513,7 @@
               </td>
             </tr>
             <tr *ngIf="filteredTickerConfigsList().length === 0">
-              <td [attr.colspan]="service.showNameColumn() ? 8 : 7" style="text-align: center; color: var(--text-muted); padding: 1.5rem; font-size: 0.82rem;">
+              <td [attr.colspan]="service.showNameColumn() ? 9 : 8" style="text-align: center; color: var(--text-muted); padding: 1.5rem; font-size: 0.82rem;">
                 No ticker assets found.
               </td>
             </tr>

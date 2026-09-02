@@ -356,6 +356,7 @@ export class PortfolioService {
   public showNameHoldings = signal<boolean>(false);
   public showNameRealized = signal<boolean>(false);
   public showNameTransactions = signal<boolean>(false);
+  public showPeRatio = signal<boolean>(true);
 
   constructor() {
     this.loadFromStorage();
@@ -633,6 +634,13 @@ export class PortfolioService {
       const snt = localStorage.getItem('pt_show_name_transactions');
       if (snt) this.showNameTransactions.set(snt === 'true');
 
+      const spr = localStorage.getItem('pt_show_pe_ratio');
+      if (spr !== null) {
+        this.showPeRatio.set(spr !== 'false');
+      } else {
+        this.showPeRatio.set(true);
+      }
+
       const savedRates = localStorage.getItem('pt_exchange_rates');
       if (savedRates) {
         this.exchangeRates.set(JSON.parse(savedRates));
@@ -794,6 +802,7 @@ export class PortfolioService {
     localStorage.setItem('pt_show_name_holdings', this.showNameHoldings().toString());
     localStorage.setItem('pt_show_name_realized', this.showNameRealized().toString());
     localStorage.setItem('pt_show_name_transactions', this.showNameTransactions().toString());
+    localStorage.setItem('pt_show_pe_ratio', this.showPeRatio().toString());
     localStorage.setItem('pt_db_version', '2.0');
 
     localStorage.setItem('pt_google_client_id', this.googleClientId());
@@ -1006,7 +1015,19 @@ export class PortfolioService {
     this.saveToStorage();
   }
 
-  public updateTickerConfig(ticker: string, currentPrice: number, sector: string, name: string = '', priceCurrency?: string, logoData?: string, yahooSymbol?: string, customSector?: string, splitRatio?: number, splitDate?: string) {
+  public updateTickerConfig(
+    ticker: string, 
+    currentPrice: number, 
+    sector: string, 
+    name: string = '', 
+    priceCurrency?: string, 
+    logoData?: string, 
+    yahooSymbol?: string, 
+    customSector?: string, 
+    splitRatio?: number, 
+    splitDate?: string,
+    pe?: number
+  ) {
     const cleanTicker = ticker.replace(/\..*$/, '').toUpperCase().trim();
     const finalSector = sector || 'Other';
 
@@ -1020,6 +1041,8 @@ export class PortfolioService {
     const finalYahooSymbol = yahooSymbol !== undefined ? (yahooSymbol.trim() || undefined) : existingYahooSymbol;
     const existingCustomSector = prev[ticker.toUpperCase()]?.customSector;
     const finalCustomSector = customSector !== undefined ? customSector : existingCustomSector;
+    const existingPe = prev[ticker.toUpperCase()]?.pe;
+    const finalPe = pe !== undefined ? pe : existingPe;
 
     if (finalYahooSymbol !== existingYahooSymbol) {
       const pricesObj = { ...this.historicalPrices() };
@@ -1043,6 +1066,7 @@ export class PortfolioService {
           customSector: finalCustomSector,
           splitRatio: splitRatio !== undefined ? splitRatio : p[ticker.toUpperCase()]?.splitRatio,
           splitDate: splitDate !== undefined ? splitDate : p[ticker.toUpperCase()]?.splitDate,
+          pe: finalPe,
           notFound: false,
           notFoundTime: undefined
         }
@@ -1050,6 +1074,14 @@ export class PortfolioService {
       return updated;
     });
     this.saveToStorage();
+  }
+
+  public getTickerPe(ticker: string): number | null {
+    const config = this.tickerConfigs()[ticker.toUpperCase()];
+    if (config && typeof config.pe === 'number' && !isNaN(config.pe)) {
+      return config.pe;
+    }
+    return null;
   }
 
   public markTickerNotFound(ticker: string) {
@@ -1977,6 +2009,7 @@ export class PortfolioService {
                 } else if (item?.preMarketPrice && typeof item.preMarketPrice === 'number' && item.preMarketPrice > 0) {
                   activePrice = item.preMarketPrice;
                 }
+                const peVal = typeof item?.pe === 'number' ? item.pe : (typeof item?.trailingPE === 'number' ? item.trailingPE : (typeof item?.peRatio === 'number' ? item.peRatio : (typeof item?.trailingPe === 'number' ? item.trailingPe : undefined)));
                 if (item && typeof activePrice === 'number' && activePrice > 0) {
                   const current = meta[originalTicker] || {};
                   this.updateTickerConfig(
@@ -1986,7 +2019,11 @@ export class PortfolioService {
                     item.name || current.name || originalTicker,
                     item.currency || current.priceCurrency || 'USD',
                     current.logoData,
-                    current.yahooSymbol
+                    current.yahooSymbol,
+                    current.customSector,
+                    undefined,
+                    undefined,
+                    peVal
                   );
                   updatedCount++;
                 }
@@ -2716,6 +2753,7 @@ export class PortfolioService {
     if (remoteData.showNameHoldings !== undefined) this.showNameHoldings.set(remoteData.showNameHoldings);
     if (remoteData.showNameRealized !== undefined) this.showNameRealized.set(remoteData.showNameRealized);
     if (remoteData.showNameTransactions !== undefined) this.showNameTransactions.set(remoteData.showNameTransactions);
+    if (remoteData.showPeRatio !== undefined) this.showPeRatio.set(remoteData.showPeRatio);
     if (remoteData.exchangeRates) this.exchangeRates.set(remoteData.exchangeRates);
     if (remoteData.useProperSectors !== undefined) this.useProperSectors.set(remoteData.useProperSectors);
     if (remoteData.historicalPrices) {
@@ -2791,6 +2829,7 @@ export class PortfolioService {
       showNameHoldings: this.showNameHoldings(),
       showNameRealized: this.showNameRealized(),
       showNameTransactions: this.showNameTransactions(),
+      showPeRatio: this.showPeRatio(),
       exchangeRates: this.exchangeRates(),
       historicalPrices: this.historicalPrices(),
       simulatedTransactions: this.simulatedTransactions(),
