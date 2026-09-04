@@ -114,6 +114,7 @@ export class PortfolioService {
     return `${y}-${m}-${day}`;
   }
 
+  public wishlist = signal<string[]>([]);
   public displayCurrency = signal<string>('native');
   public numberFormat = signal<string>('1,234.56');
   public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
@@ -778,6 +779,13 @@ export class PortfolioService {
 
       const sma = localStorage.getItem('pt_simulation_mode_active');
       if (sma) this.isSimulationModeActive.set(sma === 'true');
+
+      const wl = localStorage.getItem('pt_wishlist');
+      if (wl) {
+        try {
+          this.wishlist.set(JSON.parse(wl));
+        } catch (e) {}
+      }
     } catch (e) {
       console.error('Failed to load portfolio tracker data from localStorage', e);
     }
@@ -790,6 +798,7 @@ export class PortfolioService {
     localStorage.setItem('pt_transactions', JSON.stringify(this.transactions()));
     localStorage.setItem('pt_templates', JSON.stringify(this.templates()));
     localStorage.setItem('pt_ticker_configs', JSON.stringify(this.tickerConfigs()));
+    localStorage.setItem('pt_wishlist', JSON.stringify(this.wishlist()));
     localStorage.setItem('pt_exchange_rates', JSON.stringify(this.exchangeRates()));
     localStorage.setItem('pt_historical_prices', JSON.stringify(this.historicalPrices()));
     localStorage.setItem('pt_custom_sectors', JSON.stringify(this.customSectors()));
@@ -1172,8 +1181,29 @@ export class PortfolioService {
     txs.forEach((t) => {
       if (t.ticker) tickers.add(t.ticker.toUpperCase().trim());
     });
+    this.wishlist().forEach((t) => {
+      if (t) tickers.add(t.toUpperCase().trim());
+    });
     return Array.from(tickers);
   });
+
+  public addToWishlist(ticker: string): void {
+    const clean = ticker.toUpperCase().trim();
+    if (!clean) return;
+    const current = this.wishlist();
+    if (!current.includes(clean)) {
+      this.wishlist.set([...current, clean]);
+      this.saveToStorage();
+      this.fetchHistoricalPricesForTickers([clean], '1mo');
+      this.loadMarketPricesApi(false, true);
+    }
+  }
+
+  public removeFromWishlist(ticker: string): void {
+    const clean = ticker.toUpperCase().trim();
+    this.wishlist.set(this.wishlist().filter(t => t !== clean));
+    this.saveToStorage();
+  }
 
   public getExchangeRate(from: string, to: string, date?: string): number {
     const f = from.toUpperCase();
@@ -2788,6 +2818,7 @@ export class PortfolioService {
     if (remoteData.taxRate !== undefined) this.taxRate.set(remoteData.taxRate !== null ? Number(remoteData.taxRate) : null);
     if (remoteData.taxExemptionLimit !== undefined) this.taxExemptionLimit.set(remoteData.taxExemptionLimit !== null ? Number(remoteData.taxExemptionLimit) : null);
     if (remoteData.taxExemptionCurrency) this.taxExemptionCurrency.set(remoteData.taxExemptionCurrency);
+    if (remoteData.wishlist && Array.isArray(remoteData.wishlist)) this.wishlist.set(remoteData.wishlist);
     if (remoteData.splitsCache && typeof localStorage !== 'undefined') {
       localStorage.setItem('pt_splits_cache', JSON.stringify(remoteData.splitsCache));
     }
@@ -2893,6 +2924,7 @@ export class PortfolioService {
       taxRate: this.taxRate(),
       taxExemptionLimit: this.taxExemptionLimit(),
       taxExemptionCurrency: this.taxExemptionCurrency(),
+      wishlist: this.wishlist(),
       splitsCache: cachedSplits ? JSON.parse(cachedSplits) : null,
       lastUpdated: this.lastUpdated() || Date.now()
     };

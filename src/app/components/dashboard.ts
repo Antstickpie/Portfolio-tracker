@@ -206,8 +206,53 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public currentYear = new Date().getFullYear();
   public isCollapsed = signal<boolean>(false);
   public isRealizedCollapsed = signal<boolean>(false);
+  public isWishlistCollapsed = signal<boolean>(false);
   public isChartsCollapsed = signal<boolean>(false);
   public isRefreshing = this.service.isSyncing;
+  public newWishlistTicker = signal<string>('');
+  public filterWishlistTicker = signal<string>('');
+
+  public wishlistItems = computed(() => {
+    const list = this.service.wishlist();
+    const configs = this.service.tickerConfigs();
+    const filter = this.filterWishlistTicker().toUpperCase().trim();
+    
+    let filtered = list;
+    if (filter) {
+      filtered = filtered.filter(t => t.toUpperCase().includes(filter));
+    }
+
+    return filtered.map(ticker => {
+      const clean = ticker.toUpperCase().trim();
+      const cfg = configs[clean];
+      const name = cfg?.name || this.service.getTickerName(clean) || clean;
+      const currentPrice = cfg?.currentPrice || 0;
+      const currency = cfg?.priceCurrency || 'USD';
+      const sector = this.service.getTickerSector(clean) || 'Other';
+      return {
+        ticker: clean,
+        name,
+        currentPrice,
+        currency,
+        sector
+      };
+    });
+  });
+
+  public addWishlistStock() {
+    const val = this.newWishlistTicker().trim();
+    if (val) {
+      this.service.addToWishlist(val);
+      this.newWishlistTicker.set('');
+    }
+  }
+
+  public removeWishlistStock(ticker: string, event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.service.removeFromWishlist(ticker);
+  }
 
   // Computed signal to calculate detailed realized gain events (chronologically correct avg cost, filtered by date)
   public realizedGains = computed(() => {
