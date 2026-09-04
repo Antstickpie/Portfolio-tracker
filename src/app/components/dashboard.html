@@ -777,6 +777,14 @@
             style="cursor: pointer; accent-color: var(--primary);">
           Show Company Name
         </label>
+        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+          <input 
+            type="checkbox" 
+            [ngModel]="service.showPeRatio()" 
+            (ngModelChange)="service.showPeRatio.set($event); service.saveToStorage()" 
+            style="cursor: pointer; accent-color: var(--primary);">
+          Show P/E Ratio
+        </label>
         <input 
           type="text" 
           placeholder="Filter by ticker..." 
@@ -800,6 +808,9 @@
             </th>
             <th (click)="setSortRealized('ticker')" style="cursor: pointer; user-select: none;">
               Ticker <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'ticker'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('currentPrice')" style="cursor: pointer; user-select: none;">
+              Current Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'currentPrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
             </th>
             <th class="num" (click)="setSortRealized('sellPrice')" style="cursor: pointer; user-select: none;">
               Sell Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'sellPrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
@@ -839,27 +850,33 @@
               </td>
               <td class="text-sm text-muted" *ngIf="service.showNameRealized()" style="vertical-align: middle;">{{ g.name }}</td>
               <td class="bold-ticker" style="vertical-align: middle;">
-                <div style="display: flex; align-items: center; gap: 0.6rem;">
-                  <img 
-                    [src]="service.getLogoData(g.ticker)" 
-                    (error)="service.onLogoError(g.ticker)"
-                    style="width: 20px; height: 20px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
-                    *ngIf="service.hasLogo(g.ticker) && !service.shouldShowPlaceholder(g.ticker)">
-                  <div 
-                    *ngIf="service.hasLogo(g.ticker) && service.shouldShowPlaceholder(g.ticker)"
-                    [style.background]="service.getTickerColor(g.ticker)"
-                    style="width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
-                    {{ g.ticker.slice(0, 2) }}
+                <div style="display: flex; align-items: flex-start; gap: 0.55rem; padding: 2px 0;">
+                  <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: 32px; flex-shrink: 0;">
+                    <img 
+                      [src]="service.getLogoData(g.ticker)" 
+                      (error)="service.onLogoError(g.ticker)"
+                      style="width: 22px; height: 22px; border-radius: 4px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 2px;"
+                      *ngIf="service.hasLogo(g.ticker) && !service.shouldShowPlaceholder(g.ticker)">
+                    <div 
+                      *ngIf="service.hasLogo(g.ticker) && service.shouldShowPlaceholder(g.ticker)"
+                      [style.background]="service.getTickerColor(g.ticker)"
+                      style="width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); text-transform: uppercase;">
+                      {{ g.ticker.slice(0, 2) }}
+                    </div>
+                    <span *ngIf="service.showPeRatio()" class="pe-ratio-badge" style="font-size: 0.65rem; color: #818cf8; font-weight: 700; line-height: 1; font-family: 'Consolas', monospace; margin-top: 3px; display: inline-block; text-align: center; white-space: nowrap;" [title]="'Current P/E Ratio: ' + getFormattedPe(g.ticker)">
+                      {{ getFormattedPe(g.ticker) }}
+                    </span>
                   </div>
-                  <a href="https://www.google.com/search?q={{ g.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer;" title="Search stock price on Google" (click)="$event.stopPropagation()">{{ g.ticker }}</a>
+                  <a href="https://www.google.com/search?q={{ g.ticker }}+stock" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); cursor: pointer; line-height: 22px; font-weight: 700;" title="Search stock price on Google" (click)="$event.stopPropagation()">{{ g.ticker }}</a>
                 </div>
               </td>
+              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.currentPrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
                 {{ (g.currency !== displayCurrency() && g.sales.length === 1) ? (getRowFxRate(g.currency, g.sales[0].date) | number:'1.4-4') : '—' }}
               </td>
-              <td class="num font-mono" style="vertical-align: middle;">{{ g.shares | number:'1.0-6' }}</td>
+              <td class="num font-mono" style="vertical-align: middle;">{{ service.formatShares(g.shares) }}</td>
               <td class="num font-mono" style="vertical-align: middle;">{{ formatVal(g.sellRevenue, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono" style="vertical-align: middle;">{{ formatVal(g.costBasis, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono bold" [ngClass]="g.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="vertical-align: middle;">
@@ -879,12 +896,13 @@
                 <td class="text-muted" style="vertical-align: middle; padding-left: 1.5rem;">
                   Sale
                 </td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(service.getTickerCurrentPrice(g.ticker), 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.purchasePrice, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
                   {{ s.currency !== displayCurrency() ? (getRowFxRate(s.currency, s.date) | number:'1.4-4') : '—' }}
                 </td>
-                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ s.shares | number:'1.0-6' }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ service.formatShares(s.shares) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellRevenue, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.costBasis, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono bold text-muted" [ngClass]="s.realizedGain >= 0 ? 'text-success' : 'text-danger'" style="vertical-align: middle;">
@@ -897,8 +915,8 @@
           <!-- Totals row -->
           <tr *ngIf="realizedGains().length > 0" class="totals-row">
             <td [attr.colspan]="service.showNameRealized() ? 3 : 2">Total Realized</td>
-            <td [attr.colspan]="displayCurrency() !== 'native' ? 3 : 2"></td>
-            <td class="num bold font-mono">{{ realizedGainsTotals().shares | number:'1.0-6' }}</td>
+            <td [attr.colspan]="displayCurrency() !== 'native' ? 4 : 3"></td>
+            <td class="num bold font-mono">{{ service.formatShares(realizedGainsTotals().shares) }}</td>
             <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().revenue, 'USD') }}</td>
             <td class="num bold font-mono">{{ formatVal(realizedGainsTotals().costBasis, 'USD') }}</td>
             <td class="num font-mono bold" [ngClass]="realizedGainsTotals().realizedGain >= 0 ? 'text-success' : 'text-danger'">
@@ -906,7 +924,7 @@
             </td>
           </tr>
           <tr *ngIf="realizedGains().length === 0">
-            <td [attr.colspan]="displayCurrency() !== 'native' ? (service.showNameRealized() ? 10 : 9) : (service.showNameRealized() ? 9 : 8)" class="empty-state">
+            <td [attr.colspan]="displayCurrency() !== 'native' ? (service.showNameRealized() ? 11 : 10) : (service.showNameRealized() ? 10 : 9)" class="empty-state">
               No realized data. Enable accounts or import transactions to view realized gains/losses.
             </td>
           </tr>

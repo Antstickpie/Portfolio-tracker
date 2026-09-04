@@ -453,8 +453,10 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const avgSellPrice = agg.shares > 0 ? (agg.sellRevenue / agg.shares) : 0;
       const avgPurchasePrice = agg.shares > 0 ? (agg.costBasis / agg.shares) : 0;
       const realizedGainPct = agg.costBasis > 0 ? (agg.realizedGain / agg.costBasis) * 100 : 0;
+      const currentPrice = this.service.getTickerCurrentPrice(agg.ticker);
       return {
         ...agg,
+        currentPrice,
         sellPrice: avgSellPrice,
         purchasePrice: avgPurchasePrice,
         realizedGainPct
