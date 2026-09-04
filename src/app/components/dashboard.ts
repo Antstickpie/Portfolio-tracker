@@ -258,33 +258,29 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         sharesAllocated *= cfg.splitRatio;
       }
 
-      // Exchange rate from transaction currency to target currency.
-      // EUR uses annual average exchange rate tax rule; other currencies use daily rate.
-      let rateToTarget = 1.0;
-      if (targetCurrency === 'EUR' && tx.date) {
-        const txYear = parseInt(tx.date.slice(0, 4)) || new Date().getFullYear();
-        rateToTarget = this.service.getYearlyAverageExchangeRate(tx.currency, targetCurrency, txYear);
-      } else {
-        rateToTarget = this.service.getExchangeRate(tx.currency, targetCurrency, tx.date);
-      }
+      const rateToUsd = tx.currency.toUpperCase() === 'USD'
+        ? 1.0
+        : (tx.fxRate && tx.fxRate !== 1.0 ? tx.fxRate : this.service.getExchangeRate(tx.currency, 'USD', tx.date));
 
-      let pureCostAllocated = costAllocated;
       const ownerFraction = tx.quantity > 0 ? (sharesAllocated / tx.quantity) : 0;
       const txFees = (tx.fees || 0) * ownerFraction;
+
+      let pureCostAllocated = costAllocated;
       if (tx.price && tx.price > 0 && sharesAllocated > 0) {
         pureCostAllocated = sharesAllocated * tx.price;
       } else if (txFees > 0 && costAllocated > txFees) {
         pureCostAllocated = costAllocated - txFees;
       }
-      const targetCost = pureCostAllocated * rateToTarget;
+
+      const baseCost = pureCostAllocated * rateToUsd;
 
       if (tx.type.toUpperCase() === 'BUY') {
         if (sharesAllocated > 0) {
           runningShares[ticker] = (runningShares[ticker] || 0) + sharesAllocated;
-          runningCostTarget[ticker] = (runningCostTarget[ticker] || 0) + targetCost;
+          runningCostTarget[ticker] = (runningCostTarget[ticker] || 0) + baseCost;
           if (useFifo) {
             if (!fifoLotsTarget[ticker]) fifoLotsTarget[ticker] = [];
-            fifoLotsTarget[ticker].push({ shares: sharesAllocated, costPerShare: targetCost / sharesAllocated });
+            fifoLotsTarget[ticker].push({ shares: sharesAllocated, costPerShare: baseCost / sharesAllocated });
           }
         }
       } else if (tx.type.toUpperCase() === 'SELL') {
@@ -317,8 +313,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
           runningShares[ticker] = Math.max(0, currentShares - sharesAllocated);
           runningCostTarget[ticker] = Math.max(0, currentCostTarget - costOfSharesSoldTarget);
 
-          const sellRevenueTarget = targetCost;
-          const realizedProfitTarget = sellRevenueTarget - costOfSharesSoldTarget;
+          const sellRevenueBase = baseCost;
+          const txRealizedProfit = sellRevenueBase - costOfSharesSoldTarget;
 
           // Check if transaction date is within the current period filter
           const cleanDate = tx.date.slice(0, 10);
@@ -326,12 +322,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
           const beforeTo = !to || cleanDate <= to;
 
           if (afterFrom && beforeTo) {
-            // Translate target currency values back to USD equivalents using today's rate
-            const sellRevenueBase = sellRevenueTarget / targetRateToday;
-            const costBasisBase = costOfSharesSoldTarget / targetRateToday;
-            const realizedProfitBase = realizedProfitTarget / targetRateToday;
-            const avgCostBeforeSellBase = avgCostBeforeSellTarget / targetRateToday;
-            const sellPriceBase = (tx.price * rateToTarget) / targetRateToday;
+            const avgCostBeforeSellBase = avgCostBeforeSellTarget;
+            const sellPriceBase = tx.price * rateToUsd;
 
             events.push({
               id: tx.id,
@@ -342,11 +334,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
               sellPrice: sellPriceBase,
               purchasePrice: avgCostBeforeSellBase,
               sellRevenue: sellRevenueBase,
-              costBasis: costBasisBase,
-              realizedGain: realizedProfitBase,
-              realizedGainPct: costOfSharesSoldTarget > 0 ? (realizedProfitTarget / costOfSharesSoldTarget) * 100 : 0,
+              costBasis: costOfSharesSoldTarget,
+              realizedGain: txRealizedProfit,
+              realizedGainPct: costOfSharesSoldTarget > 0 ? (txRealizedProfit / costOfSharesSoldTarget) * 100 : 0,
               currency: tx.currency,
-              rateToUsd: rateToTarget
+              rateToUsd: rateToUsd
             } as any);
           }
         }
@@ -878,14 +870,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   public estimatedTax = computed(() => {
     const s = this.summary();
-    const totalProfit = s.totalReturn;
-    if (totalProfit <= 0) return 0;
     const rate = this.service.taxRate();
     if (!rate || rate <= 0) return 0;
+    
+    // Capital gains tax applies to realized profit (net of realized losses) + dividends
+    const taxableRealizedProfit = (s.totalRealized || 0) + (s.totalDividends || 0);
+    if (taxableRealizedProfit <= 0) return 0;
+
     const exemptionRaw = this.service.taxExemptionLimit() || 0;
     const exemptionCurr = this.service.taxExemptionCurrency() || this.service.defaultCurrency();
     const exemptionInUSD = exemptionRaw * this.service.getExchangeRate(exemptionCurr, 'USD');
-    const taxableProfit = Math.max(0, totalProfit - exemptionInUSD);
+    const taxableProfit = Math.max(0, taxableRealizedProfit - exemptionInUSD);
     return taxableProfit * (rate / 100);
   });
 
