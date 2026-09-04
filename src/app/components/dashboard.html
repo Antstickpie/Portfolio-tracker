@@ -844,10 +844,8 @@
               </div>
             </td>
             <td class="text-sm text-muted" style="vertical-align: middle;">{{ item.name }}</td>
-            <td style="vertical-align: middle;">
-              <span class="sector-tag" [style.border-color]="service.getSectorColor(item.sector) + '40'" [style.color]="service.getSectorColor(item.sector)" style="background: rgba(255,255,255,0.03); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">
-                {{ item.sector }}
-              </span>
+            <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{{ item.sector }}">
+              <span class="sector-badge" style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ item.sector }}</span>
             </td>
             <td class="num font-mono bold" style="vertical-align: middle;">
               {{ formatVal(item.currentPrice, 'USD', 2, item.currency) }}
