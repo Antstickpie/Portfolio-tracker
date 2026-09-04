@@ -6,3 +6,5 @@
   1. `npm run typecheck` (`npx tsc -p tsconfig.app.json --noEmit`)
   2. `npm run build`
 - NEVER say you are done unless both `npm run typecheck` and `npm run build` exit with code 0 and 0 errors.
+- Always kill/stop any background tasks or dev servers (`ng serve`) after verification is done so no lingering background tasks are left running.
+
