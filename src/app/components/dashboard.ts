@@ -870,17 +870,15 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   public estimatedTax = computed(() => {
     const s = this.summary();
+    const totalProfit = s.totalReturn;
+    if (totalProfit <= 0) return 0;
     const rate = this.service.taxRate();
     if (!rate || rate <= 0) return 0;
     
-    // Capital gains tax applies to realized profit (net of realized losses) + dividends
-    const taxableRealizedProfit = (s.totalRealized || 0) + (s.totalDividends || 0);
-    if (taxableRealizedProfit <= 0) return 0;
-
     const exemptionRaw = this.service.taxExemptionLimit() || 0;
     const exemptionCurr = this.service.taxExemptionCurrency() || this.service.defaultCurrency();
     const exemptionInUSD = exemptionRaw * this.service.getExchangeRate(exemptionCurr, 'USD');
-    const taxableProfit = Math.max(0, taxableRealizedProfit - exemptionInUSD);
+    const taxableProfit = Math.max(0, totalProfit - exemptionInUSD);
     return taxableProfit * (rate / 100);
   });
 

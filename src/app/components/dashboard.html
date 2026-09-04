@@ -177,12 +177,12 @@
         {{ formatVal(summary().totalReturn, 'USD', 2, undefined, true) }}
       </div>
       <!-- Sub-value with Tax -->
-      <div class="sub-value" *ngIf="(service.taxRate() || 0) > 0 && estimatedTax() > 0" style="flex-direction: column; gap: 0.3rem; align-items: flex-start;">
+      <div class="sub-value" *ngIf="(service.taxRate() || 0) > 0" style="flex-direction: column; gap: 0.3rem; align-items: flex-start;">
         <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem;">
           <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">
             {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(totalReturnPercentage(), 2) }}%
           </span>
-          <span style="font-size: 0.72rem; color: var(--text-muted);">
+          <span style="font-size: 0.72rem; color: var(--text-muted);" *ngIf="estimatedTax() > 0">
             Tax: <strong style="color: #f43f5e;">-{{ formatVal(estimatedTax(), 'USD', 2) }}</strong>
           </span>
         </div>
@@ -196,7 +196,7 @@
       </div>
 
       <!-- Sub-value without Tax (Clean default) -->
-      <div class="sub-value" *ngIf="!(service.taxRate() || 0) || estimatedTax() <= 0">
+      <div class="sub-value" *ngIf="!(service.taxRate() || 0)">
         <span class="badge" [ngClass]="summary().totalReturn >= 0 ? 'badge-success' : 'badge-danger'">
           {{ summary().totalReturn >= 0 ? '▲ ' : '▼ ' }}{{ formatPct(totalReturnPercentage(), 2) }}%
         </span>
@@ -812,11 +812,11 @@
             <th class="num" (click)="setSortRealized('currentPrice')" style="cursor: pointer; user-select: none;">
               Current Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'currentPrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
             </th>
-            <th class="num" (click)="setSortRealized('sellPrice')" style="cursor: pointer; user-select: none;">
-              Sell Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'sellPrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
-            </th>
             <th class="num" (click)="setSortRealized('purchasePrice')" style="cursor: pointer; user-select: none;">
               Avg Cost <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'purchasePrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
+            </th>
+            <th class="num" (click)="setSortRealized('sellPrice')" style="cursor: pointer; user-select: none;">
+              Sell Price <span class="sort-icon" style="font-size: 0.75rem; margin-left: 0.2rem;" *ngIf="sortByRealized() === 'sellPrice'">{{ sortDirectionRealized() === 'desc' ? '▼' : '▲' }}</span>
             </th>
             <th class="num" style="color: var(--text-muted); font-size: 0.72rem; font-weight: normal;" *ngIf="displayCurrency() !== 'native'">
               FX Rate
@@ -871,8 +871,8 @@
                 </div>
               </td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.currentPrice, 'USD', 2, g.currency) }}</td>
-              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.purchasePrice, 'USD', 2, g.currency) }}</td>
+              <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(g.sellPrice, 'USD', 2, g.currency) }}</td>
               <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
                 {{ (g.currency !== displayCurrency() && g.sales.length === 1) ? (getRowFxRate(g.currency, g.sales[0].date) | number:'1.4-4') : '—' }}
               </td>
@@ -897,8 +897,8 @@
                   Sale
                 </td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(service.getTickerCurrentPrice(g.ticker), 'USD', 2, s.currency) }}</td>
-                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.purchasePrice, 'USD', 2, s.currency) }}</td>
+                <td class="num font-mono text-muted" style="vertical-align: middle;">{{ formatVal(s.sellPrice, 'USD', 2, s.currency) }}</td>
                 <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
                   {{ s.currency !== displayCurrency() ? (getRowFxRate(s.currency, s.date) | number:'1.4-4') : '—' }}
                 </td>
