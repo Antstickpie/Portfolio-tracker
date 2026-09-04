@@ -779,7 +779,7 @@
         <span class="badge badge-info">{{ wishlistItems().length }} Stocks</span>
       </h2>
       <div style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;" *ngIf="!isWishlistCollapsed()">
-        <form (submit)="$event.preventDefault(); addWishlistStock()" style="display: flex; align-items: center; gap: 0.4rem; margin: 0;">
+        <form (ngSubmit)="addWishlistStock()" style="display: flex; align-items: center; gap: 0.4rem; margin: 0;">
           <input 
             type="text" 
             placeholder="Add ticker (e.g. AAPL)..." 
