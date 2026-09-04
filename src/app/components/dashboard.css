@@ -67,7 +67,8 @@
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  width: 90px;
+  width: 125px;
+  min-width: 120px;
   text-align: center;
   height: 100%;
 }
