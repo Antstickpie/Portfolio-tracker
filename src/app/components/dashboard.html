@@ -709,7 +709,7 @@
             <td class="num font-mono text-muted" style="vertical-align: middle;" *ngIf="displayCurrency() !== 'native'">
               {{ pos.currency !== displayCurrency() ? (service.formatNumber(getRowFxRate(pos.currency), 4)) : '—' }}
             </td>
-            <td class="num font-mono">{{ service.formatNumber(pos.totalShares, 4) }}</td>
+            <td class="num font-mono">{{ service.formatShares(pos.totalShares) }}</td>
             <td style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pos.sector }}"><span class="sector-badge" style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ pos.sector }}</span></td>
             <td class="num font-mono" title="% of total portfolio cost">
               {{ formatVal(pos.totalCost, 'USD', 2, pos.currency) }}

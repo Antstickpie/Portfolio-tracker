@@ -2818,6 +2818,39 @@ export class PortfolioService {
     return (isNegative ? '-' : '') + (decimals > 0 ? (integerPart + decimalSep + decimalPart) : integerPart);
   }
 
+  public formatShares(val: number, maxDecimals: number = 4): string {
+    const isNegative = val < 0;
+    const absVal = Math.abs(val);
+    
+    // Check how many decimal places actually exist
+    const str = absVal.toFixed(maxDecimals);
+    const trimmed = str.replace(/\.?0+$/, '');
+    const parts = trimmed.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts[1];
+
+    const fmt = this.numberFormat();
+    let thousandSep = ',';
+    let decimalSep = '.';
+
+    if (fmt === '1.234,56') {
+      thousandSep = '.';
+      decimalSep = ',';
+    } else if (fmt === '1 234.56') {
+      thousandSep = ' ';
+      decimalSep = '.';
+    } else if (fmt === '1 234,56') {
+      thousandSep = ' ';
+      decimalSep = ',';
+    }
+
+    if (thousandSep) {
+      integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousandSep);
+    }
+
+    return (isNegative ? '-' : '') + (decimalPart ? (integerPart + decimalSep + decimalPart) : integerPart);
+  }
+
   public buildLocalData() {
     const cachedSplits = typeof localStorage !== 'undefined' ? localStorage.getItem('pt_splits_cache') : null;
     const payload: Record<string, any> = {
