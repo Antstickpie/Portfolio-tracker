@@ -364,7 +364,9 @@ export class PortfolioService {
   public showNameHoldings = signal<boolean>(false);
   public showNameRealized = signal<boolean>(false);
   public showNameTransactions = signal<boolean>(false);
+  public showNameWishlist = signal<boolean>(false);
   public showPeRatio = signal<boolean>(true);
+  public showPeWishlist = signal<boolean>(false);
   public peThresholds = signal<number[]>([15, 25, 40]);
 
   constructor() {
@@ -643,6 +645,12 @@ export class PortfolioService {
       const snt = localStorage.getItem('pt_show_name_transactions');
       if (snt) this.showNameTransactions.set(snt === 'true');
 
+      const snw = localStorage.getItem('pt_show_name_wishlist');
+      if (snw) this.showNameWishlist.set(snw === 'true');
+
+      const spw = localStorage.getItem('pt_show_pe_wishlist');
+      if (spw) this.showPeWishlist.set(spw === 'true');
+
       const spr = localStorage.getItem('pt_show_pe_ratio');
       if (spr !== null) {
         this.showPeRatio.set(spr !== 'false');
@@ -829,6 +837,8 @@ export class PortfolioService {
     localStorage.setItem('pt_show_name_holdings', this.showNameHoldings().toString());
     localStorage.setItem('pt_show_name_realized', this.showNameRealized().toString());
     localStorage.setItem('pt_show_name_transactions', this.showNameTransactions().toString());
+    localStorage.setItem('pt_show_name_wishlist', this.showNameWishlist().toString());
+    localStorage.setItem('pt_show_pe_wishlist', this.showPeWishlist().toString());
     localStorage.setItem('pt_show_pe_ratio', this.showPeRatio().toString());
     localStorage.setItem('pt_pe_thresholds', JSON.stringify(this.peThresholds()));
     localStorage.setItem('pt_db_version', '2.0');
@@ -2802,6 +2812,8 @@ export class PortfolioService {
     if (remoteData.showNameHoldings !== undefined) this.showNameHoldings.set(remoteData.showNameHoldings);
     if (remoteData.showNameRealized !== undefined) this.showNameRealized.set(remoteData.showNameRealized);
     if (remoteData.showNameTransactions !== undefined) this.showNameTransactions.set(remoteData.showNameTransactions);
+    if (remoteData.showNameWishlist !== undefined) this.showNameWishlist.set(remoteData.showNameWishlist);
+    if (remoteData.showPeWishlist !== undefined) this.showPeWishlist.set(remoteData.showPeWishlist);
     if (remoteData.showPeRatio !== undefined) this.showPeRatio.set(remoteData.showPeRatio);
     if (remoteData.peThresholds && Array.isArray(remoteData.peThresholds)) this.peThresholds.set(remoteData.peThresholds);
     if (remoteData.exchangeRates) this.exchangeRates.set(remoteData.exchangeRates);
@@ -2913,6 +2925,8 @@ export class PortfolioService {
       showNameHoldings: this.showNameHoldings(),
       showNameRealized: this.showNameRealized(),
       showNameTransactions: this.showNameTransactions(),
+      showNameWishlist: this.showNameWishlist(),
+      showPeWishlist: this.showPeWishlist(),
       showPeRatio: this.showPeRatio(),
       peThresholds: this.peThresholds(),
       exchangeRates: this.exchangeRates(),

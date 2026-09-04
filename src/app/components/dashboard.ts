@@ -211,6 +211,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public isRefreshing = this.service.isSyncing;
   public newWishlistTicker = signal<string>('');
   public filterWishlistTicker = signal<string>('');
+  public sortByWishlist = signal<string>('sector');
+  public sortDirectionWishlist = signal<'asc' | 'desc'>('asc');
 
   public wishlistItems = computed(() => {
     const list = this.service.wishlist();
@@ -222,20 +224,44 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       filtered = filtered.filter(t => t.toUpperCase().includes(filter));
     }
 
-    return filtered.map(ticker => {
+    const items = filtered.map(ticker => {
       const clean = ticker.toUpperCase().trim();
       const cfg = configs[clean];
       const name = cfg?.name || this.service.getTickerName(clean) || clean;
       const currentPrice = cfg?.currentPrice || 0;
       const currency = cfg?.priceCurrency || 'USD';
       const sector = this.service.getTickerSector(clean) || 'Other';
+      const pe = this.service.getTickerPe(clean);
       return {
         ticker: clean,
         name,
         currentPrice,
         currency,
-        sector
+        sector,
+        pe
       };
+    });
+
+    const field = this.sortByWishlist();
+    const dir = this.sortDirectionWishlist();
+
+    return items.sort((a: any, b: any) => {
+      let valA = a[field];
+      let valB = b[field];
+
+      if (field === 'pe') {
+        valA = (valA !== undefined && valA !== null && !isNaN(valA)) ? Number(valA) : (dir === 'asc' ? 999999 : -999999);
+        valB = (valB !== undefined && valB !== null && !isNaN(valB)) ? Number(valB) : (dir === 'asc' ? 999999 : -999999);
+      }
+
+      if (typeof valA === 'string') {
+        valA = valA.toUpperCase();
+        valB = (valB || '').toUpperCase();
+      }
+
+      if (valA < valB) return dir === 'asc' ? -1 : 1;
+      if (valA > valB) return dir === 'asc' ? 1 : -1;
+      return 0;
     });
   });
 
@@ -844,6 +870,15 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  public setSortWishlist(field: string) {
+    if (this.sortByWishlist() === field) {
+      this.sortDirectionWishlist.update((d) => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      this.sortByWishlist.set(field);
+      this.sortDirectionWishlist.set(field === 'currentPrice' || field === 'pe' ? 'desc' : 'asc');
+    }
+  }
+
   public filteredPositions = computed(() => {
     let list = this.summary().positions;
     const q = this.filterTicker().toUpperCase().trim();
@@ -1379,6 +1414,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const rlsm = localStorage.getItem('pt_realized_ledger_sort_mode');
     if (rlsm) this.realizedLedgerSortMode.set(rlsm as any);
 
+    const sbw = localStorage.getItem('pt_wishlist_sort_by');
+    if (sbw) this.sortByWishlist.set(sbw);
+    const sdw = localStorage.getItem('pt_wishlist_sort_dir');
+    if (sdw) this.sortDirectionWishlist.set(sdw as any);
+
     effect(() => {
       localStorage.setItem('pt_dash_active_view', this.activeView());
     });
@@ -1398,6 +1438,9 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     effect(() => { localStorage.setItem('pt_realized_ledger_sort_by', this.sortByRealized()); });
     effect(() => { localStorage.setItem('pt_realized_ledger_sort_dir', this.sortDirectionRealized()); });
     effect(() => { localStorage.setItem('pt_realized_ledger_sort_mode', this.realizedLedgerSortMode()); });
+
+    effect(() => { localStorage.setItem('pt_wishlist_sort_by', this.sortByWishlist()); });
+    effect(() => { localStorage.setItem('pt_wishlist_sort_dir', this.sortDirectionWishlist()); });
 
     const timeStr = localStorage.getItem('pt_last_refresh_time');
     if (timeStr) {
