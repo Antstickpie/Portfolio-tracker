@@ -226,9 +226,29 @@
       </div>
     </div>
 
-    <div style="width: 100%; display: flex; justify-content: center; position: relative; margin-top: 0.5rem; min-height: 320px;">
-      <!-- SVG Chart -->
-      <div style="position: relative; width: 100%; height: 320px;">
+    <!-- HTML Legend Row -->
+    <div class="chart-legend-row" style="display: flex; align-items: center; justify-content: flex-start; gap: 1.25rem; margin: 0.4rem 0 0.2rem; font-size: 0.8rem;">
+      <div style="display: flex; align-items: center; gap: 0.4rem; color: #818cf8;">
+        <span style="display: inline-block; width: 14px; height: 3px; background: #6366f1; border-radius: 2px;"></span>
+        <span style="font-weight: 500;">Invested Capital</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.4rem;" [style.color]="svgThemeColor">
+        <span style="display: inline-block; width: 14px; height: 3px; background: currentColor; border-radius: 2px;"></span>
+        <span style="font-weight: 500;">Portfolio Value</span>
+      </div>
+    </div>
+
+    <div style="width: 100%; display: flex; justify-content: center; position: relative; margin-top: 0.4rem;">
+      <!-- Chart Wrapper -->
+      <div #chartContainer 
+           class="history-chart-wrapper"
+           style="position: relative; width: 100%; user-select: none; touch-action: none;"
+           (mousemove)="onChartMouseMove($event)"
+           (mouseleave)="onChartMouseLeave()"
+           (touchstart)="onChartTouch($event)"
+           (touchmove)="onChartTouch($event)"
+           (touchend)="onChartMouseLeave()">
+
         <!-- No Data Overlay -->
         <div *ngIf="chartPoints.length === 0" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(5px); border-radius: 12px; z-index: 10; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05);">
           <span style="font-size: 2.2rem; margin-bottom: 0.6rem; opacity: 0.85;">📊</span>
@@ -236,12 +256,29 @@
           <p class="subtitle" style="margin: 0.3rem 0 0; font-size: 0.8rem; max-width: 290px; line-height: 1.4;">Enable accounts or import transactions to plot history.</p>
         </div>
 
+        <!-- Y Axis HTML Labels Overlay -->
+        <div class="chart-y-labels" style="position: absolute; top: 0; left: 8px; bottom: 30px; pointer-events: none; width: 100%; z-index: 2;">
+          <div *ngFor="let tick of yTicks" 
+               [style.top]="((tick.y / 320) * 100) + '%'" 
+               style="position: absolute; transform: translateY(-50%); font-size: 0.68rem; font-weight: 600; color: #9ca3af; font-family: 'Consolas', monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(13, 17, 23, 0.5); padding: 1px 4px; border-radius: 3px;">
+            {{ tick.valText }}
+          </div>
+        </div>
+
+        <!-- X Axis HTML Labels Overlay -->
+        <div class="chart-x-labels" style="position: absolute; bottom: 4px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 2;">
+          <span *ngFor="let tick of responsiveXTicks; let first = first; let last = last" 
+                [style.text-align]="first ? 'left' : (last ? 'right' : 'center')"
+                style="font-size: 0.7rem; font-weight: 500; color: #6b7280; font-family: 'Outfit', sans-serif;">
+            {{ tick.dateStr }}
+          </span>
+        </div>
+
+        <!-- SVG Geometry Layer -->
         <svg #chartSvg
              viewBox="0 0 1000 320" 
              preserveAspectRatio="none"
-             style="width: 100%; height: 100%; display: block; user-select: none;"
-             (mousemove)="onChartMouseMove($event)"
-             (mouseleave)="onChartMouseLeave()">
+             style="width: 100%; height: 100%; display: block; user-select: none;">
           
           <!-- Gradients -->
           <defs>
@@ -257,37 +294,13 @@
             </mask>
           </defs>
 
-          <!-- Grid Lines & Y Axis Labels -->
+          <!-- Grid Lines -->
           <g>
             <ng-container *ngFor="let tick of yTicks">
               <line x1="0" [attr.y1]="tick.y" x2="1000" [attr.y2]="tick.y" 
                     stroke="rgba(255, 255, 255, 0.05)" 
                     stroke-width="0.8" 
                     [attr.stroke-dasharray]="tick.y === yTicks[0].y ? '0' : '4 6'" />
-              
-              <text x="15" [attr.y]="tick.y" 
-                    fill="#9ca3af" 
-                    font-family="Outfit" 
-                    font-size="10" 
-                    font-weight="600" 
-                    text-anchor="start" 
-                    alignment-baseline="middle">
-                {{ tick.valText }}
-              </text>
-            </ng-container>
-          </g>
-
-          <!-- X Axis Labels -->
-          <g>
-            <ng-container *ngFor="let tick of xTicks; let first = first; let last = last">
-              <text [attr.x]="tick.x" y="305" 
-                    fill="#6b7280" 
-                    font-family="Outfit" 
-                    font-size="10" 
-                    font-weight="500" 
-                    [attr.text-anchor]="first ? 'start' : (last ? 'end' : 'middle')">
-                {{ tick.dateStr }}
-              </text>
             </ng-container>
           </g>
 
@@ -309,69 +322,66 @@
                 stroke-linejoin="round" 
                 fill="none" />
 
-          <!-- Legend -->
-          <g>
-            <!-- Invested Capital -->
-            <circle cx="80" cy="15" r="4" fill="#6366f1" />
-            <text x="90" y="15" fill="#6366f1" font-family="Outfit" font-size="11" font-weight="500" alignment-baseline="middle">Invested Capital</text>
-            
-            <!-- Portfolio Value -->
-            <circle cx="220" cy="15" r="4" [attr.fill]="svgThemeColor" />
-            <text x="230" y="15" [attr.fill]="svgThemeColor" font-family="Outfit" font-size="11" font-weight="500" alignment-baseline="middle">Portfolio Value</text>
-          </g>
-
-          <!-- Hover Guide Line & Indicators -->
-          <g *ngIf="hoveredPt">
-            <!-- Vertical Guide Line -->
-            <line [attr.x1]="hoveredPt.x" y1="30" [attr.x2]="hoveredPt.x" y2="280" 
-                  stroke="rgba(255, 255, 255, 0.15)" 
-                  stroke-width="1" 
-                  stroke-dasharray="4 4" />
-            
-            <!-- Invested Indicator Dot -->
-            <circle [attr.cx]="hoveredPt.x" [attr.cy]="hoveredPt.yInv" r="5" fill="#6366f1" stroke="#fff" stroke-width="1.5" />
-            
-            <!-- Value Indicator Dot -->
-            <circle [attr.cx]="hoveredPt.x" [attr.cy]="hoveredPt.yVal" r="5" [attr.fill]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'" stroke="#fff" stroke-width="1.5" />
-          </g>
+          <!-- Hover Vertical Guide Line -->
+          <line *ngIf="hoveredPt" 
+                [attr.x1]="hoveredPt.x" y1="20" [attr.x2]="hoveredPt.x" y2="290" 
+                stroke="rgba(255, 255, 255, 0.2)" 
+                stroke-width="1.2" 
+                stroke-dasharray="4 4" />
         </svg>
 
-        <!-- Tooltip Card (positioned dynamically based on hover coordinates) -->
-         <div *ngIf="hoveredPt" 
-              class="card tooltip-card"
-              [style.left.px]="getTooltipLeft(hoveredPt, chartSvg)"
-              [style.top.px]="getTooltipTop(hoveredPt, chartSvg)"
-              style="position: absolute; transform: translateY(-100%) translateY(-15px); width: 170px; z-index: 10; padding: 12px; pointer-events: none; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(8px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); border-radius: 8px;">
-          <div style="font-weight: 600; color: #9ca3af; margin-bottom: 4px;">{{ hoveredPt.date | date:'EEEE, MMMM d, yyyy' }}</div>
+        <!-- Hover Indicator Dots (Rendered in HTML for perfect 1:1 circle shape) -->
+        <div *ngIf="hoveredPt" class="chart-hover-dots" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4;">
+          <!-- Invested dot -->
+          <div [style.left]="((hoveredPt.x / 1000) * 100) + '%'"
+               [style.top]="((hoveredPt.yInv / 320) * 100) + '%'"
+               style="position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #6366f1; border: 2px solid #ffffff; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(99, 102, 241, 0.8);">
+          </div>
+          <!-- Value dot -->
+          <div [style.left]="((hoveredPt.x / 1000) * 100) + '%'"
+               [style.top]="((hoveredPt.yVal / 320) * 100) + '%'"
+               [style.background]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'"
+               style="position: absolute; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);">
+          </div>
+        </div>
+
+        <!-- Tooltip Card (positioned dynamically and clamped within screen boundaries) -->
+        <div *ngIf="hoveredPt" 
+             class="card tooltip-card"
+             [style.left.px]="getTooltipLeft(hoveredPt, chartContainer)"
+             [style.top.px]="getTooltipTop(hoveredPt, chartContainer)"
+             [style.transform]="isTooltipBelow(hoveredPt, chartContainer) ? 'translateY(0)' : 'translateY(-100%)'"
+             style="position: absolute; width: 175px; z-index: 10; padding: 10px 12px; pointer-events: none; background: rgba(17, 24, 39, 0.96); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.6); border-radius: 8px;">
+          <div style="font-weight: 600; color: #9ca3af; margin-bottom: 4px; font-size: 0.78rem;">{{ hoveredPt.date | date:'EEEE, MMMM d, yyyy' }}</div>
           
-          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
             <span style="color: #9ca3af;">{{ filterTicker() ? 'Purchase Value:' : 'Invested:' }}</span>
-            <span style="font-weight: bold; color: #6366f1;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ hoveredPt.invested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+            <span style="font-weight: bold; color: #818cf8;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ hoveredPt.invested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
           </div>
           
-          <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
+          <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
             <span style="color: #9ca3af;">Shares Held:</span>
             <span style="font-weight: bold; color: #fff;">{{ hoveredPt.shares | number:'1.0-6' }}</span>
           </div>
           
-          <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px;">
+          <div *ngIf="filterTicker()" style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
             <span style="color: #9ca3af;">Avg Cost:</span>
             <span style="font-weight: bold; color: #fff;">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ (hoveredPt.avgCost || 0) | number:'1.2-2' }}</span>
           </div>
           
-          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 4px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.08);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.08);">
             <span style="color: #9ca3af;">Value:</span>
             <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">{{ getCurrencySymbol(displayCurrency() === 'native' ? service.defaultCurrency() : displayCurrency()) }}{{ hoveredPt.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1f2937; padding-top: 4px; margin-top: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1f2937; padding-top: 4px; margin-top: 4px; font-size: 0.82rem;">
             <span style="color: #9ca3af;">Return:</span>
             <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">
               {{ hoveredPt.invested > 0 ? (((hoveredPt.value - hoveredPt.invested) / hoveredPt.invested) * 100).toFixed(2) + '%' : '0.00%' }}
             </span>
           </div>
           
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
             <span style="color: #9ca3af;">P&L:</span>
             <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">
               {{ hoveredPt.value >= hoveredPt.invested ? '+' : '' }}{{ (hoveredPt.value - hoveredPt.invested).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}

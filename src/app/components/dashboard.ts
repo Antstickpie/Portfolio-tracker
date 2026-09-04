@@ -26,6 +26,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const sectorData = this.sectorChartData();
     const peData = this.peDistributionData();
     this.drawCharts(assetData, sectorData, peData);
+    this.updateResponsiveTicks();
   }
 
   public service = inject(PortfolioService);
@@ -69,6 +70,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public chartMaxVal = 100;
   public yTicks: { valText: string; y: number }[] = [];
   public xTicks: { dateStr: string; x: number }[] = [];
+  public responsiveXTicks: { dateStr: string; x: number; pct: number }[] = [];
   public svgThemeColor = '#10b981';
   public svgFillGradStr = '16, 185, 129';
   public hoveredPt: any = null;
@@ -77,24 +79,40 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   private gradientCounter = 0;
   private chartLoadSession = 0;
 
-  public onChartMouseMove(event: MouseEvent) {
-    if (this.chartPoints.length === 0 || !this.chartSvg) return;
-    const svgElement = this.chartSvg.nativeElement as any;
-    const pt = svgElement.createSVGPoint();
-    pt.x = event.clientX;
-    pt.y = event.clientY;
-    const screenCTM = svgElement.getScreenCTM();
-    if (!screenCTM) return;
-    const svgPoint = pt.matrixTransform(screenCTM.inverse());
-    const svgX = svgPoint.x;
+  public onChartTouch(event: TouchEvent) {
+    if (event.touches && event.touches.length > 0) {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      const touch = event.touches[0];
+      this.handleChartHoverAt(touch.clientX, touch.clientY);
+    }
+  }
 
-    const svgY = svgPoint.y;
+  public onChartMouseMove(event: MouseEvent) {
+    this.handleChartHoverAt(event.clientX, event.clientY);
+  }
+
+  private handleChartHoverAt(clientX: number, clientY: number) {
+    if (this.chartPoints.length === 0 || !this.chartSvg) return;
+    const svgElement = this.chartSvg.nativeElement;
+    const rect = svgElement.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    const relativeX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    let svgX = (relativeX / rect.width) * 1000;
 
     let pLeft = this.chartPoints[0];
     let pRight = this.chartPoints[this.chartPoints.length - 1];
 
-    if (svgX < pLeft.x || svgX > pRight.x) {
-      this.hoveredPt = null;
+    if (svgX <= pLeft.x) {
+      pLeft = this.chartPoints[0];
+      pRight = this.chartPoints[Math.min(1, this.chartPoints.length - 1)];
+      svgX = pLeft.x;
+    } else if (svgX >= pRight.x) {
+      pLeft = this.chartPoints[Math.max(0, this.chartPoints.length - 2)];
+      pRight = this.chartPoints[this.chartPoints.length - 1];
+      svgX = pRight.x;
     } else {
       for (let i = 0; i < this.chartPoints.length - 1; i++) {
         const p1 = this.chartPoints[i];
@@ -105,55 +123,68 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
           break;
         }
       }
-
-      const t = (svgX - pLeft.x) / (pRight.x - pLeft.x || 1);
-      const interpolatedValue = pLeft.value + t * (pRight.value - pLeft.value);
-      const interpolatedInvested = pLeft.invested + t * (pRight.invested - pLeft.invested);
-      const interpolatedShares = (pLeft.shares || 0) + t * ((pRight.shares || 0) - (pLeft.shares || 0));
-      const interpolatedAvgCost = (pLeft.avgCost || 0) + t * ((pRight.avgCost || 0) - (pLeft.avgCost || 0));
-      const t2 = t * t;
-      const t3 = t2 * t;
-      const w1 = 1 - 3 * t2 + 2 * t3;
-      const w2 = 3 * t2 - 2 * t3;
-      const interpolatedYVal = pLeft.yVal * w1 + pRight.yVal * w2;
-      const interpolatedYInv = pLeft.yInv * w1 + pRight.yInv * w2;
-
-      const interpolatedTime = pLeft.date.getTime() + t * (pRight.date.getTime() - pLeft.date.getTime());
-      const interpolatedDate = new Date(interpolatedTime);
-      const dateStr = this.datePipe.transform(interpolatedDate, this.service.dateFormat()) || '';
-
-      this.hoveredPt = {
-        date: interpolatedDate,
-        dateStr,
-        invested: interpolatedInvested,
-        value: interpolatedValue,
-        shares: interpolatedShares,
-        avgCost: interpolatedAvgCost,
-        x: svgX,
-        yInv: interpolatedYInv,
-        yVal: interpolatedYVal
-      };
     }
 
+    const span = pRight.x - pLeft.x || 1;
+    const t = Math.max(0, Math.min(1, (svgX - pLeft.x) / span));
+    const interpolatedValue = pLeft.value + t * (pRight.value - pLeft.value);
+    const interpolatedInvested = pLeft.invested + t * (pRight.invested - pLeft.invested);
+    const interpolatedShares = (pLeft.shares || 0) + t * ((pRight.shares || 0) - (pLeft.shares || 0));
+    const interpolatedAvgCost = (pLeft.avgCost || 0) + t * ((pRight.avgCost || 0) - (pLeft.avgCost || 0));
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const w1 = 1 - 3 * t2 + 2 * t3;
+    const w2 = 3 * t2 - 2 * t3;
+    const interpolatedYVal = pLeft.yVal * w1 + pRight.yVal * w2;
+    const interpolatedYInv = pLeft.yInv * w1 + pRight.yInv * w2;
 
+    const interpolatedTime = pLeft.date.getTime() + t * (pRight.date.getTime() - pLeft.date.getTime());
+    const interpolatedDate = new Date(interpolatedTime);
+    const dateStr = this.datePipe.transform(interpolatedDate, this.service.dateFormat()) || '';
+
+    this.hoveredPt = {
+      date: interpolatedDate,
+      dateStr,
+      invested: interpolatedInvested,
+      value: interpolatedValue,
+      shares: interpolatedShares,
+      avgCost: interpolatedAvgCost,
+      x: svgX,
+      yInv: interpolatedYInv,
+      yVal: interpolatedYVal
+    };
   }
 
   public onChartMouseLeave() {
     this.hoveredPt = null;
   }
 
-  public getTooltipTop(hoveredPt: any, svgElement: any): number {
-    if (!hoveredPt || !svgElement) return 50;
-    const clientHeight = svgElement.clientHeight || 320;
+  public getTooltipTop(hoveredPt: any, containerElement: any): number {
+    if (!hoveredPt || !containerElement) return 20;
+    const clientHeight = containerElement.clientHeight || 230;
     const higherY = Math.min(hoveredPt.yVal, hoveredPt.yInv);
-    return (higherY / 320) * clientHeight;
+    const screenY = (higherY / 320) * clientHeight;
+    if (screenY < 125) {
+      return screenY + 15;
+    }
+    return screenY - 10;
   }
 
-  public getTooltipLeft(hoveredPt: any, svgElement: any): number {
-    if (!hoveredPt || !svgElement) return 0;
-    const clientWidth = svgElement.clientWidth || 1000;
-    const screenX = hoveredPt.x * (clientWidth / 1000);
-    return Math.max(10, Math.min(clientWidth - 180, screenX - 85));
+  public getTooltipLeft(hoveredPt: any, containerElement: any): number {
+    if (!hoveredPt || !containerElement) return 0;
+    const clientWidth = containerElement.clientWidth || 360;
+    const tooltipWidth = 175;
+    const screenX = (hoveredPt.x / 1000) * clientWidth;
+    const idealLeft = screenX - (tooltipWidth / 2);
+    return Math.max(8, Math.min(clientWidth - tooltipWidth - 8, idealLeft));
+  }
+
+  public isTooltipBelow(hoveredPt: any, containerElement: any): boolean {
+    if (!hoveredPt || !containerElement) return false;
+    const clientHeight = containerElement.clientHeight || 230;
+    const higherY = Math.min(hoveredPt.yVal, hoveredPt.yInv);
+    const screenY = (higherY / 320) * clientHeight;
+    return screenY < 125;
   }
 
   // Filter and sort holdings state
@@ -1419,7 +1450,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public setHistoryPeriod(period: any) {
     this.historyPeriod.set(period);
     const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = this.service.formatLocalDate(today);
     
     let fromDate = new Date();
     if (period === '1w') fromDate.setDate(today.getDate() - 7);
@@ -1432,7 +1463,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       return;
     }
     
-    this.service.dateFrom.set(fromDate.toISOString().slice(0, 10));
+    this.service.dateFrom.set(this.service.formatLocalDate(fromDate));
     this.service.dateTo.set(todayStr);
   }
 
@@ -2392,16 +2423,32 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       this.yTicks.push({ valText, y });
     }
 
-    const xTicksCount = 5;
-    this.xTicks = [];
-    for (let i = 0; i < xTicksCount; i++) {
-      const targetTime = minTime + (maxTime - minTime) * (i / (xTicksCount - 1));
-      const tickDate = new Date(targetTime);
-      const x = getX(targetTime);
-      const dateStr = this.datePipe.transform(tickDate, 'MMM d, yyyy') || '';
-      this.xTicks.push({ dateStr, x });
-    }
+    this.updateResponsiveTicks();
     this.cdr.detectChanges();
+  }
+
+  public updateResponsiveTicks() {
+    if (this.chartPoints.length === 0) {
+      this.responsiveXTicks = [];
+      return;
+    }
+    const minTime = this.chartPoints[0].date.getTime();
+    const maxTime = this.chartPoints[this.chartPoints.length - 1].date.getTime();
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 600;
+    const xTicksCount = isMobile ? 3 : 5;
+    this.responsiveXTicks = [];
+    const minDateYear = new Date(minTime).getFullYear();
+    const maxDateYear = new Date(maxTime).getFullYear();
+    const isMultiYear = minDateYear !== maxDateYear;
+    const formatPattern = isMultiYear ? 'MMM d, yyyy' : 'MMM d';
+
+    for (let i = 0; i < xTicksCount; i++) {
+      const targetTime = minTime + (maxTime - minTime) * (i / (Math.max(1, xTicksCount - 1)));
+      const tickDate = new Date(targetTime);
+      const dateStr = this.datePipe.transform(tickDate, formatPattern) || '';
+      const pct = (i / (Math.max(1, xTicksCount - 1))) * 100;
+      this.responsiveXTicks.push({ dateStr, x: 0, pct });
+    }
   }
 
   private startAutoRefreshInterval() {

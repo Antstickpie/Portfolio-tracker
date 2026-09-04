@@ -49,7 +49,7 @@ export class PortfolioService {
 
       return {
         id: 'sim-' + s.id,
-        date: new Date().toISOString().slice(0, 10), // today
+        date: this.formatLocalDate(new Date()), // today
         ticker: tickerUpper,
         type: s.type,
         price: s.price,
@@ -107,6 +107,13 @@ export class PortfolioService {
   public costBasisMethod = signal<'fifo' | 'avg'>('fifo');
   public disabledSources = signal<string[]>([]);
   public defaultCurrency = signal<string>('EUR');
+  public formatLocalDate(d: Date = new Date()): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   public displayCurrency = signal<string>('native');
   public numberFormat = signal<string>('1,234.56');
   public static readonly DEFAULT_MARKET_PROXY = 'https://script.google.com/macros/s/AKfycbwpBOCeky8fwyvjhDGlwOtsquReafTp5RV7VmVFvyRwSNHMPZK6Dxe8PHS6XMZk8AUO7w/exec';
@@ -3015,9 +3022,9 @@ export class PortfolioService {
       else if (range === '5y') daysNeeded = 1825;
       else if (range === 'max') daysNeeded = 10000;
       limitDate.setDate(limitDate.getDate() - daysNeeded);
-      const limitDateStr = limitDate.toISOString().slice(0, 10);
+      const limitDateStr = this.formatLocalDate(limitDate);
 
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = this.formatLocalDate(new Date());
       const now = Date.now();
       const cooldownMs = 15 * 60 * 1000; // 15 minutes cooldown
 
@@ -3121,7 +3128,7 @@ export class PortfolioService {
                 const closeVal = closes[idx];
                 if (closeVal !== null && !isNaN(closeVal) && closeVal > 0) {
                   const date = new Date(ts * 1000);
-                  const dateStr = date.toISOString().slice(0, 10);
+                  const dateStr = this.formatLocalDate(date);
                   tickerPrices[dateStr] = closeVal;
                 }
               });
