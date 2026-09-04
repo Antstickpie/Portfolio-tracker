@@ -1520,8 +1520,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         }
       });
     }
+  }
 
-
+  public getFormattedPe(ticker: string): string {
+    const pe = this.service.getTickerPe(ticker);
+    return pe !== null ? `${this.service.formatNumber(pe, 1)}x` : '—';
   }
 
   public getCurrencySymbol(curr: string): string {
