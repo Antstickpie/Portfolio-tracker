@@ -2018,8 +2018,6 @@ export class PortfolioService {
     if (force) {
       this.failedTickers.clear();
       this.lastFetchTimeMap.clear();
-      this.lastDailyFetchMap.clear();
-      this.maxFetchedRangeLevelMap.clear();
     }
 
     const tickers = this.allTickers();
@@ -3122,10 +3120,184 @@ export class PortfolioService {
     await this.uploadToGoogleDrive();
   }
 
-  public async fetchHistoricalPricesForTickers(tickers: string[], range: string = '1mo') {
-    // Completely disabled individual proxy requests to eliminate network request floods and infinite waterfalls.
-    // The application strictly relies on bulk requests for current prices and cached/interpolated historical data.
-    return;
+  public getLastCompletedTradingDate(refDate: Date = new Date()): string {
+    const d = new Date(refDate);
+    const day = d.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const hour = d.getUTCHours(); // US market closes at 21:00 UTC (16:00 EST)
+
+    let daysToSubtract = 0;
+    if (day === 0) { // Sunday -> Friday
+      daysToSubtract = 2;
+    } else if (day === 6) { // Saturday -> Friday
+      daysToSubtract = 1;
+    } else if (day === 1) { // Monday
+      daysToSubtract = hour < 21 ? 3 : 0;
+    } else { // Tuesday - Friday
+      daysToSubtract = hour < 21 ? 1 : 0;
+    }
+
+    d.setDate(d.getDate() - daysToSubtract);
+    return this.formatLocalDate(d);
+  }
+
+  public getTickerEarliestTxDate(ticker: string): string | null {
+    const clean = ticker.toUpperCase().trim();
+    let earliest: string | null = null;
+    this.transactions().forEach(t => {
+      if ((t.ticker || '').toUpperCase().trim() === clean && t.date) {
+        const d = t.date.slice(0, 10);
+        if (!earliest || d < earliest) earliest = d;
+      }
+    });
+    return earliest;
+  }
+
+  public needsHistoricalFetch(ticker: string, requestedRange: string = '1mo'): boolean {
+    const clean = ticker.toUpperCase().trim();
+    if (!clean) return false;
+    if (this.failedTickers.has(clean)) return false;
+
+    const todayStr = this.formatLocalDate(new Date());
+    // 1. If checked today, never check again today
+    if (this.lastDailyFetchMap.get(clean) === todayStr) {
+      return false;
+    }
+
+    const config = this.tickerConfigs()[clean];
+    if (config && config.notFound) {
+      const isFresh = !config.notFoundTime || (Date.now() - config.notFoundTime < 7 * 24 * 60 * 60 * 1000);
+      if (isFresh) return false;
+    }
+
+    const tickerCache = this.historicalPrices()[clean];
+    if (!tickerCache || Object.keys(tickerCache).length === 0) {
+      return true; // No data at all for this ticker, must fetch
+    }
+
+    const cacheDates = Object.keys(tickerCache).sort();
+    const minCachedDate = cacheDates[0];
+    const maxCachedDate = cacheDates[cacheDates.length - 1];
+
+    // Determine target start date based on requested range and first transaction
+    const firstTx = this.getTickerEarliestTxDate(clean);
+    
+    // Determine limit date for requested range
+    const limitDate = new Date();
+    let daysNeeded = 30;
+    if (requestedRange === '3mo') daysNeeded = 90;
+    else if (requestedRange === '6mo') daysNeeded = 180;
+    else if (requestedRange === '1y') daysNeeded = 365;
+    else if (requestedRange === '2y') daysNeeded = 730;
+    else if (requestedRange === '5y') daysNeeded = 1825;
+    else if (requestedRange === 'max') daysNeeded = 10000;
+    limitDate.setDate(limitDate.getDate() - daysNeeded);
+    const limitDateStr = this.formatLocalDate(limitDate);
+
+    // If first transaction is later than limitDateStr, we only need from first transaction
+    const targetStartDate = (firstTx && firstTx > limitDateStr) ? firstTx : limitDateStr;
+
+    // Past is covered if minCachedDate is on or before targetStartDate (with 4 days grace for weekends/holidays)
+    const minCachedTime = new Date(minCachedDate).getTime();
+    const targetStartTime = new Date(targetStartDate).getTime();
+    const pastDiffDays = (minCachedTime - targetStartTime) / (1000 * 60 * 60 * 24);
+    const pastCovered = pastDiffDays <= 4;
+
+    // Recent is covered if maxCachedDate is >= last completed trading day
+    const lastTradingDay = this.getLastCompletedTradingDate();
+    const recentCovered = maxCachedDate >= lastTradingDay;
+
+    if (pastCovered && recentCovered) {
+      // Both past dates and latest dates are already in cache! Mark checked today and skip!
+      this.lastDailyFetchMap.set(clean, todayStr);
+      return false;
+    }
+
+    return true;
+  }
+
+  private isFetchingHistory = false;
+
+  public async fetchHistoricalPricesForTickers(tickers: string[], requestedRange: string = '1mo') {
+    if (this.isFetchingHistory) return;
+    this.isFetchingHistory = true;
+
+    try {
+      const todayStr = this.formatLocalDate(new Date());
+      const activeTickers = Array.from(new Set(tickers.map(t => t.toUpperCase().trim()).filter(Boolean)));
+      const tickersToFetch = activeTickers.filter(t => this.needsHistoricalFetch(t, requestedRange));
+      if (tickersToFetch.length === 0) return;
+
+      const pricesObj = { ...this.historicalPrices() };
+      let updated = false;
+
+      for (const ticker of tickersToFetch) {
+        if (this.lastDailyFetchMap.get(ticker) === todayStr) continue;
+
+        const existingCache = pricesObj[ticker];
+        let rangeToFetch = requestedRange;
+        if (existingCache && Object.keys(existingCache).length > 20) {
+          const firstTx = this.getTickerEarliestTxDate(ticker);
+          const cacheDates = Object.keys(existingCache).sort();
+          if (!firstTx || cacheDates[0] <= firstTx) {
+            rangeToFetch = '5d'; // Past dates are already cached! Only fetch missing recent days.
+          }
+        }
+
+        const config = this.tickerConfigs()[ticker];
+        let resolvedSymbol = (config && config.yahooSymbol) ? config.yahooSymbol : ticker;
+
+        try {
+          const targetUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolvedSymbol)}?range=${rangeToFetch}&interval=1d&events=split`;
+          const resp = await this.fetchWithProxy(targetUrl, true);
+          
+          this.lastDailyFetchMap.set(ticker, todayStr);
+
+          if (resp.status === 404) {
+            this.failedTickers.add(ticker);
+            continue;
+          }
+
+          if (resp.ok) {
+            const json = await resp.json();
+            const result = json.chart?.result?.[0];
+            if (result) {
+              const timestamps = result.timestamp || [];
+              const closes = result.indicators?.quote?.[0]?.close || [];
+              const tickerPrices: Record<string, number> = {};
+
+              timestamps.forEach((ts: number, idx: number) => {
+                const closeVal = closes[idx];
+                if (closeVal !== null && !isNaN(closeVal) && closeVal > 0) {
+                  const date = new Date(ts * 1000);
+                  const dateStr = this.formatLocalDate(date);
+                  tickerPrices[dateStr] = closeVal;
+                }
+              });
+
+              if (Object.keys(tickerPrices).length > 0) {
+                // Merge new prices with existing cached dates - NEVER overwrite with empty/partial data
+                pricesObj[ticker] = { ...(pricesObj[ticker] || {}), ...tickerPrices };
+                updated = true;
+              }
+            } else {
+              this.failedTickers.add(ticker);
+            }
+          }
+        } catch (e) {
+          this.failedTickers.add(ticker);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (updated) {
+        this.historicalPrices.set({ ...pricesObj });
+        localStorage.setItem('pt_historical_prices', JSON.stringify(pricesObj));
+        this.saveToStorage();
+      }
+    } finally {
+      this.isFetchingHistory = false;
+    }
   }
 
   public getCurrencySymbol(curr: string): string {

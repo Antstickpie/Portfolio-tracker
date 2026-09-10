@@ -2052,10 +2052,63 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (this.loadHistoryTimeout) {
       clearTimeout(this.loadHistoryTimeout);
     }
-    this.loadHistoryTimeout = setTimeout(() => {
+    this.loadHistoryTimeout = setTimeout(async () => {
       this.loadHistoryTimeout = null;
+
+      // 1. Immediately render chart from local cached and transaction data
       if (currentSession === this.chartLoadSession) {
         this.updateHistoryChartData();
+      }
+
+      // 2. Identify required historical range
+      const period = this.historyPeriod();
+      const dateFrom = this.service.dateFrom();
+      const dateTo = this.service.dateTo();
+
+      let range = '1mo';
+      let endDate = new Date();
+      if (dateTo) {
+        const parsedTo = new Date(dateTo);
+        if (parsedTo < endDate) endDate = parsedTo;
+      }
+      let startDate = new Date(endDate);
+      if (period === '1w') startDate.setDate(startDate.getDate() - 7);
+      else if (period === '1m') startDate.setDate(startDate.getDate() - 30);
+      else if (period === '3m') startDate.setDate(startDate.getDate() - 90);
+      else if (period === '6m') startDate.setDate(startDate.getDate() - 180);
+      else if (period === '1y') startDate.setDate(startDate.getDate() - 365);
+      else {
+        if (dateFrom) {
+          startDate = new Date(dateFrom);
+        } else {
+          const txs = this.service.transactions();
+          if (txs.length > 0) startDate = new Date(txs[0].date);
+        }
+      }
+
+      const daysDiff = (new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysDiff <= 30) range = '1mo';
+      else if (daysDiff <= 90) range = '3mo';
+      else if (daysDiff <= 180) range = '6mo';
+      else if (daysDiff <= 365) range = '1y';
+      else if (daysDiff <= 730) range = '2y';
+      else if (daysDiff <= 1825) range = '5y';
+      else range = 'max';
+
+      const txs = this.service.activeTransactions()
+        .filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL')
+        .filter(t => !this.service.disabledSources().includes(t.source || ''));
+      const tickers = Array.from(new Set(txs.map(t => t.ticker.toUpperCase().trim()).filter(Boolean)));
+      tickers.push('USDINR=X');
+      tickers.push('USDEUR=X');
+
+      // 3. ONLY fetch tickers that are genuinely missing dates in the permanent cache
+      const missingTickers = tickers.filter(t => this.service.needsHistoricalFetch(t, range));
+      if (missingTickers.length > 0) {
+        await this.service.fetchHistoricalPricesForTickers(missingTickers, range);
+        if (currentSession === this.chartLoadSession) {
+          this.updateHistoryChartData();
+        }
       }
     }, 50);
   }
