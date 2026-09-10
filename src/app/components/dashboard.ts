@@ -57,18 +57,24 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     value: number;
     shares?: number;
     avgCost?: number;
+    returnPct: number;
     x: number;
     yInv: number;
     yVal: number;
+    yPct: number;
   }[] = [];
 
   public investedPath = '';
   public valuePath = '';
+  public percentPath = '';
   public fillPath = '';
   
   public chartMinVal = 0;
   public chartMaxVal = 100;
+  public chartMinPct = 0;
+  public chartMaxPct = 100;
   public yTicks: { valText: string; y: number }[] = [];
+  public pctTicks: { valText: string; y: number }[] = [];
   public xTicks: { dateStr: string; x: number }[] = [];
   public responsiveXTicks: { dateStr: string; x: number; pct: number }[] = [];
   public svgThemeColor = '#10b981';
@@ -76,6 +82,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public hoveredPt: any = null;
   public lineGradStops: { offset: string; color: string }[] = [];
   public gradientId = 'chartLineGrad_0';
+  public showPercentLine = signal<boolean>(true);
+  public historyChartUsePostTax = signal<boolean>(false);
   private gradientCounter = 0;
   private chartLoadSession = 0;
 
@@ -137,6 +145,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const w2 = 3 * t2 - 2 * t3;
     const interpolatedYVal = pLeft.yVal * w1 + pRight.yVal * w2;
     const interpolatedYInv = pLeft.yInv * w1 + pRight.yInv * w2;
+    const interpolatedYPct = pLeft.yPct * w1 + pRight.yPct * w2;
+    const interpolatedReturnPct = pLeft.returnPct + t * (pRight.returnPct - pLeft.returnPct);
 
     const interpolatedTime = pLeft.date.getTime() + t * (pRight.date.getTime() - pLeft.date.getTime());
     const interpolatedDate = new Date(interpolatedTime);
@@ -149,9 +159,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       value: interpolatedValue,
       shares: interpolatedShares,
       avgCost: interpolatedAvgCost,
+      returnPct: interpolatedReturnPct,
       x: svgX,
       yInv: interpolatedYInv,
-      yVal: interpolatedYVal
+      yVal: interpolatedYVal,
+      yPct: interpolatedYPct
     };
   }
 
@@ -162,7 +174,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   public getTooltipTop(hoveredPt: any, containerElement: any): number {
     if (!hoveredPt || !containerElement) return 20;
     const clientHeight = containerElement.clientHeight || 230;
-    const higherY = Math.min(hoveredPt.yVal, hoveredPt.yInv);
+    const higherY = Math.min(hoveredPt.yVal, hoveredPt.yInv, hoveredPt.yPct || 320);
     const screenY = (higherY / 320) * clientHeight;
     if (screenY < 125) {
       return screenY + 15;
@@ -1448,6 +1460,15 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       this.service.lastRefreshTime.set(parsedTime);
     }
 
+    const savedTaxMode = localStorage.getItem('pt_history_chart_post_tax');
+    if (savedTaxMode !== null) {
+      this.historyChartUsePostTax.set(savedTaxMode === 'true');
+    }
+    const savedShowPct = localStorage.getItem('pt_history_chart_show_pct');
+    if (savedShowPct !== null) {
+      this.showPercentLine.set(savedShowPct === 'true');
+    }
+
     // Fetch historical prices only when period, transactions, date filters, or view changes
     effect(() => {
       this.historyPeriod();
@@ -1553,6 +1574,19 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     
     this.service.dateFrom.set(this.service.formatLocalDate(fromDate));
     this.service.dateTo.set(todayStr);
+  }
+
+  public setHistoryChartTaxMode(val: boolean) {
+    this.historyChartUsePostTax.set(val);
+    localStorage.setItem('pt_history_chart_post_tax', val ? 'true' : 'false');
+    this.updateHistoryChartData();
+  }
+
+  public toggleShowPercentLine() {
+    const next = !this.showPercentLine();
+    this.showPercentLine.set(next);
+    localStorage.setItem('pt_history_chart_show_pct', next ? 'true' : 'false');
+    this.updateHistoryChartData();
   }
 
   private setupChartEvents() {
@@ -2362,16 +2396,47 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       this.chartPoints = [];
       this.investedPath = '';
       this.valuePath = '';
+      this.percentPath = '';
       this.fillPath = '';
       this.yTicks = [];
+      this.pctTicks = [];
       this.xTicks = [];
       this.cdr.detectChanges();
       return;
     }
 
+    const displayCurr = this.service.displayCurrency();
+    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
+    const symbol = this.getCurrencySymbol(targetCurr);
+
+    const usePostTax = this.historyChartUsePostTax();
+    const taxRate = this.service.taxRate() || 0;
+    const exemptionRaw = this.service.taxExemptionLimit() || 0;
+    const exemptionCurr = this.service.taxExemptionCurrency() || this.service.defaultCurrency();
+    const exemptionInTarget = exemptionRaw * this.service.getExchangeRate(exemptionCurr, targetCurr);
+
+    const pointsWithPct = points.map(p => {
+      const gain = p.value - p.invested;
+      let returnPct = 0;
+      if (p.invested > 0) {
+        if (usePostTax && taxRate > 0 && gain > 0) {
+          const taxableGain = Math.max(0, gain - exemptionInTarget);
+          const tax = taxableGain * (taxRate / 100);
+          const postTaxGain = gain - tax;
+          returnPct = (postTaxGain / p.invested) * 100;
+        } else {
+          returnPct = (gain / p.invested) * 100;
+        }
+      }
+      return {
+        ...p,
+        returnPct
+      };
+    });
+
     let minVal = Infinity;
     let maxVal = -Infinity;
-    points.forEach(p => {
+    pointsWithPct.forEach(p => {
       minVal = Math.min(minVal, p.invested, p.value);
       maxVal = Math.max(maxVal, p.invested, p.value);
     });
@@ -2393,6 +2458,30 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.chartMinVal = minVal;
     this.chartMaxVal = maxVal;
 
+    let minPct = Infinity;
+    let maxPct = -Infinity;
+    pointsWithPct.forEach(p => {
+      minPct = Math.min(minPct, p.returnPct);
+      maxPct = Math.max(maxPct, p.returnPct);
+    });
+
+    if (minPct === Infinity || maxPct === -Infinity) {
+      minPct = -10;
+      maxPct = 10;
+    } else {
+      const diffPct = maxPct - minPct;
+      if (diffPct === 0) {
+        minPct = minPct - 5;
+        maxPct = maxPct + 5;
+      } else {
+        minPct = minPct - diffPct * 0.1;
+        maxPct = maxPct + diffPct * 0.15;
+      }
+    }
+
+    this.chartMinPct = minPct;
+    this.chartMaxPct = maxPct;
+
     const minTime = points[0].date.getTime();
     const maxTime = points[points.length - 1].date.getTime();
     const timeSpan = maxTime - minTime || 1;
@@ -2410,11 +2499,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (denom === 0) return paddingTop + chartHeight;
       return paddingTop + chartHeight - ((v - minVal) / denom) * chartHeight;
     };
+    const getYPct = (pct: number) => {
+      const denom = maxPct - minPct;
+      if (denom === 0) return paddingTop + chartHeight;
+      return paddingTop + chartHeight - ((pct - minPct) / denom) * chartHeight;
+    };
 
-    this.chartPoints = points.map(p => {
+    this.chartPoints = pointsWithPct.map(p => {
       const x = getX(p.date.getTime());
       const yInv = getY(p.invested);
       const yVal = getY(p.value);
+      const yPct = getYPct(p.returnPct);
       const dateStr = this.datePipe.transform(p.date, this.service.dateFormat()) || '';
       return {
         date: p.date,
@@ -2423,9 +2518,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         value: p.value,
         shares: p.shares,
         avgCost: p.avgCost,
+        returnPct: p.returnPct,
         x,
         yInv,
-        yVal
+        yVal,
+        yPct
       };
     });
 
@@ -2446,9 +2543,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const valPoints = this.chartPoints.map(p => ({ x: p.x, y: p.yVal }));
     const invPoints = this.chartPoints.map(p => ({ x: p.x, y: p.yInv }));
+    const pctPoints = this.chartPoints.map(p => ({ x: p.x, y: p.yPct }));
 
     this.valuePath = getBezierPath(valPoints);
     this.investedPath = getBezierPath(invPoints);
+    this.percentPath = getBezierPath(pctPoints);
 
     if (this.chartPoints.length > 0) {
       const first = this.chartPoints[0];
@@ -2486,10 +2585,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const yTicksCount = 5;
     this.yTicks = [];
-    const displayCurr = this.service.displayCurrency();
-    const targetCurr = displayCurr === 'native' ? this.service.defaultCurrency() : displayCurr;
-    const symbol = this.getCurrencySymbol(targetCurr);
-
     for (let i = 0; i <= yTicksCount; i++) {
       const val = minVal + (maxVal - minVal) * (i / yTicksCount);
       const y = getY(val);
@@ -2500,6 +2595,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         valText = symbol + (val / 1000).toFixed(1) + 'k';
       }
       this.yTicks.push({ valText, y });
+    }
+
+    this.pctTicks = [];
+    for (let i = 0; i <= yTicksCount; i++) {
+      const pctVal = minPct + (maxPct - minPct) * (i / yTicksCount);
+      const y = getYPct(pctVal);
+      const valText = (pctVal >= 0 ? '+' : '') + pctVal.toFixed(1) + '%';
+      this.pctTicks.push({ valText, y });
     }
 
     this.updateResponsiveTicks();

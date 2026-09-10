@@ -227,14 +227,35 @@
     </div>
 
     <!-- HTML Legend Row -->
-    <div class="chart-legend-row" style="display: flex; align-items: center; justify-content: flex-start; gap: 1.25rem; margin: 0.4rem 0 0.2rem; font-size: 0.8rem;">
-      <div style="display: flex; align-items: center; gap: 0.4rem; color: #818cf8;">
-        <span style="display: inline-block; width: 14px; height: 3px; background: #6366f1; border-radius: 2px;"></span>
-        <span style="font-weight: 500;">Invested Capital</span>
+    <div class="chart-legend-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.4rem 0 0.2rem; font-size: 0.8rem;">
+      <div style="display: flex; align-items: center; gap: 1.15rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.4rem; color: #818cf8;">
+          <span style="display: inline-block; width: 14px; height: 3px; background: #6366f1; border-radius: 2px;"></span>
+          <span style="font-weight: 500;">Invested Capital</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.4rem;" [style.color]="svgThemeColor">
+          <span style="display: inline-block; width: 14px; height: 3px; background: currentColor; border-radius: 2px;"></span>
+          <span style="font-weight: 500;">Portfolio Value</span>
+        </div>
+        <div (click)="toggleShowPercentLine()" 
+             style="display: flex; align-items: center; gap: 0.4rem; color: #00e5ff; cursor: pointer; user-select: none;"
+             [style.opacity]="showPercentLine() ? '1' : '0.4'"
+             title="Click to toggle % Return line">
+          <span style="display: inline-block; width: 14px; height: 3px; background: #00e5ff; border-radius: 2px; box-shadow: 0 0 6px rgba(0, 229, 255, 0.6);"></span>
+          <span style="font-weight: 600;">% Return ({{ historyChartUsePostTax() ? 'Post-Tax' : 'Pre-Tax' }})</span>
+        </div>
       </div>
-      <div style="display: flex; align-items: center; gap: 0.4rem;" [style.color]="svgThemeColor">
-        <span style="display: inline-block; width: 14px; height: 3px; background: currentColor; border-radius: 2px;"></span>
-        <span style="font-weight: 500;">Portfolio Value</span>
+
+      <!-- Pre/Post Tax Checkbox -->
+      <div style="display: flex; align-items: center; gap: 0.45rem;">
+        <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; user-select: none; font-size: 0.76rem; color: var(--text-muted); font-weight: 500;">
+          <input 
+            type="checkbox" 
+            [checked]="historyChartUsePostTax()" 
+            (change)="setHistoryChartTaxMode(!historyChartUsePostTax())"
+            style="accent-color: #00e5ff; width: 14px; height: 14px; cursor: pointer;">
+          <span>Post-Tax</span>
+        </label>
       </div>
     </div>
 
@@ -256,11 +277,20 @@
           <p class="subtitle" style="margin: 0.3rem 0 0; font-size: 0.8rem; max-width: 290px; line-height: 1.4;">Enable accounts or import transactions to plot history.</p>
         </div>
 
-        <!-- Y Axis HTML Labels Overlay -->
-        <div class="chart-y-labels" style="position: absolute; top: 0; left: 8px; bottom: 30px; pointer-events: none; width: 100%; z-index: 2;">
+        <!-- Y Axis HTML Labels Overlay (Currency on Left) -->
+        <div class="chart-y-labels" style="position: absolute; top: 0; left: 8px; bottom: 30px; pointer-events: none; width: auto; z-index: 2;">
           <div *ngFor="let tick of yTicks" 
                [style.top]="((tick.y / 320) * 100) + '%'" 
-               style="position: absolute; transform: translateY(-50%); font-size: 0.68rem; font-weight: 600; color: #9ca3af; font-family: 'Consolas', monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(13, 17, 23, 0.5); padding: 1px 4px; border-radius: 3px;">
+               style="position: absolute; transform: translateY(-50%); font-size: 0.68rem; font-weight: 600; color: #9ca3af; font-family: 'Consolas', monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(13, 17, 23, 0.6); padding: 1px 4px; border-radius: 3px; white-space: nowrap;">
+            {{ tick.valText }}
+          </div>
+        </div>
+
+        <!-- % Axis HTML Labels Overlay (Percentage on Right) -->
+        <div class="chart-pct-labels" *ngIf="showPercentLine()" style="position: absolute; top: 0; right: 8px; bottom: 30px; pointer-events: none; width: auto; text-align: right; z-index: 2;">
+          <div *ngFor="let tick of pctTicks" 
+               [style.top]="((tick.y / 320) * 100) + '%'" 
+               style="position: absolute; right: 0; transform: translateY(-50%); font-size: 0.68rem; font-weight: 600; color: #00e5ff; font-family: 'Consolas', monospace; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(13, 17, 23, 0.65); padding: 1px 4px; border-radius: 3px; white-space: nowrap;">
             {{ tick.valText }}
           </div>
         </div>
@@ -322,6 +352,16 @@
                 stroke-linejoin="round" 
                 fill="none" />
 
+          <!-- 4. % Return Line (Cyan) -->
+          <path *ngIf="percentPath && showPercentLine()" 
+                [attr.d]="percentPath" 
+                stroke="#00e5ff" 
+                stroke-width="2.2" 
+                stroke-linecap="round" 
+                stroke-linejoin="round" 
+                fill="none" 
+                style="filter: drop-shadow(0 0 3px rgba(0, 229, 255, 0.4));" />
+
           <!-- Hover Vertical Guide Line -->
           <line *ngIf="hoveredPt" 
                 [attr.x1]="hoveredPt.x" y1="20" [attr.x2]="hoveredPt.x" y2="290" 
@@ -343,6 +383,12 @@
                [style.background]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'"
                style="position: absolute; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);">
           </div>
+          <!-- % Return dot -->
+          <div *ngIf="showPercentLine() && hoveredPt?.yPct !== undefined"
+               [style.left]="((hoveredPt.x / 1000) * 100) + '%'"
+               [style.top]="((hoveredPt.yPct / 320) * 100) + '%'"
+               style="position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #00e5ff; border: 2px solid #ffffff; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(0, 229, 255, 0.9);">
+          </div>
         </div>
 
         <!-- Tooltip Card (positioned dynamically and clamped within screen boundaries) -->
@@ -351,7 +397,7 @@
              [style.left.px]="getTooltipLeft(hoveredPt, chartContainer)"
              [style.top.px]="getTooltipTop(hoveredPt, chartContainer)"
              [style.transform]="isTooltipBelow(hoveredPt, chartContainer) ? 'translateY(0)' : 'translateY(-100%)'"
-             style="position: absolute; width: 175px; z-index: 10; padding: 10px 12px; pointer-events: none; background: rgba(17, 24, 39, 0.96); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.6); border-radius: 8px;">
+             style="position: absolute; width: 185px; z-index: 10; padding: 10px 12px; pointer-events: none; background: rgba(17, 24, 39, 0.96); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.6); border-radius: 8px;">
           <div style="font-weight: 600; color: #9ca3af; margin-bottom: 4px; font-size: 0.78rem;">{{ hoveredPt.date | date:'EEEE, MMMM d, yyyy' }}</div>
           
           <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-top: 4px;">
@@ -375,9 +421,9 @@
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1f2937; padding-top: 4px; margin-top: 4px; font-size: 0.82rem;">
-            <span style="color: #9ca3af;">Return:</span>
-            <span style="font-weight: bold;" [style.color]="hoveredPt.value >= hoveredPt.invested ? '#10b981' : '#ef4444'">
-              {{ hoveredPt.invested > 0 ? (((hoveredPt.value - hoveredPt.invested) / hoveredPt.invested) * 100).toFixed(2) + '%' : '0.00%' }}
+            <span style="color: #00e5ff; font-weight: 600;">{{ historyChartUsePostTax() ? 'Return (Post-Tax):' : 'Return (Pre-Tax):' }}</span>
+            <span style="font-weight: bold; color: #00e5ff;">
+              {{ (hoveredPt.returnPct >= 0 ? '+' : '') + hoveredPt.returnPct.toFixed(2) + '%' }}
             </span>
           </div>
           
