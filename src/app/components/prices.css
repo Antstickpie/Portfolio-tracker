@@ -10,6 +10,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
+  gap: 1.25rem;
+  flex-wrap: wrap;
 }
 
 .settings-header-left h2 {
@@ -24,6 +26,44 @@
   font-size: 0.8rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+/* Settings Sub-Tabs Bar */
+.settings-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.32);
+  padding: 0.35rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.settings-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.settings-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-tab-btn.active {
+  color: var(--primary);
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.3);
+  font-weight: 700;
 }
 
 /* Sections */
@@ -51,16 +91,16 @@
 /* Top 4-Card Compact Grid */
 .settings-top-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 1.25rem;
   align-items: stretch;
 }
 
 .setting-box {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  padding: 1.15rem 1.25rem;
+  gap: 0.75rem;
+  padding: 1.25rem 1.35rem;
   height: 100%;
   box-sizing: border-box;
 }
@@ -467,4 +507,18 @@
 
 .currency-pair-link:hover span:first-child {
   text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .settings-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-tabs-bar {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+  }
 }

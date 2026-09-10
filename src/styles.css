@@ -135,9 +135,11 @@ body.light-theme {
 
 /* Layout Utilities */
 .container {
-  max-width: 1440px;
+  max-width: 1840px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1.5rem 2rem;
+  box-sizing: border-box;
 }
 
 /* Premium Card / Glassmorphism */
@@ -147,11 +149,11 @@ body.light-theme {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--card-border);
   border-radius: 10px;
-  padding: 0.75rem 1rem !important;
+  padding: 1.15rem 1.35rem;
   box-shadow: var(--shadow-md);
   transition: var(--transition-smooth);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .glass-card::before {
@@ -204,6 +206,13 @@ input::placeholder {
   align-items: center;
   gap: 0.5rem;
   transition: var(--transition-smooth);
+}
+
+.btn-xs {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  line-height: 1.2;
 }
 
 .btn-sm {

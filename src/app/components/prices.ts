@@ -23,14 +23,19 @@ export class PricesComponent {
   public filterTicker = signal('');
   public sortBy = signal<string>('ticker');
   public sortDirection = signal<'asc' | 'desc'>('asc');
+  public activeSettingsTab = signal<'general' | 'classification' | 'catalog' | 'all'>('general');
 
   constructor() {
+    const savedTab = localStorage.getItem('pt_active_settings_tab') as any;
+    if (savedTab) this.activeSettingsTab.set(savedTab);
+
     const savedBy = localStorage.getItem('pt_prices_sort_by');
     if (savedBy) this.sortBy.set(savedBy);
 
     const savedDir = localStorage.getItem('pt_prices_sort_dir');
     if (savedDir) this.sortDirection.set(savedDir as any);
 
+    effect(() => { localStorage.setItem('pt_active_settings_tab', this.activeSettingsTab()); });
     effect(() => { localStorage.setItem('pt_prices_sort_by', this.sortBy()); });
     effect(() => { localStorage.setItem('pt_prices_sort_dir', this.sortDirection()); });
   }

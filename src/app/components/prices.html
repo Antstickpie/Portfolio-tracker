@@ -5,10 +5,40 @@
       <h2>⚙ Settings & Preferences</h2>
       <p class="subtitle">Configure portfolio owners, active currencies, live exchange rates, cloud sync, and asset catalog.</p>
     </div>
+    <div class="settings-tabs-bar">
+      <button 
+        type="button" 
+        class="settings-tab-btn" 
+        [class.active]="activeSettingsTab() === 'general'" 
+        (click)="activeSettingsTab.set('general')">
+        ⚙️ General & Cloud
+      </button>
+      <button 
+        type="button" 
+        class="settings-tab-btn" 
+        [class.active]="activeSettingsTab() === 'classification'" 
+        (click)="activeSettingsTab.set('classification')">
+        🏷️ Classification & Tax
+      </button>
+      <button 
+        type="button" 
+        class="settings-tab-btn" 
+        [class.active]="activeSettingsTab() === 'catalog'" 
+        (click)="activeSettingsTab.set('catalog')">
+        📈 Asset Catalog & Prices
+      </button>
+      <button 
+        type="button" 
+        class="settings-tab-btn" 
+        [class.active]="activeSettingsTab() === 'all'" 
+        (click)="activeSettingsTab.set('all')">
+        📋 All
+      </button>
+    </div>
   </div>
 
   <!-- TOP COMPACT GRID (4 Compact Cards: Owners, Currencies & Formats, Exchange Rates, Cloud Backup) -->
-  <div class="settings-top-grid">
+  <div class="settings-top-grid" *ngIf="activeSettingsTab() === 'general' || activeSettingsTab() === 'all'">
     <!-- Card 1: Portfolio Owners -->
     <div class="glass-card setting-box">
       <div class="box-header">
@@ -229,14 +259,14 @@
         </div>
 
         <div class="gdrive-filename-row">
-          <span style="font-size: 0.78rem; color: #94a3b8;">Backup file name</span>
+          <span style="font-size: 0.78rem; color: #94a3b8; white-space: nowrap;">Backup file name</span>
           <input
             type="text"
             [ngModel]="service.googleFileName()"
             (ngModelChange)="service.googleFileName.set($event); service.saveToStorage()"
             placeholder="portfolio_tracker_transactions.json"
             class="person-input font-mono"
-            style="width: 195px; font-size: 0.74rem; padding: 0.2rem 0.5rem; text-align: right;">
+            style="width: 180px; max-width: 58%; font-size: 0.74rem; padding: 0.2rem 0.5rem; text-align: right;">
         </div>
 
         <div class="cloud-action-buttons-row">
@@ -277,7 +307,7 @@
   </div>
 
   <!-- WIDE SECTION 1: Classification, Accounts & Tax Settings -->
-  <div class="settings-section">
+  <div class="settings-section" *ngIf="activeSettingsTab() === 'classification' || activeSettingsTab() === 'all'">
     <div class="section-title">
       <span class="section-icon">🏷️</span>
       <span>Classification, Accounts & Tax Settings</span>
@@ -432,7 +462,7 @@
   </div>
 
   <!-- WIDE SECTION 2: Current Stock Prices & Asset Catalog (Full Width) -->
-  <div class="settings-section">
+  <div class="settings-section" *ngIf="activeSettingsTab() === 'catalog' || activeSettingsTab() === 'all'">
     <div class="section-title">
       <span class="section-icon">📊</span>
       <span>Current Stock Prices & Asset Catalog</span>
@@ -596,7 +626,7 @@
   </div>
 
   <!-- WIDE SECTION 3: Danger Zone (Reset Data) -->
-  <div class="settings-section">
+  <div class="settings-section" *ngIf="activeSettingsTab() === 'general' || activeSettingsTab() === 'all'">
     <div class="glass-card" style="padding: 1.25rem 1.5rem; border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.02);">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div>
