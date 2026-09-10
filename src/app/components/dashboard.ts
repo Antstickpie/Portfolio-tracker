@@ -2044,8 +2044,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   private loadHistoryTimeout: any = null;
-  private lastHistoricalFetchTime = 0;
-  private lastFetchedRange = '';
 
   private loadHistoryForChart() {
     this.chartLoadSession++;
@@ -2054,72 +2052,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (this.loadHistoryTimeout) {
       clearTimeout(this.loadHistoryTimeout);
     }
-    this.loadHistoryTimeout = setTimeout(async () => {
+    this.loadHistoryTimeout = setTimeout(() => {
       this.loadHistoryTimeout = null;
-
-      const period = this.historyPeriod();
-      const dateFrom = this.service.dateFrom();
-      const dateTo = this.service.dateTo();
-
-      let range = '1mo';
-      
-      // Determine target range start date based on the active top filter (capped at today)
-      let endDate = new Date();
-      if (dateTo) {
-        const parsedTo = new Date(dateTo);
-        if (parsedTo < endDate) {
-          endDate = parsedTo;
-        }
-      }
-      
-      let startDate = new Date(endDate);
-      
-      if (period === '1w') startDate.setDate(startDate.getDate() - 7);
-      else if (period === '1m') startDate.setDate(startDate.getDate() - 30);
-      else if (period === '3m') startDate.setDate(startDate.getDate() - 90);
-      else if (period === '6m') startDate.setDate(startDate.getDate() - 180);
-      else if (period === '1y') startDate.setDate(startDate.getDate() - 365);
-      else {
-        // 'all'
-        if (dateFrom) {
-          startDate = new Date(dateFrom);
-        } else {
-          const txs = this.service.transactions();
-          if (txs.length > 0) {
-            startDate = new Date(txs[0].date);
-          }
-        }
-      }
-      
-      // Days diff between today and target start date determines Yahoo API history range
-      const daysDiff = (new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysDiff <= 30) range = '1mo';
-      else if (daysDiff <= 90) range = '3mo';
-      else if (daysDiff <= 180) range = '6mo';
-      else if (daysDiff <= 365) range = '1y';
-      else if (daysDiff <= 730) range = '2y';
-      else if (daysDiff <= 1825) range = '5y';
-      else range = 'max';
-
-      const txs = this.service.activeTransactions()
-        .filter(t => t.type.toUpperCase() === 'BUY' || t.type.toUpperCase() === 'SELL')
-        .filter(t => !this.service.disabledSources().includes(t.source || ''));
-      const tickers = Array.from(new Set(txs.map(t => t.ticker.toUpperCase().trim()).filter(Boolean)));
-      tickers.push('USDINR=X');
-      tickers.push('USDEUR=X');
-      
-      const now = Date.now();
-      const needsNetworkFetch = (now - this.lastHistoricalFetchTime > 10 * 60 * 1000) || (this.lastFetchedRange !== range);
-      if (tickers.length > 0 && needsNetworkFetch) {
-        this.lastHistoricalFetchTime = now;
-        this.lastFetchedRange = range;
-        await this.service.fetchHistoricalPricesForTickers(tickers, range);
-      }
-
       if (currentSession === this.chartLoadSession) {
         this.updateHistoryChartData();
       }
-    }, 200);
+    }, 50);
   }
 
   public calculateHistoricalData(): any[] {
