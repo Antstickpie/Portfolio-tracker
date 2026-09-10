@@ -314,17 +314,20 @@ export class PortfolioService {
   public googleFileName = signal<string>('portfolio_tracker_transactions.json');
   public autoSyncGoogleDrive = signal<boolean>(true);
   public activeTokenSignal = signal<string | null>(null);
-  public isGoogleConnected = computed(() => !!this.activeTokenSignal() && !!this.getValidAccessToken());
-  public googleUserEmail = signal<string>('');
-  public lastGoogleSyncTime = signal<number | null>(null);
+  public isGoogleConnected = signal<boolean>(false);
   public isGoogleSyncing = signal<boolean>(false);
+  public syncAction = signal<'idle' | 'push' | 'pull'>('idle');
+  public lastGoogleSyncTime = signal<number | null>(null);
+  public googleUserEmail = signal<string | null>(null);
   public lastUpdated = signal<number>(0);
 
-  private accessToken: string | null = null;
+  private driveToken: string | null = null;
   private tokenClient: any = null;
-  private pendingGoogleDriveAction: 'upload' | 'download' | 'connect' | null = null;
+  private driveFileIdCache: { name: string; id: string } | null = null;
+  private pendingGoogleDriveAction: (() => Promise<void> | void) | null = null;
+  private readonly GDRIVE_TOKEN_KEY = 'pt_gdrive_token';
+  private readonly GDRIVE_USER_KEY = 'pt_gdrive_user';
   private lastSyncedJsonHash: string | null = null;
-  private driveFileIdCache: string | null = null;
   private failedTickers = new Set<string>();
   private lastFetchTimeMap = new Map<string, number>();
   private lastDailyFetchMap = new Map<string, string>();
@@ -371,6 +374,7 @@ export class PortfolioService {
 
   constructor() {
     this.loadFromStorage();
+    this.initGoogleAuthIfPossible();
     const savedTheme = (localStorage.getItem('pt_theme') as 'dark' | 'light') || 'dark';
     this.theme.set(savedTheme);
     this.applyTheme(savedTheme);
@@ -733,16 +737,23 @@ export class PortfolioService {
       const fn = localStorage.getItem('pt_google_file_name');
       if (fn) this.googleFileName.set(fn);
 
-      this.getValidAccessToken();
-
       const asgd = localStorage.getItem('pt_auto_sync_google_drive');
       if (asgd !== null) this.autoSyncGoogleDrive.set(asgd === 'true');
 
-      const gemail = localStorage.getItem('pt_google_user_email');
-      if (gemail) this.googleUserEmail.set(gemail);
+      const savedEmail = localStorage.getItem(this.GDRIVE_USER_KEY) || localStorage.getItem('pt_google_user_email');
+      if (savedEmail) this.googleUserEmail.set(savedEmail);
 
       const gsync = localStorage.getItem('pt_last_google_sync');
       if (gsync) this.lastGoogleSyncTime.set(parseInt(gsync, 10));
+
+      if (this.getValidDriveToken()) {
+        this.isGoogleConnected.set(true);
+        if (!this.googleUserEmail()) {
+          this.fetchGoogleAccountProfile();
+        }
+      } else if (localStorage.getItem('pt_google_connected') === 'true' && savedEmail) {
+        this.isGoogleConnected.set(true);
+      }
 
       const sas = localStorage.getItem('pt_split_adjusted_sources');
       if (sas) this.splitAdjustedSources.set(JSON.parse(sas));
@@ -846,8 +857,13 @@ export class PortfolioService {
     localStorage.setItem('pt_google_client_id', this.googleClientId());
     localStorage.setItem('pt_google_file_name', this.googleFileName());
     localStorage.setItem('pt_auto_sync_google_drive', this.autoSyncGoogleDrive().toString());
-    localStorage.setItem('pt_google_connected', this.isGoogleConnected().toString());
-    localStorage.setItem('pt_google_user_email', this.googleUserEmail());
+    if (this.googleUserEmail()) {
+      localStorage.setItem('pt_google_user_email', this.googleUserEmail()!);
+      localStorage.setItem(this.GDRIVE_USER_KEY, this.googleUserEmail()!);
+    } else {
+      localStorage.removeItem('pt_google_user_email');
+      localStorage.removeItem(this.GDRIVE_USER_KEY);
+    }
     if (this.lastGoogleSyncTime() !== null) {
       localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
     }
@@ -2266,181 +2282,224 @@ export class PortfolioService {
     }
   }
 
-  public getValidAccessToken(): string | null {
-    if (typeof localStorage === 'undefined') return null;
-    const token = this.accessToken || localStorage.getItem('pt_google_access_token');
-    const expiresAtStr = localStorage.getItem('pt_google_token_expires_at');
-
-    if (!token) return null;
-
-    // Only reject if expiration timestamp is explicitly set in localStorage AND has passed
-    if (expiresAtStr) {
-      const expiresAt = parseInt(expiresAtStr, 10);
-      if (expiresAt > 0 && Date.now() >= expiresAt - 60000) {
+  public getValidDriveToken(): string | null {
+    if (this.driveToken) return this.driveToken;
+    try {
+      const raw = localStorage.getItem(this.GDRIVE_TOKEN_KEY);
+      if (!raw) {
+        const legacyToken = localStorage.getItem('pt_google_access_token');
+        const legacyExpiresAt = localStorage.getItem('pt_google_token_expires_at');
+        if (legacyToken && legacyExpiresAt && parseInt(legacyExpiresAt, 10) > Date.now() + 60000) {
+          this.driveToken = legacyToken;
+          this.isGoogleConnected.set(true);
+          return this.driveToken;
+        }
         return null;
       }
+      const parsed = JSON.parse(raw);
+      // Ensure token is valid for at least 60 seconds into the future
+      if (parsed.token && parsed.expiresAt && parsed.expiresAt > Date.now() + 60000) {
+        this.driveToken = parsed.token;
+        this.isGoogleConnected.set(true);
+        return this.driveToken;
+      } else {
+        localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
+        this.driveToken = null;
+      }
+    } catch {
+      localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
+      this.driveToken = null;
     }
-
-    if (this.accessToken !== token) {
-      this.accessToken = token;
-      this.activeTokenSignal.set(token);
-    }
-    return token;
+    return null;
   }
 
-  public async refreshAccessToken(): Promise<string | null> {
-    const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('pt_google_refresh_token') : null;
-    const clientId = this.googleClientId().trim();
-    if (!refreshToken || !clientId) return null;
+  public getValidAccessToken(): string | null {
+    return this.getValidDriveToken();
+  }
 
+  public async ensureFreshToken(): Promise<string | null> {
+    const valid = this.getValidDriveToken();
+    if (valid) return valid;
+    if (this.isGoogleConnected() || (typeof localStorage !== 'undefined' && localStorage.getItem('pt_google_connected') === 'true')) {
+      return await this.requestSilentAccessToken();
+    }
+    return null;
+  }
+
+  public async fetchGoogleAccountProfile(): Promise<void> {
+    const token = this.getValidDriveToken();
+    if (!token) return;
     try {
-      const resp = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          client_id: clientId,
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken
-        }).toString()
+      const resp = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (!resp.ok) return null;
-      const data = await resp.json();
-      if (data.access_token) {
-        const expiresIn = data.expires_in ? parseInt(data.expires_in, 10) : 3600;
-        this.setStoredAccessToken(data.access_token, expiresIn);
-        return data.access_token;
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.user?.emailAddress) {
+          this.googleUserEmail.set(data.user.emailAddress);
+          localStorage.setItem(this.GDRIVE_USER_KEY, data.user.emailAddress);
+          localStorage.setItem('pt_google_user_email', data.user.emailAddress);
+        }
       }
-      return null;
     } catch (e) {
-      return null;
+      console.warn('Failed to fetch Google profile', e);
     }
   }
 
-  private setStoredAccessToken(token: string, expiresInSeconds: number = 3600) {
-    if (typeof localStorage === 'undefined') return;
-    this.accessToken = token;
-    this.activeTokenSignal.set(token);
-    const expiresAt = Date.now() + (expiresInSeconds * 1000);
-    localStorage.setItem('pt_google_access_token', token);
-    localStorage.setItem('pt_google_token_expires_at', expiresAt.toString());
-  }
-
-  private clearStoredAccessToken() {
-    this.accessToken = null;
-    this.activeTokenSignal.set(null);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('pt_google_access_token');
-      localStorage.removeItem('pt_google_token_expires_at');
-      localStorage.removeItem('pt_google_refresh_token');
-      localStorage.removeItem('pt_google_connected');
-    }
-  }
-
-  private silentRefreshPromise: Promise<string | null> | null = null;
-  private silentRefreshResolve: ((token: string | null) => void) | null = null;
-
-  public requestSilentAccessToken(): Promise<string | null> {
-    if (this.silentRefreshPromise) return this.silentRefreshPromise;
-
-    this.silentRefreshPromise = new Promise<string | null>((resolve) => {
-      this.silentRefreshResolve = resolve;
-
-      if (!this.tokenClient) {
-        this.initializeGoogleDriveSDK();
-      }
-      if (!this.tokenClient) {
-        this.silentRefreshResolve = null;
-        this.silentRefreshPromise = null;
-        resolve(null);
-        return;
-      }
-
-      try {
-        this.tokenClient.requestAccessToken({ prompt: '' });
-      } catch (e) {
-        this.silentRefreshResolve = null;
-        this.silentRefreshPromise = null;
-        resolve(null);
-      }
-    });
-
-    return this.silentRefreshPromise;
-  }
-
-  // Google Drive REST API & SDK Sync Integration
-  public initializeGoogleDriveSDK() {
-    if (!this.googleClientId().trim()) {
-      return;
-    }
+  public initGoogleAuthIfPossible(): boolean {
+    if (typeof google === 'undefined' || !google.accounts?.oauth2) return false;
     try {
-      if (typeof google === 'undefined') {
-        return;
-      }
       this.tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: this.googleClientId().trim(),
         scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: async (resp: any) => {
-          const resolveSilent = this.silentRefreshResolve;
-          this.silentRefreshResolve = null;
-          this.silentRefreshPromise = null;
-
-          if (resp && resp.access_token) {
-            const expiresIn = resp.expires_in ? parseInt(resp.expires_in, 10) : 3600;
-            this.setStoredAccessToken(resp.access_token, expiresIn);
-            localStorage.setItem('pt_google_connected', 'true');
-
-            if (resolveSilent) resolveSilent(resp.access_token);
-
-            const action = this.pendingGoogleDriveAction;
+        callback: (response: any) => {
+          if (response.error) {
+            this.showToast('Google Auth Failed: ' + (response.error_description || response.error), 'error');
             this.pendingGoogleDriveAction = null;
+            this.isGoogleSyncing.set(false);
+            this.syncAction.set('idle');
+            return;
+          }
+          this.driveToken = response.access_token;
+          const expiresInSec = parseInt(response.expires_in, 10) || 3600;
+          const expiresAt = Date.now() + expiresInSec * 1000;
+          localStorage.setItem(this.GDRIVE_TOKEN_KEY, JSON.stringify({ token: this.driveToken, expiresAt }));
+          localStorage.setItem('pt_google_connected', 'true');
+          this.isGoogleConnected.set(true);
+          this.fetchGoogleAccountProfile();
 
-            if (action === 'connect') {
-              this.showToast('Connected to Google Drive!', 'success');
-            } else if (action === 'upload') {
-              this.uploadToGoogleDrive();
-            } else if (action === 'download') {
-              this.downloadFromGoogleDrive();
-            }
+          if (this.pendingGoogleDriveAction) {
+            const nextAction = this.pendingGoogleDriveAction;
+            this.pendingGoogleDriveAction = null;
+            this.showToast('Connected to Google Drive! Proceeding with sync...', 'info');
+            nextAction();
           } else {
-            if (resolveSilent) resolveSilent(null);
-            if (resp?.error && this.pendingGoogleDriveAction === 'connect') {
-              this.showToast('Authentication failed: ' + resp.error, 'error');
-            }
-            this.pendingGoogleDriveAction = null;
+            this.showToast('Connected to Google Drive!', 'success');
           }
         }
       });
-    } catch (err) {
-      console.error('Failed to init Google Drive SDK', err);
+      return true;
+    } catch (e) {
+      console.warn('Google client init failed', e);
+      return false;
     }
   }
 
-  public connectGoogleDrive(action: 'connect' | 'upload' | 'download' = 'connect') {
-    if (!this.googleClientId().trim()) {
-      this.showToast('Please enter your Google Client ID first.', 'error');
-      return;
+  public connectGoogleDrive(pendingAction?: () => Promise<void> | void): void {
+    if (pendingAction) {
+      this.pendingGoogleDriveAction = pendingAction;
     }
-    this.pendingGoogleDriveAction = action;
     if (!this.tokenClient) {
-      this.initializeGoogleDriveSDK();
+      this.initGoogleAuthIfPossible();
     }
     if (this.tokenClient) {
-      this.tokenClient.requestAccessToken({ prompt: 'select_account' });
+      const requestConfig: any = { prompt: '' };
+      const email = this.googleUserEmail() || localStorage.getItem(this.GDRIVE_USER_KEY) || localStorage.getItem('pt_google_user_email');
+      if (email) {
+        requestConfig.hint = email;
+      }
+      this.tokenClient.requestAccessToken(requestConfig);
     } else {
-      this.showToast('Google GIS script is loading. Try again in a moment.', 'info');
+      this.pendingGoogleDriveAction = null;
+      this.isGoogleSyncing.set(false);
+      this.syncAction.set('idle');
+      this.showToast('Google Auth script is loading or unavailable. Please check your connection.', 'error');
     }
   }
 
-  public disconnectGoogleDrive() {
-    this.clearStoredAccessToken();
-    this.googleUserEmail.set('');
+  public disconnectGoogleDrive(): void {
+    const token = this.getValidDriveToken();
+    if (token && typeof google !== 'undefined' && google.accounts?.oauth2?.revoke) {
+      try {
+        google.accounts.oauth2.revoke(token, () => {});
+      } catch (e) {
+        console.warn('Revoke failed', e);
+      }
+    }
+    this.driveToken = null;
+    this.driveFileIdCache = null;
+    this.isGoogleConnected.set(false);
+    this.googleUserEmail.set(null);
     this.lastGoogleSyncTime.set(null);
+    localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
+    localStorage.removeItem(this.GDRIVE_USER_KEY);
     localStorage.removeItem('pt_google_connected');
+    localStorage.removeItem('pt_google_access_token');
+    localStorage.removeItem('pt_google_token_expires_at');
     localStorage.removeItem('pt_google_user_email');
     localStorage.removeItem('pt_last_google_sync');
+    this.showToast('Disconnected from Google Drive.', 'info');
+  }
+
+  public requestSilentAccessToken(): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      if (!this.tokenClient) {
+        this.initGoogleAuthIfPossible();
+      }
+      if (!this.tokenClient) {
+        resolve(null);
+        return;
+      }
+      const prevCallback = this.tokenClient.callback;
+      this.tokenClient.callback = (resp: any) => {
+        this.tokenClient.callback = prevCallback;
+        if (resp && resp.access_token) {
+          this.driveToken = resp.access_token;
+          const expiresInSec = parseInt(resp.expires_in, 10) || 3600;
+          const expiresAt = Date.now() + expiresInSec * 1000;
+          localStorage.setItem(this.GDRIVE_TOKEN_KEY, JSON.stringify({ token: this.driveToken, expiresAt }));
+          this.isGoogleConnected.set(true);
+          resolve(resp.access_token);
+        } else {
+          resolve(null);
+        }
+      };
+      const requestConfig: any = { prompt: '' };
+      const email = this.googleUserEmail() || localStorage.getItem(this.GDRIVE_USER_KEY) || localStorage.getItem('pt_google_user_email');
+      if (email) requestConfig.hint = email;
+      try {
+        this.tokenClient.requestAccessToken(requestConfig);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  public formatDateTime(timestamp: number | null): string {
+    if (!timestamp) return '';
+    const d = new Date(timestamp);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const month = months[d.getMonth()];
+    const day = d.getDate();
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${month} ${day}, ${year} at ${hours}:${mins}`;
+  }
+
+  public async findGoogleDriveFileId(fileName: string): Promise<string | null> {
+    if (this.driveFileIdCache && this.driveFileIdCache.name === fileName) {
+      return this.driveFileIdCache.id;
+    }
+    const token = this.getValidDriveToken();
+    if (!token) return null;
+    const q = encodeURIComponent(`name='${fileName}' and trashed=false`);
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (resp.status === 401) {
+      this.driveToken = null;
+      localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
+      this.isGoogleConnected.set(false);
+      throw new Error('Google session expired. Please sign in again.');
+    }
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data.files && data.files.length > 0) {
+      this.driveFileIdCache = { name: fileName, id: data.files[0].id };
+      return this.driveFileIdCache.id;
+    }
+    return null;
   }
 
   private async fetchDriveApi(url: string, options: RequestInit = {}): Promise<Response> {
@@ -2463,8 +2522,9 @@ export class PortfolioService {
     let resp = await fetch(url, options);
 
     if (resp.status === 401) {
-      this.accessToken = null;
+      this.driveToken = null;
       if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
         localStorage.removeItem('pt_google_access_token');
         localStorage.removeItem('pt_google_token_expires_at');
       }
@@ -2480,7 +2540,7 @@ export class PortfolioService {
   }
 
   private async findDriveFile(fileName: string): Promise<string | null> {
-    if (this.driveFileIdCache) return this.driveFileIdCache;
+    if (this.driveFileIdCache && this.driveFileIdCache.name === fileName) return this.driveFileIdCache.id;
     try {
       const resp = await this.fetchDriveApi(
         `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(fileName)}' and trashed=false&fields=files(id,name)`
@@ -2490,7 +2550,7 @@ export class PortfolioService {
       }
       const data = await resp.json();
       if (data.files && data.files.length > 0) {
-        this.driveFileIdCache = data.files[0].id;
+        this.driveFileIdCache = { name: fileName, id: data.files[0].id };
         return data.files[0].id;
       }
       return null;
@@ -2643,17 +2703,6 @@ export class PortfolioService {
     }, 3000);
   }
 
-  public async ensureFreshToken(): Promise<string | null> {
-    const valid = this.getValidAccessToken();
-    if (valid) return valid;
-
-    const isConnected = this.isGoogleConnected() || (typeof localStorage !== 'undefined' && localStorage.getItem('pt_google_connected') === 'true');
-    if (isConnected) {
-      return await this.requestSilentAccessToken();
-    }
-    return null;
-  }
-
   private lastUploadErrorTime = 0;
 
   public async uploadToGoogleDriveSilent() {
@@ -2681,12 +2730,12 @@ export class PortfolioService {
         return;
       }
 
-      const fileId = fileDetails?.id ?? await this.findDriveFile(fileName);
+      const fileId = fileDetails?.id ?? await this.findGoogleDriveFileId(fileName);
       let success = false;
       if (!fileId) {
         const newId = await this.createDriveFile(fileName, localData);
         success = !!newId;
-        if (newId) this.driveFileIdCache = newId;
+        if (newId) this.driveFileIdCache = { name: fileName, id: newId };
       } else {
         success = await this.updateDriveFile(fileId, localData);
       }
@@ -2946,84 +2995,125 @@ export class PortfolioService {
     return payload;
   }
 
-  public async uploadToGoogleDrive() {
-    let token = this.getValidAccessToken();
-    if (!token) token = await this.ensureFreshToken();
+  public async uploadToGoogleDrive(): Promise<void> {
+    const token = this.getValidDriveToken();
     if (!token) {
-      this.connectGoogleDrive('upload');
+      this.syncAction.set('push');
+      this.isGoogleSyncing.set(true);
+      this.connectGoogleDrive(() => this.uploadToGoogleDrive());
       return;
     }
-
-    const localCount = this.transactions().length;
-    const ok = await this.showConfirm(
-      'Upload to Google Drive',
-      `This will OVERWRITE your Google Drive backup with your current local data (${localCount} transactions). Are you sure?`
-    );
-    if (!ok) return;
-
+    this.syncAction.set('push');
     this.isGoogleSyncing.set(true);
     try {
       const fileName = this.googleFileName().trim() || 'portfolio_tracker_transactions.json';
+      const fileId = await this.findGoogleDriveFileId(fileName);
       const localData = this.buildLocalData();
-      const fileId = await this.findDriveFile(fileName);
-      let success = false;
-      if (!fileId) {
-        const newId = await this.createDriveFile(fileName, localData);
-        success = !!newId;
-      } else {
-        success = await this.updateDriveFile(fileId, localData);
+      const content = JSON.stringify(localData, null, 2);
+
+      const metadata = {
+        name: fileName,
+        mimeType: 'application/json',
+        properties: {
+          contentHash: localData['hash'] || '',
+          lastUpdated: String(localData['lastUpdated'] || Date.now())
+        }
+      };
+
+      const boundary = '-------314159265358979323846';
+      const delimiter = '\r\n--' + boundary + '\r\n';
+      const closeDelim = '\r\n--' + boundary + '--';
+
+      const multipartRequestBody =
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        content +
+        closeDelim;
+
+      const url = fileId
+        ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
+        : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+      const method = fileId ? 'PATCH' : 'POST';
+
+      const resp = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body: multipartRequestBody
+      });
+
+      if (resp.status === 401) {
+        this.driveToken = null;
+        localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
+        this.isGoogleConnected.set(false);
+        throw new Error('Google session expired. Please sign in again.');
       }
-      if (success) {
-        this.lastUpdated.set(localData['lastUpdated']);
-        this.lastGoogleSyncTime.set(Date.now());
-        localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
-        this.showToast('Uploaded to Google Drive successfully!', 'success');
-      } else {
-        this.showToast('Upload failed.', 'error');
-      }
-    } catch (e) {
-      this.showToast('Upload failed: ' + e, 'error');
+
+      if (!resp.ok) throw new Error('Upload HTTP status ' + resp.status);
+      const resJson = await resp.json();
+      this.driveFileIdCache = { name: fileName, id: resJson.id };
+      if (resJson.id) this.pinDriveRevisions(resJson.id);
+
+      const now = Date.now();
+      this.lastUpdated.set(localData['lastUpdated']);
+      this.lastGoogleSyncTime.set(now);
+      localStorage.setItem('pt_last_google_sync', now.toString());
+      this.showToast('Uploaded backup to Google Drive!', 'success');
+    } catch (e: any) {
+      this.showToast('Google Drive upload failed: ' + (e?.message || e), 'error');
     } finally {
       this.isGoogleSyncing.set(false);
+      this.syncAction.set('idle');
     }
   }
 
-  public async downloadFromGoogleDrive() {
-    let token = this.getValidAccessToken();
-    if (!token) token = await this.ensureFreshToken();
+  public async downloadFromGoogleDrive(): Promise<void> {
+    const token = this.getValidDriveToken();
     if (!token) {
-      this.connectGoogleDrive('download');
+      this.syncAction.set('pull');
+      this.isGoogleSyncing.set(true);
+      this.connectGoogleDrive(() => this.downloadFromGoogleDrive());
       return;
     }
-
-    const ok = await this.showConfirm(
-      'Download from Google Drive',
-      `This will OVERWRITE your current local data with the Google Drive backup. Your local changes will be lost. Are you sure?`
-    );
-    if (!ok) return;
-
+    this.syncAction.set('pull');
     this.isGoogleSyncing.set(true);
     try {
       const fileName = this.googleFileName().trim() || 'portfolio_tracker_transactions.json';
-      const fileId = await this.findDriveFile(fileName);
+      let fileId = await this.findGoogleDriveFileId(fileName);
       if (!fileId) {
-        this.showToast('No portfolio file found on Google Drive.', 'error');
+        this.showToast(`File "${fileName}" not found in Google Drive.`, 'error');
         return;
       }
-      const remoteData = await this.downloadDriveFile(fileId);
-      if (!remoteData) {
-        this.showToast('Failed to download from Google Drive.', 'error');
-        return;
+
+      const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (resp.status === 401) {
+        this.driveToken = null;
+        localStorage.removeItem(this.GDRIVE_TOKEN_KEY);
+        this.isGoogleConnected.set(false);
+        throw new Error('Google session expired. Please sign in again.');
       }
+
+      if (!resp.ok) throw new Error('Download HTTP status ' + resp.status);
+      const remoteData = await resp.json();
       this.applyRemoteData(remoteData);
       this.saveToStorage();
-      this.lastGoogleSyncTime.set(Date.now());
-      localStorage.setItem('pt_last_google_sync', this.lastGoogleSyncTime()!.toString());
+      const now = Date.now();
+      this.lastGoogleSyncTime.set(now);
+      localStorage.setItem('pt_last_google_sync', now.toString());
       this.showToast(`Downloaded from Google Drive (${this.transactions().length} transactions).`, 'success');
-    } catch (e) {
-      this.showToast('Download failed: ' + e, 'error');
+    } catch (e: any) {
+      this.showToast('Google Drive download failed: ' + (e?.message || e), 'error');
     } finally {
       this.isGoogleSyncing.set(false);
+      this.syncAction.set('idle');
     }
   }
 
