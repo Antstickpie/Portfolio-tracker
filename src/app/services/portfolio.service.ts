@@ -572,10 +572,16 @@ export class PortfolioService {
         
         list = this.deduplicateTransactionsList(list);
         const sanitized = this.sanitizeTransactions(list);
-        this.transactions.set(sanitized);
+        const divMigrated = localStorage.getItem('pt_dividend_splits_migrated');
+        let finalTxs = sanitized;
+        if (!divMigrated) {
+          finalTxs = this.applyDividendSplits(sanitized, false);
+          localStorage.setItem('pt_dividend_splits_migrated', 'true');
+        }
+        this.transactions.set(finalTxs);
         
-        if (JSON.stringify(list) !== JSON.stringify(sanitized) || dbVersion !== '2.0') {
-          localStorage.setItem('pt_transactions', JSON.stringify(sanitized));
+        if (JSON.stringify(list) !== JSON.stringify(finalTxs) || dbVersion !== '2.0') {
+          localStorage.setItem('pt_transactions', JSON.stringify(finalTxs));
           localStorage.setItem('pt_db_version', '2.0');
         }
       }
@@ -921,9 +927,140 @@ export class PortfolioService {
       const merged = [...prev, ...newTxs];
       // Sort chronologically by date
       const sorted = merged.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      return this.sanitizeTransactions(sorted);
+      const sanitized = this.sanitizeTransactions(sorted);
+      return this.applyDividendSplits(sanitized);
     });
     this.saveToStorage();
+  }
+
+  /**
+   * Automatically calculates and applies dividend splits for all dividend transactions
+   * based on who held shares of that ticker on each dividend's date.
+   * If forceAll is true, even manually locked dividends will be recalculated.
+   */
+  public applyDividendSplits(list: Transaction[], forceAll = false): Transaction[] {
+    const sorted = [...list].sort((a, b) => {
+      const dateA = a.date ? a.date.slice(0, 10) : '';
+      const dateB = b.date ? b.date.slice(0, 10) : '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+      const typeOrder = (t: string) => {
+        const up = (t || '').toUpperCase().trim();
+        if (up === 'BUY') return 1;
+        if (up === 'SELL') return 2;
+        if (up === 'DIVIDEND') return 3;
+        return 4;
+      };
+      return typeOrder(a.type) - typeOrder(b.type);
+    });
+
+    const holdings = new Map<string, { sharesA: number; sharesB: number; lastSharesA: number; lastSharesB: number }>();
+
+    return sorted.map((tx) => {
+      const ticker = (tx.ticker || '').toUpperCase().trim();
+      if (!ticker) return tx;
+
+      if (!holdings.has(ticker)) {
+        holdings.set(ticker, { sharesA: 0, sharesB: 0, lastSharesA: 0, lastSharesB: 0 });
+      }
+      const h = holdings.get(ticker)!;
+      const type = (tx.type || '').toUpperCase().trim();
+
+      if (type === 'BUY') {
+        h.sharesA += (tx.personAShares || 0);
+        h.sharesB += (tx.personBShares || 0);
+        if (h.sharesA + h.sharesB > 0.00001) {
+          h.lastSharesA = h.sharesA;
+          h.lastSharesB = h.sharesB;
+        }
+        return tx;
+      }
+
+      if (type === 'SELL') {
+        h.sharesA = Math.max(0, h.sharesA - (tx.personAShares || 0));
+        h.sharesB = Math.max(0, h.sharesB - (tx.personBShares || 0));
+        if (h.sharesA + h.sharesB > 0.00001) {
+          h.lastSharesA = h.sharesA;
+          h.lastSharesB = h.sharesB;
+        }
+        return tx;
+      }
+
+      if (type === 'DIVIDEND') {
+        if (!forceAll && tx.manualAllocation) {
+          return tx;
+        }
+
+        const totalAmount = tx.totalAmount || 0;
+        const currentTotal = h.sharesA + h.sharesB;
+        let ratioA = 0.5;
+        let ratioB = 0.5;
+
+        if (currentTotal > 0.00001) {
+          ratioA = h.sharesA / currentTotal;
+          ratioB = h.sharesB / currentTotal;
+        } else {
+          // If position was 0 on dividend date, check last holding balance before sale (ex-dividend holding)
+          const lastTotal = h.lastSharesA + h.lastSharesB;
+          if (lastTotal > 0.00001) {
+            ratioA = h.lastSharesA / lastTotal;
+            ratioB = h.lastSharesB / lastTotal;
+          } else if (tx.personACostBasis > 0 || tx.personBCostBasis > 0) {
+            const prevTotal = tx.personACostBasis + tx.personBCostBasis;
+            if (prevTotal > 0) {
+              ratioA = tx.personACostBasis / prevTotal;
+              ratioB = tx.personBCostBasis / prevTotal;
+            }
+          }
+        }
+
+        const newCostA = parseFloat((totalAmount * ratioA).toFixed(2));
+        const newCostB = parseFloat((totalAmount - newCostA).toFixed(2));
+        const newSharesA = tx.quantity > 0 ? parseFloat((tx.quantity * ratioA).toFixed(6)) : 0;
+        const newSharesB = tx.quantity > 0 ? parseFloat((tx.quantity - newSharesA).toFixed(6)) : 0;
+
+        return {
+          ...tx,
+          personAShares: newSharesA,
+          personBShares: newSharesB,
+          personACostBasis: newCostA,
+          personBCostBasis: newCostB,
+          manualAllocation: forceAll ? false : tx.manualAllocation,
+        };
+      }
+
+      return tx;
+    });
+  }
+
+  /**
+   * Recalculates all dividend splits across the entire portfolio based on historical shareholding.
+   * If forceAll is true, even manually locked dividends will be recalculated.
+   * Returns number of modified dividend transactions.
+   */
+  public recalculateAllDividendSplits(forceAll = false): number {
+    let changedCount = 0;
+    this.transactions.update((txs) => {
+      const updated = this.applyDividendSplits(txs, forceAll);
+      for (const orig of txs) {
+        if (orig.type?.toUpperCase().trim() === 'DIVIDEND') {
+          const now = updated.find((u) => u.id === orig.id);
+          if (
+            now &&
+            (Math.abs(now.personACostBasis - orig.personACostBasis) > 0.005 ||
+              Math.abs(now.personBCostBasis - orig.personBCostBasis) > 0.005)
+          ) {
+            changedCount++;
+          }
+        }
+      }
+      return updated;
+    });
+
+    if (changedCount > 0) {
+      this.saveToStorage();
+    }
+    return changedCount;
   }
 
   private getTransactionSignatureCandidates(tx: Transaction): string[] {

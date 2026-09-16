@@ -6,6 +6,9 @@
       <p class="subtitle">Click on any row to expand it and configure direct ownership splits.</p>
     </div>
     <div class="header-right button-group">
+      <button class="btn btn-secondary" (click)="recalculateDividends()" title="Recalculate all dividend splits based on historical share ownership at payment date">
+        Recalculate Dividends
+      </button>
       <button class="btn btn-secondary" (click)="showImport.set(!showImport())">
         {{ showImport() ? 'Hide Import' : 'Import CSV/JSON' }}
       </button>

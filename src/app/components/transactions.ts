@@ -244,6 +244,21 @@ export class TransactionsComponent {
     }
   }
 
+  public async recalculateDividends() {
+    const confirm = await this.service.showConfirm(
+      'Recalculate Dividend Splits?',
+      'This will check all dividend transactions against your historical BUY and SELL holdings on each dividend date, and automatically split the dividend proportionally based on who held shares at that time. Do you want to proceed?'
+    );
+    if (!confirm) return;
+
+    const count = this.service.recalculateAllDividendSplits(true);
+    if (count > 0) {
+      this.service.showToast(`Successfully updated ${count} dividend ${count === 1 ? 'split' : 'splits'} based on historical holdings.`, 'success');
+    } else {
+      this.service.showToast('All dividend transactions already match historical share holdings.', 'info');
+    }
+  }
+
   // Drawer Tab & Editing State ('ownership' is default)
   public editingTxMap = signal<Record<string, Transaction>>({});
   public activeDrawerTab = signal<Record<string, 'ownership' | 'edit'>>({});

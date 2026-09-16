@@ -466,7 +466,7 @@ export class ImportComponent {
       // Allocate ownership according to the selected defaultOwner mode
       let bShares = 0;
       let bCostBasis = 0;
-      let manualAllocation = true;
+      let manualAllocation = normalizedType !== 'DIVIDEND';
 
       // For cash top-ups, quantity and shares are 0
       const isCash = normalizedType === 'CASH TOP-UP';
