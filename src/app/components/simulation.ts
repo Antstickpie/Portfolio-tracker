@@ -816,6 +816,44 @@ export class SimulationComponent implements AfterViewInit {
     const usedYLeft: number[] = [];
     const isLight = this.service.theme() === 'light';
 
+    // Draw "Simulated % / Baseline %" legend at top of canvas if dual ring
+    if (baselineData.length > 0) {
+      ctx.save();
+      const simText = 'Simulated %';
+      const sep = ' / ';
+      const baseText = 'Baseline %';
+
+      ctx.font = '600 10.5px Outfit';
+      const simW = ctx.measureText(simText).width;
+      ctx.font = '400 10.5px Outfit';
+      const sepW = ctx.measureText(sep).width;
+      ctx.font = '500 10.5px Outfit';
+      const baseW = ctx.measureText(baseText).width;
+
+      const totalW = simW + sepW + baseW;
+      let startX = cx - totalW / 2;
+      const topY = 6;
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      ctx.font = '600 10.5px Outfit';
+      ctx.fillStyle = isLight ? '#4338ca' : '#a5b4fc';
+      ctx.fillText(simText, startX, topY);
+      startX += simW;
+
+      ctx.font = '400 10.5px Outfit';
+      ctx.fillStyle = isLight ? '#94a3b8' : '#64748b';
+      ctx.fillText(sep, startX, topY);
+      startX += sepW;
+
+      ctx.font = '500 10.5px Outfit';
+      ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
+      ctx.fillText(baseText, startX, topY);
+
+      ctx.restore();
+    }
+
     // 1. Draw Inner Ring: Ghost Baseline (Before Simulation Trades)
     if (baselineData.length > 0) {
       let startAngleBase = -0.5 * Math.PI;
@@ -841,10 +879,10 @@ export class SimulationComponent implements AfterViewInit {
       });
     }
 
-    // 2. Draw Outer Ring: Active Simulated (After Simulation Trades)
+    // 2. Draw Outer Ring: Active Value (After Simulation Trades)
     let startAngle = -0.5 * Math.PI;
     const outerR = radius;
-    const outerInnerR = radius - 11;
+    const outerInnerR = baselineData.length > 0 ? radius - 11 : innerRadius;
     const strokeWidthOuter = outerR - outerInnerR;
 
     data.forEach((item, index) => {
@@ -857,10 +895,7 @@ export class SimulationComponent implements AfterViewInit {
       ctx.arc(cx, cy, (outerR + outerInnerR) / 2, startAngle, endAngle);
       ctx.strokeStyle = this.getColor(centerText === 'Assets' ? index : index + 5);
       ctx.lineWidth = isHovered ? strokeWidthOuter + 4 : strokeWidthOuter;
-      if (isHovered) {
-        ctx.shadowColor = this.getColor(centerText === 'Assets' ? index : index + 5);
-        ctx.shadowBlur = 10;
-      }
+      ctx.lineCap = 'butt';
       ctx.stroke();
       ctx.restore();
 
@@ -883,11 +918,7 @@ export class SimulationComponent implements AfterViewInit {
       if (baselineData.length > 0) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          if (isMobile) {
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% Sim / ${baseItem.pct.toFixed(1)}% Base`;
-          } else {
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% Sim (${baseItem.pct.toFixed(1)}% Base)`;
-          }
+          labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;

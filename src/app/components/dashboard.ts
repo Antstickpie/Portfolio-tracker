@@ -1865,7 +1865,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const cx = displayWidth / 2;
     const cy = displayHeight / 2;
     const hasBaseline = baselineData.length > 0;
-    const sideMargin = isMobile ? (hasBaseline ? 80 : 70) : 108;
+    const sideMargin = isMobile ? 70 : 108;
     const radius = Math.min(cx - sideMargin, cy - 42);
     const innerRadius = radius * 0.48;
 
@@ -1889,6 +1889,44 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const usedYRight: number[] = [];
     const usedYLeft: number[] = [];
     const isLight = this.service.theme() === 'light';
+
+    // Draw "Current % / Invested %" legend at top of canvas if dual ring
+    if (hasBaseline) {
+      ctx.save();
+      const curText = 'Current %';
+      const sep = ' / ';
+      const invText = 'Invested %';
+
+      ctx.font = '600 10.5px Outfit';
+      const curW = ctx.measureText(curText).width;
+      ctx.font = '400 10.5px Outfit';
+      const sepW = ctx.measureText(sep).width;
+      ctx.font = '500 10.5px Outfit';
+      const invW = ctx.measureText(invText).width;
+
+      const totalW = curW + sepW + invW;
+      let startX = cx - totalW / 2;
+      const topY = 6;
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      ctx.font = '600 10.5px Outfit';
+      ctx.fillStyle = isLight ? '#4338ca' : '#a5b4fc';
+      ctx.fillText(curText, startX, topY);
+      startX += curW;
+
+      ctx.font = '400 10.5px Outfit';
+      ctx.fillStyle = isLight ? '#94a3b8' : '#64748b';
+      ctx.fillText(sep, startX, topY);
+      startX += sepW;
+
+      ctx.font = '500 10.5px Outfit';
+      ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
+      ctx.fillText(invText, startX, topY);
+
+      ctx.restore();
+    }
 
     // 1. Draw Inner Ring: Ghost Baseline (Invested Money / Cost Basis)
     if (baselineData.length > 0) {
@@ -1954,7 +1992,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          labelText = `${displayLabel} ${item.pct.toFixed(1)}% Cur / ${baseItem.pct.toFixed(1)}% Inv`;
+          labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;
@@ -1992,7 +2030,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
         const ty = finalY;
         ctx.save();
-        const fontPx = isMobile ? (hasBaseline ? 8 : 8.5) : 9.5;
+        const fontPx = isMobile ? 8.5 : 9.5;
         ctx.font = `500 ${fontPx}px Outfit`;
         const textWidth = ctx.measureText(labelText).width;
 
