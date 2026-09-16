@@ -572,11 +572,11 @@ export class PortfolioService {
         
         list = this.deduplicateTransactionsList(list);
         const sanitized = this.sanitizeTransactions(list);
-        const divMigrated = localStorage.getItem('pt_dividend_splits_migrated');
+        const divMigrated = localStorage.getItem('pt_dividend_splits_auto_recalculated_v1');
         let finalTxs = sanitized;
         if (!divMigrated) {
-          finalTxs = this.applyDividendSplits(sanitized, false);
-          localStorage.setItem('pt_dividend_splits_migrated', 'true');
+          finalTxs = this.applyDividendSplits(sanitized, true);
+          localStorage.setItem('pt_dividend_splits_auto_recalculated_v1', 'true');
         }
         this.transactions.set(finalTxs);
         
