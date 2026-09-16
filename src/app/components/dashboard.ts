@@ -1864,7 +1864,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     const cx = displayWidth / 2;
     const cy = displayHeight / 2;
-    const sideMargin = isMobile ? 70 : 108;
+    const hasBaseline = baselineData.length > 0;
+    const sideMargin = isMobile ? (hasBaseline ? 80 : 70) : 108;
     const radius = Math.min(cx - sideMargin, cy - 42);
     const innerRadius = radius * 0.48;
 
@@ -1916,7 +1917,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
     // 2. Draw Outer Ring: Active Value (Current Market Value)
     let startAngle = -0.5 * Math.PI;
-    const hasBaseline = baselineData.length > 0;
     const outerR = radius;
     const outerInnerR = hasBaseline ? radius - 11 : innerRadius;
     const strokeWidthOuter = outerR - outerInnerR;
@@ -1954,11 +1954,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       if (hasBaseline) {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
-          if (isMobile) {
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
-          } else {
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% Cost)`;
-          }
+          labelText = `${displayLabel} ${item.pct.toFixed(1)}% Cur / ${baseItem.pct.toFixed(1)}% Inv`;
         }
       }
       const middleAngle = startAngle + sliceAngle / 2;
@@ -1996,7 +1992,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
         const ty = finalY;
         ctx.save();
-        const fontPx = isMobile ? 8.5 : 9.5;
+        const fontPx = isMobile ? (hasBaseline ? 8 : 8.5) : 9.5;
         ctx.font = `500 ${fontPx}px Outfit`;
         const textWidth = ctx.measureText(labelText).width;
 

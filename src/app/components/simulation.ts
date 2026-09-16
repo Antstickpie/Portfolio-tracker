@@ -884,9 +884,9 @@ export class SimulationComponent implements AfterViewInit {
         const baseItem = baselineData.find(b => b.label === item.label);
         if (baseItem) {
           if (isMobile) {
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% / ${baseItem.pct.toFixed(1)}%`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% Sim / ${baseItem.pct.toFixed(1)}% Base`;
           } else {
-            labelText = `${displayLabel} ${item.pct.toFixed(1)}% (${baseItem.pct.toFixed(1)}% Base)`;
+            labelText = `${displayLabel} ${item.pct.toFixed(1)}% Sim (${baseItem.pct.toFixed(1)}% Base)`;
           }
         }
       }

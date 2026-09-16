@@ -459,15 +459,28 @@
         </div>
         <!-- Valuation Basis Toggle -->
         <div class="currency-toggle" style="margin: 0;">
-          <button class="currency-btn" [class.active]="allocationBasis() === 'both'" (click)="allocationBasis.set('both')" title="Inner Ring = Invested, Outer Ring = Current Value">
-            Invested vs Current
-          </button>
-          <button class="currency-btn" [class.active]="allocationBasis() === 'cost'" (click)="allocationBasis.set('cost')">
-            Invested
+          <button class="currency-btn" [class.active]="allocationBasis() === 'both'" (click)="allocationBasis.set('both')" title="Outer Ring = Current Value (Cur), Inner Ring = Invested Capital (Inv)">
+            Current vs Invested
           </button>
           <button class="currency-btn" [class.active]="allocationBasis() === 'value'" (click)="allocationBasis.set('value')">
             Current
           </button>
+          <button class="currency-btn" [class.active]="allocationBasis() === 'cost'" (click)="allocationBasis.set('cost')">
+            Invested
+          </button>
+        </div>
+
+        <!-- Dual Ring Legend Badge -->
+        <div *ngIf="allocationBasis() === 'both'" class="chart-dual-ring-legend" style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.72rem; color: var(--text-muted); background: rgba(255, 255, 255, 0.04); padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.06);">
+          <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6366f1;"></span>
+            <span><strong>Cur:</strong> Current (Outer)</span>
+          </span>
+          <span style="opacity: 0.35;">|</span>
+          <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: rgba(99, 102, 241, 0.4); border: 1px dashed rgba(255, 255, 255, 0.5);"></span>
+            <span><strong>Inv:</strong> Invested (Inner)</span>
+          </span>
         </div>
       </div>
     <div class="charts-row" [style.display]="isChartsCollapsed() ? 'none' : 'grid'" style="margin-top: 0.75rem; margin-bottom: 0;">
@@ -498,9 +511,9 @@
             <div class="overlay-detail-row">
               <span class="detail-label">Weight:</span>
               <span class="detail-val-highlight">
-                {{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%
+                {{ hoveredAssetDetail()?.pct | number:'1.1-1' }}%<span *ngIf="allocationBasis() === 'both'"> Cur</span>
                 <span *ngIf="allocationBasis() === 'both' && hoveredAssetDetail()?.investedPct" style="font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 0.2rem;">
-                  ({{ hoveredAssetDetail()?.investedPct | number:'1.1-1' }}% Cost)
+                  / {{ hoveredAssetDetail()?.investedPct | number:'1.1-1' }}% Inv
                 </span>
               </span>
             </div>
@@ -555,7 +568,7 @@
             <div style="font-weight: 600; font-size: 0.82rem; color: var(--text-main); white-space: nowrap; margin-left: 0.5rem;">
               {{ sectorChartData()[hoveredSectorIndex()].totalFormatted }}
               <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 0.2rem;">
-                ({{ sectorChartData()[hoveredSectorIndex()].pct | number:'1.0-1' }}%<span *ngIf="allocationBasis() === 'both' && getHoveredSectorInvestedPct() !== null"> / {{ getHoveredSectorInvestedPct() | number:'1.0-1' }}% Cost</span>)
+                ({{ sectorChartData()[hoveredSectorIndex()].pct | number:'1.0-1' }}%<span *ngIf="allocationBasis() === 'both'"> Cur</span><span *ngIf="allocationBasis() === 'both' && getHoveredSectorInvestedPct() !== null"> / {{ getHoveredSectorInvestedPct() | number:'1.0-1' }}% Inv</span>)
               </span>
             </div>
           </div>
