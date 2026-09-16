@@ -1890,44 +1890,6 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     const usedYLeft: number[] = [];
     const isLight = this.service.theme() === 'light';
 
-    // Draw "Current % / Invested %" legend at top of canvas if dual ring
-    if (hasBaseline) {
-      ctx.save();
-      const curText = 'Current %';
-      const sep = ' / ';
-      const invText = 'Invested %';
-
-      ctx.font = '600 10.5px Outfit';
-      const curW = ctx.measureText(curText).width;
-      ctx.font = '400 10.5px Outfit';
-      const sepW = ctx.measureText(sep).width;
-      ctx.font = '500 10.5px Outfit';
-      const invW = ctx.measureText(invText).width;
-
-      const totalW = curW + sepW + invW;
-      let startX = cx - totalW / 2;
-      const topY = 6;
-
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-
-      ctx.font = '600 10.5px Outfit';
-      ctx.fillStyle = isLight ? '#4338ca' : '#a5b4fc';
-      ctx.fillText(curText, startX, topY);
-      startX += curW;
-
-      ctx.font = '400 10.5px Outfit';
-      ctx.fillStyle = isLight ? '#94a3b8' : '#64748b';
-      ctx.fillText(sep, startX, topY);
-      startX += sepW;
-
-      ctx.font = '500 10.5px Outfit';
-      ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
-      ctx.fillText(invText, startX, topY);
-
-      ctx.restore();
-    }
-
     // 1. Draw Inner Ring: Ghost Baseline (Invested Money / Cost Basis)
     if (baselineData.length > 0) {
       let startAngleBase = -0.5 * Math.PI;

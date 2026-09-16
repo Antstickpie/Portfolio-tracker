@@ -816,44 +816,6 @@ export class SimulationComponent implements AfterViewInit {
     const usedYLeft: number[] = [];
     const isLight = this.service.theme() === 'light';
 
-    // Draw "Simulated % / Baseline %" legend at top of canvas if dual ring
-    if (baselineData.length > 0) {
-      ctx.save();
-      const simText = 'Simulated %';
-      const sep = ' / ';
-      const baseText = 'Baseline %';
-
-      ctx.font = '600 10.5px Outfit';
-      const simW = ctx.measureText(simText).width;
-      ctx.font = '400 10.5px Outfit';
-      const sepW = ctx.measureText(sep).width;
-      ctx.font = '500 10.5px Outfit';
-      const baseW = ctx.measureText(baseText).width;
-
-      const totalW = simW + sepW + baseW;
-      let startX = cx - totalW / 2;
-      const topY = 6;
-
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-
-      ctx.font = '600 10.5px Outfit';
-      ctx.fillStyle = isLight ? '#4338ca' : '#a5b4fc';
-      ctx.fillText(simText, startX, topY);
-      startX += simW;
-
-      ctx.font = '400 10.5px Outfit';
-      ctx.fillStyle = isLight ? '#94a3b8' : '#64748b';
-      ctx.fillText(sep, startX, topY);
-      startX += sepW;
-
-      ctx.font = '500 10.5px Outfit';
-      ctx.fillStyle = isLight ? '#64748b' : '#94a3b8';
-      ctx.fillText(baseText, startX, topY);
-
-      ctx.restore();
-    }
-
     // 1. Draw Inner Ring: Ghost Baseline (Before Simulation Trades)
     if (baselineData.length > 0) {
       let startAngleBase = -0.5 * Math.PI;
