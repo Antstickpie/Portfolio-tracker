@@ -2200,49 +2200,71 @@ export class PortfolioService {
       let consecutiveErrors = 0;
       let circuitBreakerTripped = false;
 
-      // 0. Single bulk batch fetch via Google Apps Script Proxy (1 single request for all tickers)
+      // 0. Bulk batch fetch via Google Apps Script Proxy (chunked for resilience & speed)
       const proxyUrl = this.marketProxyUrl().trim();
       if (proxyUrl && symbolsToFetch.length > 0) {
-        try {
+        const chunkSize = 16;
+        const chunks: string[][] = [];
+        for (let i = 0; i < symbolsToFetch.length; i += chunkSize) {
+          chunks.push(symbolsToFetch.slice(i, i + chunkSize));
+        }
+
+        const fetchChunk = async (chunk: string[]): Promise<any> => {
           const sep = proxyUrl.includes('?') ? '&' : '?';
-          const bulkReqUrl = `${proxyUrl}${sep}tickers=${encodeURIComponent(symbolsToFetch.join(','))}`;
-          const resp = await fetch(bulkReqUrl, { signal: AbortSignal.timeout(10000) });
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data && typeof data === 'object') {
-              symbolsToFetch.forEach(sym => {
-                const item = data[sym] || data[sym.toUpperCase()];
-                const originalTicker = symbolMap.get(sym) || sym;
-                let activePrice = item?.price;
-                if (item?.postMarketPrice && typeof item.postMarketPrice === 'number' && item.postMarketPrice > 0) {
-                  activePrice = item.postMarketPrice;
-                } else if (item?.preMarketPrice && typeof item.preMarketPrice === 'number' && item.preMarketPrice > 0) {
-                  activePrice = item.preMarketPrice;
-                }
-                const peVal = typeof item?.pe === 'number' ? item.pe : (typeof item?.trailingPE === 'number' ? item.trailingPE : (typeof item?.peRatio === 'number' ? item.peRatio : (typeof item?.trailingPe === 'number' ? item.trailingPe : undefined)));
-                if (item && typeof activePrice === 'number' && activePrice > 0) {
-                  const current = meta[originalTicker] || {};
-                  this.updateTickerConfig(
-                    originalTicker,
-                    activePrice,
-                    current.sector || item.sector || 'Other',
-                    item.name || current.name || originalTicker,
-                    item.currency || current.priceCurrency || 'USD',
-                    current.logoData,
-                    current.yahooSymbol,
-                    current.customSector,
-                    undefined,
-                    undefined,
-                    peVal
-                  );
-                  updatedCount++;
-                }
-              });
+          const bulkReqUrl = `${proxyUrl}${sep}tickers=${encodeURIComponent(chunk.join(','))}`;
+          try {
+            const resp = await fetch(bulkReqUrl, { signal: this.createAbortTimeout(30000) });
+            if (resp.ok) {
+              return await resp.json();
+            }
+          } catch (e) {
+            // Retry once on timeout or cold start
+            try {
+              const resp2 = await fetch(bulkReqUrl, { signal: this.createAbortTimeout(25000) });
+              if (resp2.ok) {
+                return await resp2.json();
+              }
+            } catch (retryErr) {
+              console.warn('Google market proxy bulk fetch retry failed for chunk:', chunk, retryErr);
             }
           }
-        } catch (e) {
-          console.warn('Google market proxy bulk fetch failed:', e);
-        }
+          return null;
+        };
+
+        const chunkResults = await Promise.all(chunks.map(chunk => fetchChunk(chunk)));
+        chunkResults.forEach(data => {
+          if (data && typeof data === 'object') {
+            symbolsToFetch.forEach(sym => {
+              const item = data[sym] || data[sym.toUpperCase()];
+              if (!item) return;
+              const originalTicker = symbolMap.get(sym) || sym;
+              let activePrice = item?.price;
+              if (item?.postMarketPrice && typeof item.postMarketPrice === 'number' && item.postMarketPrice > 0) {
+                activePrice = item.postMarketPrice;
+              } else if (item?.preMarketPrice && typeof item.preMarketPrice === 'number' && item.preMarketPrice > 0) {
+                activePrice = item.preMarketPrice;
+              }
+              const peVal = typeof item?.pe === 'number' ? item.pe : (typeof item?.trailingPE === 'number' ? item.trailingPE : (typeof item?.peRatio === 'number' ? item.peRatio : (typeof item?.trailingPe === 'number' ? item.trailingPe : undefined)));
+              if (typeof activePrice === 'number' && activePrice > 0) {
+                const current = meta[originalTicker] || {};
+                this.updateTickerConfig(
+                  originalTicker,
+                  activePrice,
+                  current.sector || item.sector || 'Other',
+                  item.name || current.name || originalTicker,
+                  item.currency || current.priceCurrency || 'USD',
+                  current.logoData,
+                  current.yahooSymbol,
+                  current.customSector,
+                  undefined,
+                  undefined,
+                  peVal
+                );
+                updatedCount++;
+              }
+            });
+          }
+        });
       }
 
       if (updatedCount === 0 && !silent) {
@@ -2374,8 +2396,18 @@ export class PortfolioService {
 
       const sep = proxyUrl.includes('?') ? '&' : '?';
       const reqUrl = `${proxyUrl}${sep}tickers=${encodeURIComponent(fxTickers.join(','))}`;
-      const resp = await fetch(reqUrl, { signal: AbortSignal.timeout(8000) });
-      if (resp.ok) {
+      let resp: Response | null = null;
+      try {
+        resp = await fetch(reqUrl, { signal: this.createAbortTimeout(25000) });
+      } catch (err) {
+        // Retry once on failure / cold start
+        try {
+          resp = await fetch(reqUrl, { signal: this.createAbortTimeout(20000) });
+        } catch (retryErr) {
+          console.warn('Exchange rates fetch retry failed:', retryErr);
+        }
+      }
+      if (resp && resp.ok) {
         const data = await resp.json();
         if (data && typeof data === 'object') {
           pairs.forEach(pair => {
@@ -3475,6 +3507,15 @@ export class PortfolioService {
 
   private proxyRoundRobinIdx = 0;
 
+  private createAbortTimeout(ms: number): AbortSignal {
+    if (typeof AbortSignal !== 'undefined' && typeof (AbortSignal as any).timeout === 'function') {
+      return (AbortSignal as any).timeout(ms);
+    }
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+  }
+
   private async fetchWithProxy(targetUrl: string, cacheNoStore = false): Promise<Response> {
     let urlWithTs = targetUrl;
     if (cacheNoStore) {
@@ -3482,22 +3523,13 @@ export class PortfolioService {
       urlWithTs = `${targetUrl}${sep}_ts=${Date.now()}`;
     }
 
-    const abortTimeout = (ms: number) => {
-      if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
-        return AbortSignal.timeout(ms);
-      }
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(), ms);
-      return controller.signal;
-    };
-
     const customProxy = this.marketProxyUrl().trim();
     if (customProxy) {
       try {
         const sep = customProxy.includes('?') ? '&' : '?';
         const proxyTarget = `${customProxy}${sep}url=${encodeURIComponent(urlWithTs)}`;
         const resp = await fetch(proxyTarget, {
-          signal: abortTimeout(8000),
+          signal: this.createAbortTimeout(20000),
           ...(cacheNoStore ? { cache: 'no-store' } : {})
         });
         if (resp.ok || resp.status === 404) {
