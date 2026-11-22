@@ -127,6 +127,7 @@ export class PortfolioService {
   public isSyncing = signal<boolean>(false);
   public theme = signal<'dark' | 'light'>('dark');
   public nextSyncCountdown = signal<string>('3m 00s');
+  private isFetchingPrices = false;
 
   // Predefined map of sectors for autodiscovery
   public sectorMap: Record<string, string> = {
@@ -1244,6 +1245,7 @@ export class PortfolioService {
     }
 
     this.tickerConfigs.update((p) => {
+      const existing = p[ticker.toUpperCase()];
       const updated = {
         ...p,
         [ticker.toUpperCase()]: {
@@ -1251,12 +1253,13 @@ export class PortfolioService {
           currentPrice: parseFloat(currentPrice as any) || 0,
           priceCurrency: finalCurrency,
           sector: finalSector,
-          name: name || p[ticker.toUpperCase()]?.name || ticker,
+          name: name || existing?.name || ticker,
           logoData: finalLogo,
           yahooSymbol: finalYahooSymbol,
           customSector: finalCustomSector,
-          splitRatio: splitRatio !== undefined ? splitRatio : p[ticker.toUpperCase()]?.splitRatio,
-          splitDate: splitDate !== undefined ? splitDate : p[ticker.toUpperCase()]?.splitDate,
+          splitRatio: splitRatio !== undefined ? splitRatio : existing?.splitRatio,
+          splitDate: splitDate !== undefined ? splitDate : existing?.splitDate,
+          splits: existing?.splits,
           pe: finalPe,
           notFound: false,
           notFoundTime: undefined
@@ -1559,22 +1562,28 @@ export class PortfolioService {
       if (!isStock) continue;
 
       const cfg = meta[ticker];
-      let sharesAllocated = owner === 'A' ? tx.personAShares : tx.personBShares;
+      const rawSharesAllocated = owner === 'A' ? tx.personAShares : tx.personBShares;
+      let sharesAllocated = rawSharesAllocated;
       const costAllocated = owner === 'A' ? tx.personACostBasis : tx.personBCostBasis;
-      let totalShares = tx.quantity || 0;
+      const rawTotalShares = tx.quantity || 0;
+      let totalShares = rawTotalShares;
 
       // Apply stock splits — skip for sources marked as split-adjusted
       const isSplitAdjustedSource = this.splitAdjustedSources().includes(tx.source || '');
-      if (!isSplitAdjustedSource && cfg?.splits?.length && tx.date) {
-        for (const sp of cfg.splits) {
+      if (!isSplitAdjustedSource && cfg && tx.date) {
+        const effectiveSplits: { date: string; ratio: number }[] = [];
+        if (cfg.splits && cfg.splits.length > 0) {
+          effectiveSplits.push(...cfg.splits);
+        }
+        if (cfg.splitRatio && cfg.splitDate && !effectiveSplits.some(s => s.date === cfg.splitDate)) {
+          effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+        }
+        for (const sp of effectiveSplits) {
           if (tx.date.slice(0, 10) < sp.date) {
             sharesAllocated *= sp.ratio;
             totalShares *= sp.ratio;
           }
         }
-      } else if (!isSplitAdjustedSource && cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
-        sharesAllocated *= cfg.splitRatio;
-        totalShares *= cfg.splitRatio;
       }
       
       // FX Rate translates Tx currency to Base (USD): Base = Tx * rateToUsd
@@ -1587,8 +1596,8 @@ export class PortfolioService {
 
       // Cost basis without considering transaction fees
       let pureCostAllocated = costAllocated;
-      if (tx.price && tx.price > 0 && sharesAllocated > 0) {
-        pureCostAllocated = sharesAllocated * tx.price;
+      if (tx.price && tx.price > 0 && rawSharesAllocated > 0) {
+        pureCostAllocated = rawSharesAllocated * tx.price;
       } else if (txFees > 0 && costAllocated > txFees) {
         pureCostAllocated = costAllocated - txFees;
       }
@@ -2152,6 +2161,11 @@ export class PortfolioService {
 
   // Query a free API to update current stock prices
   public async loadMarketPricesApi(force: boolean = false, silent: boolean = false): Promise<number> {
+    if (this.isFetchingPrices) {
+      return 0;
+    }
+    this.isFetchingPrices = true;
+
     if (force) {
       this.failedTickers.clear();
       this.lastFetchTimeMap.clear();
@@ -2283,6 +2297,8 @@ export class PortfolioService {
         this.showToast('Market prices refresh postponed (network/rate limit). Keeping saved prices.', 'info');
       }
       return 0;
+    } finally {
+      this.isFetchingPrices = false;
     }
   }
 

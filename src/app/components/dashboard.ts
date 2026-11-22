@@ -358,18 +358,24 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         sharesAllocated = tx.quantity;
         costAllocated = tx.totalAmount;
       }
+      const rawSharesAllocated = sharesAllocated;
 
       const cfg = this.service.tickerConfigs()[ticker];
       // Apply stock splits — skip for sources marked as split-adjusted
       const isSplitAdjustedSource = this.service.splitAdjustedSources().includes(tx.source || '');
-      if (!isSplitAdjustedSource && cfg?.splits?.length && tx.date) {
-        for (const sp of cfg.splits) {
+      if (!isSplitAdjustedSource && cfg && tx.date) {
+        const effectiveSplits: { date: string; ratio: number }[] = [];
+        if (cfg.splits && cfg.splits.length > 0) {
+          effectiveSplits.push(...cfg.splits);
+        }
+        if (cfg.splitRatio && cfg.splitDate && !effectiveSplits.some(s => s.date === cfg.splitDate)) {
+          effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+        }
+        for (const sp of effectiveSplits) {
           if (tx.date.slice(0, 10) < sp.date) {
             sharesAllocated *= sp.ratio;
           }
         }
-      } else if (!isSplitAdjustedSource && cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
-        sharesAllocated *= cfg.splitRatio;
       }
 
       const rateToUsd = tx.currency.toUpperCase() === 'USD'
@@ -380,8 +386,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const txFees = (tx.fees || 0) * ownerFraction;
 
       let pureCostAllocated = costAllocated;
-      if (tx.price && tx.price > 0 && sharesAllocated > 0) {
-        pureCostAllocated = sharesAllocated * tx.price;
+      if (tx.price && tx.price > 0 && rawSharesAllocated > 0) {
+        pureCostAllocated = rawSharesAllocated * tx.price;
       } else if (txFees > 0 && costAllocated > txFees) {
         pureCostAllocated = costAllocated - txFees;
       }
@@ -2286,8 +2292,20 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         }
 
         const cfg = configs[ticker];
-        if (cfg && cfg.splitRatio && cfg.splitDate && tx.date && tx.date.slice(0, 10) < cfg.splitDate) {
-          actualShares *= cfg.splitRatio;
+        const isSplitAdjustedSource = this.service.splitAdjustedSources().includes(tx.source || '');
+        if (!isSplitAdjustedSource && cfg && tx.date) {
+          const effectiveSplits: { date: string; ratio: number }[] = [];
+          if (cfg.splits && cfg.splits.length > 0) {
+            effectiveSplits.push(...cfg.splits);
+          }
+          if (cfg.splitRatio && cfg.splitDate && !effectiveSplits.some(s => s.date === cfg.splitDate)) {
+            effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+          }
+          for (const sp of effectiveSplits) {
+            if (tx.date.slice(0, 10) < sp.date) {
+              actualShares *= sp.ratio;
+            }
+          }
         }
 
         if (type === 'BUY') {

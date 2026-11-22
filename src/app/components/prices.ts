@@ -333,15 +333,25 @@ export class PricesComponent {
 
   public updateTickerSplitRatio(ticker: string, value: string) {
     const val = parseFloat(value);
+    const upper = ticker.toUpperCase();
     if (!isNaN(val) && val > 0) {
-      const prev = this.service.tickerConfigs()[ticker] || {
-        ticker: ticker.toUpperCase(),
+      const prev = this.service.tickerConfigs()[upper] || {
+        ticker: upper,
         currentPrice: 0,
         sector: 'Other',
-        name: ticker.toUpperCase()
+        name: upper
       };
+      const effectiveSplits = prev.splitDate ? [{ date: prev.splitDate, ratio: val }] : prev.splits;
+      this.service.tickerConfigs.update((p) => ({
+        ...p,
+        [upper]: {
+          ...p[upper],
+          splitRatio: val,
+          splits: effectiveSplits
+        }
+      }));
       this.service.updateTickerConfig(
-        ticker,
+        upper,
         prev.currentPrice,
         prev.sector,
         prev.name,
@@ -353,30 +363,43 @@ export class PricesComponent {
         prev.splitDate
       );
       this.service.saveToStorage();
-      this.service.showToast(`Updated split ratio for ${ticker} to ${val}`, 'success');
+      this.service.showToast(`Updated split ratio for ${upper} to ${val}`, 'success');
     } else if (value === '') {
-      const prev = this.service.tickerConfigs()[ticker];
+      const prev = this.service.tickerConfigs()[upper];
       if (prev) {
         this.service.tickerConfigs.update((p) => {
           const updated = { ...p };
-          delete updated[ticker.toUpperCase()].splitRatio;
+          if (updated[upper]) {
+            delete updated[upper].splitRatio;
+            delete updated[upper].splits;
+          }
           return updated;
         });
         this.service.saveToStorage();
-        this.service.showToast(`Cleared split ratio for ${ticker}`, 'info');
+        this.service.showToast(`Cleared split ratio for ${upper}`, 'info');
       }
     }
   }
 
   public updateTickerSplitDate(ticker: string, value: string) {
-    const prev = this.service.tickerConfigs()[ticker] || {
-      ticker: ticker.toUpperCase(),
+    const upper = ticker.toUpperCase();
+    const prev = this.service.tickerConfigs()[upper] || {
+      ticker: upper,
       currentPrice: 0,
       sector: 'Other',
-      name: ticker.toUpperCase()
+      name: upper
     };
+    const effectiveSplits = (prev.splitRatio && value) ? [{ date: value, ratio: prev.splitRatio }] : (value ? prev.splits : undefined);
+    this.service.tickerConfigs.update((p) => ({
+      ...p,
+      [upper]: {
+        ...p[upper],
+        splitDate: value || undefined,
+        splits: effectiveSplits
+      }
+    }));
     this.service.updateTickerConfig(
-      ticker,
+      upper,
       prev.currentPrice,
       prev.sector,
       prev.name,
@@ -390,12 +413,15 @@ export class PricesComponent {
     if (!value) {
       this.service.tickerConfigs.update((p) => {
         const updated = { ...p };
-        delete updated[ticker.toUpperCase()].splitDate;
+        if (updated[upper]) {
+          delete updated[upper].splitDate;
+          delete updated[upper].splits;
+        }
         return updated;
       });
     }
     this.service.saveToStorage();
-    this.service.showToast(`Updated split date for ${ticker} to ${value || 'none'}`, 'success');
+    this.service.showToast(`Updated split date for ${upper} to ${value || 'none'}`, 'success');
   }
 
   public async deleteTickerConfig(ticker: string) {

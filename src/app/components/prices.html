@@ -600,6 +600,7 @@
                   type="number"
                   step="any"
                   [ngModel]="t.splitRatio || ''"
+                  (change)="updateTickerSplitRatio(t.ticker, $any($event.target).value)"
                   (blur)="updateTickerSplitRatio(t.ticker, $any($event.target).value)"
                   (keydown.enter)="updateTickerSplitRatio(t.ticker, $any($event.target).value); $any($event.target).blur()"
                   placeholder="e.g. 2"
