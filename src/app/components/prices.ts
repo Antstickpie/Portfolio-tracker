@@ -341,7 +341,7 @@ export class PricesComponent {
         sector: 'Other',
         name: upper
       };
-      const effectiveSplits = prev.splitDate ? [{ date: prev.splitDate, ratio: val }] : prev.splits;
+      const effectiveSplits = [{ date: prev.splitDate || '', ratio: val }];
       this.service.tickerConfigs.update((p) => ({
         ...p,
         [upper]: {
@@ -389,7 +389,7 @@ export class PricesComponent {
       sector: 'Other',
       name: upper
     };
-    const effectiveSplits = (prev.splitRatio && value) ? [{ date: value, ratio: prev.splitRatio }] : (value ? prev.splits : undefined);
+    const effectiveSplits = prev.splitRatio ? [{ date: value || '', ratio: prev.splitRatio }] : (value ? prev.splits : undefined);
     this.service.tickerConfigs.update((p) => ({
       ...p,
       [upper]: {
@@ -415,7 +415,11 @@ export class PricesComponent {
         const updated = { ...p };
         if (updated[upper]) {
           delete updated[upper].splitDate;
-          delete updated[upper].splits;
+          if (prev.splitRatio) {
+            updated[upper].splits = [{ date: '', ratio: prev.splitRatio }];
+          } else {
+            delete updated[upper].splits;
+          }
         }
         return updated;
       });

@@ -361,18 +361,28 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const rawSharesAllocated = sharesAllocated;
 
       const cfg = this.service.tickerConfigs()[ticker];
-      // Apply stock splits — skip for sources marked as split-adjusted
-      const isSplitAdjustedSource = this.service.splitAdjustedSources().includes(tx.source || '');
-      if (!isSplitAdjustedSource && cfg && tx.date) {
-        const effectiveSplits: { date: string; ratio: number }[] = [];
+      // Apply stock splits
+      if (cfg && (cfg.splits?.length || (cfg.splitRatio && cfg.splitRatio > 0 && cfg.splitRatio !== 1))) {
+        const effectiveSplits: { date?: string; ratio: number }[] = [];
         if (cfg.splits && cfg.splits.length > 0) {
           effectiveSplits.push(...cfg.splits);
         }
-        if (cfg.splitRatio && cfg.splitDate && !effectiveSplits.some(s => s.date === cfg.splitDate)) {
-          effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+        if (cfg.splitRatio && cfg.splitRatio > 0 && cfg.splitRatio !== 1) {
+          if (!effectiveSplits.some(s => s.ratio === cfg.splitRatio && (!cfg.splitDate || s.date === cfg.splitDate))) {
+            effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+          }
         }
         for (const sp of effectiveSplits) {
-          if (tx.date.slice(0, 10) < sp.date) {
+          if (!sp.ratio || sp.ratio <= 0 || sp.ratio === 1) continue;
+          let applies = false;
+          if (!sp.date) {
+            applies = true;
+          } else {
+            const spYmd = this.service.normalizeDateYMD(sp.date);
+            const txYmd = this.service.normalizeDateYMD(tx.date);
+            applies = !txYmd || !spYmd || txYmd <= spYmd;
+          }
+          if (applies) {
             sharesAllocated *= sp.ratio;
           }
         }
@@ -2292,17 +2302,27 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         }
 
         const cfg = configs[ticker];
-        const isSplitAdjustedSource = this.service.splitAdjustedSources().includes(tx.source || '');
-        if (!isSplitAdjustedSource && cfg && tx.date) {
-          const effectiveSplits: { date: string; ratio: number }[] = [];
+        if (cfg && (cfg.splits?.length || (cfg.splitRatio && cfg.splitRatio > 0 && cfg.splitRatio !== 1))) {
+          const effectiveSplits: { date?: string; ratio: number }[] = [];
           if (cfg.splits && cfg.splits.length > 0) {
             effectiveSplits.push(...cfg.splits);
           }
-          if (cfg.splitRatio && cfg.splitDate && !effectiveSplits.some(s => s.date === cfg.splitDate)) {
-            effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+          if (cfg.splitRatio && cfg.splitRatio > 0 && cfg.splitRatio !== 1) {
+            if (!effectiveSplits.some(s => s.ratio === cfg.splitRatio && (!cfg.splitDate || s.date === cfg.splitDate))) {
+              effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+            }
           }
           for (const sp of effectiveSplits) {
-            if (tx.date.slice(0, 10) < sp.date) {
+            if (!sp.ratio || sp.ratio <= 0 || sp.ratio === 1) continue;
+            let applies = false;
+            if (!sp.date) {
+              applies = true;
+            } else {
+              const spYmd = this.service.normalizeDateYMD(sp.date);
+              const txYmd = this.service.normalizeDateYMD(tx.date);
+              applies = !txYmd || !spYmd || txYmd <= spYmd;
+            }
+            if (applies) {
               actualShares *= sp.ratio;
             }
           }

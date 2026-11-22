@@ -600,8 +600,8 @@ export class PortfolioService {
         let migrated = false;
         const updatedCfg = { ...configs };
         Object.entries(updatedCfg).forEach(([key, cfg]) => {
-          if (cfg.splitRatio && cfg.splitDate && (!cfg.splits || cfg.splits.length === 0)) {
-            updatedCfg[key] = { ...cfg, splits: [{ date: cfg.splitDate, ratio: cfg.splitRatio }] };
+          if (cfg.splitRatio && (!cfg.splits || cfg.splits.length === 0)) {
+            updatedCfg[key] = { ...cfg, splits: [{ date: cfg.splitDate || '', ratio: cfg.splitRatio }] };
             migrated = true;
           }
         });
@@ -1064,29 +1064,32 @@ export class PortfolioService {
     return changedCount;
   }
 
+  public normalizeDateYMD(dStr?: string): string {
+    if (!dStr) return '';
+    const trimmed = dStr.trim();
+    const ymd = trimmed.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+    if (ymd) {
+      return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+    }
+    const dmy = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+    if (dmy) {
+      return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+    }
+    try {
+      const dateObj = new Date(trimmed);
+      if (!isNaN(dateObj.getTime())) {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    } catch (e) {}
+    return trimmed.slice(0, 10).replace(/[./]/g, '-');
+  }
+
   private getTransactionSignatureCandidates(tx: Transaction): string[] {
     // Robust date extractor to avoid timezone shifting
-    let d = '';
-    if (tx.date) {
-      const match = tx.date.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
-      if (match) {
-        d = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
-      } else {
-        try {
-          const dateObj = new Date(tx.date);
-          if (!isNaN(dateObj.getTime())) {
-            const year = dateObj.getFullYear();
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            d = `${year}-${month}-${day}`;
-          } else {
-            d = tx.date.slice(0, 10);
-          }
-        } catch (e) {
-          d = tx.date.slice(0, 10);
-        }
-      }
-    }
+    const d = this.normalizeDateYMD(tx.date);
 
     const ticker = (tx.ticker || '').toUpperCase().trim();
     const type = (tx.type || '').toUpperCase().trim();
@@ -1568,18 +1571,28 @@ export class PortfolioService {
       const rawTotalShares = tx.quantity || 0;
       let totalShares = rawTotalShares;
 
-      // Apply stock splits — skip for sources marked as split-adjusted
-      const isSplitAdjustedSource = this.splitAdjustedSources().includes(tx.source || '');
-      if (!isSplitAdjustedSource && cfg && tx.date) {
-        const effectiveSplits: { date: string; ratio: number }[] = [];
+      // Apply stock splits
+      if (cfg && (cfg.splits?.length || (cfg.splitRatio && cfg.splitRatio > 0 && cfg.splitRatio !== 1))) {
+        const effectiveSplits: { date?: string; ratio: number }[] = [];
         if (cfg.splits && cfg.splits.length > 0) {
           effectiveSplits.push(...cfg.splits);
         }
-        if (cfg.splitRatio && cfg.splitDate && !effectiveSplits.some(s => s.date === cfg.splitDate)) {
-          effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+        if (cfg.splitRatio && cfg.splitRatio > 0 && cfg.splitRatio !== 1) {
+          if (!effectiveSplits.some(s => s.ratio === cfg.splitRatio && (!cfg.splitDate || s.date === cfg.splitDate))) {
+            effectiveSplits.push({ date: cfg.splitDate, ratio: cfg.splitRatio });
+          }
         }
         for (const sp of effectiveSplits) {
-          if (tx.date.slice(0, 10) < sp.date) {
+          if (!sp.ratio || sp.ratio <= 0 || sp.ratio === 1) continue;
+          let applies = false;
+          if (!sp.date) {
+            applies = true;
+          } else {
+            const spYmd = this.normalizeDateYMD(sp.date);
+            const txYmd = this.normalizeDateYMD(tx.date);
+            applies = !txYmd || !spYmd || txYmd <= spYmd;
+          }
+          if (applies) {
             sharesAllocated *= sp.ratio;
             totalShares *= sp.ratio;
           }
